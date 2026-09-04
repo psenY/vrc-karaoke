@@ -93,7 +93,10 @@ module.exports = {
 ## 部署(iStoreOS 路由器, Docker)
 
 ```bash
-# 构建 + 启动
+# 一键部署
+chmod +x deploy.sh && ./deploy.sh
+
+# 或手动
 docker compose up -d --build
 
 # 访问 WebUI
