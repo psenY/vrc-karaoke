@@ -31,6 +31,8 @@ module.exports = {
   id: 'netease',
   name: '网易云音乐',
 
+  search: (kw) => searchSong(kw, 10),
+
   // 匹配网易云链接；关键词等无明确平台时由 findPlatform 回退到本平台
   matches(input) {
     return /music\.163\.com/.test(input || '');

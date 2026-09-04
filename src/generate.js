@@ -1,0 +1,67 @@
+'use strict';
+
+const path = require('path');
+const fs = require('fs');
+const { findPlatform } = require('./platforms');
+const { generateAss } = require('./core/ass');
+const { runFfmpeg, buildArgs } = require('./core/ffmpeg');
+const { uploadCatbox } = require('./core/catbox');
+
+const ROOT = path.join(__dirname, '..');
+
+/**
+ * 核心生成流程（CLI 与 WebUI 共用）：
+ * 识别平台 → 抓歌词/音频 → 生成 ASS → ffmpeg 合成 → (可选)catbox 直链。
+ * @param {string} input 关键词或平台链接
+ * @returns {Promise<{outPath:string, url:string|null, meta:object, highlight:string}>}
+ */
+async function generateVideo(input, options = {}) {
+  const {
+    workDir = path.join(ROOT, 'tmp'),
+    outDir = path.join(ROOT, 'output'),
+    fontDir = path.join(ROOT, 'fonts'),
+    highlight,                  // 未指定时 YouTube 默认 word，其余 line
+    bilingual = false,
+    background = '0x1a1a2e',
+    cookie = '',
+    songId,                     // 网易云 --id
+    upload = false,
+  } = options;
+
+  for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
+
+  // 1. 识别平台 + 抓取
+  const platform = findPlatform(input, { explicitId: !!songId });
+  const result = await platform.fetch(input, { workDir, cookie, songId });
+
+  // 2. 高亮默认值
+  let h = highlight;
+  if (h === undefined) h = result.meta.source === 'youtube' ? 'word' : 'line';
+
+  // 3. 生成 ASS
+  const assPath = path.join(workDir, `${result.meta.id}.ass`);
+  fs.writeFileSync(assPath, generateAss(result.lines, {
+    highlight: h,
+    bilingual,
+    audioDurationMs: result.audioMs,
+  }), 'utf8');
+
+  // 4. 合成
+  const outPath = path.join(outDir, `${result.meta.id}_${h}.mp4`);
+  const ffargs = buildArgs({
+    audioPath: result.audioPath,
+    assPath,
+    fontDir,
+    outPath,
+    background,
+  });
+  await runFfmpeg(ffargs);
+
+  // 5. 可选上传 catbox
+  let url = null;
+  if (upload) url = await uploadCatbox(outPath);
+
+  return { outPath, url, meta: result.meta, highlight: h };
+}
+
+module.exports = { generateVideo };

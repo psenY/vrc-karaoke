@@ -9,6 +9,7 @@
     "generate": "node src/index.js"
   },
   "dependencies": {
+    "express": "^5.2.1",
     "NeteaseCloudMusicApi": "^4.24.1"
   }
 }
