@@ -1,0 +1,14 @@
+services:
+  vrc-karaoke:
+    build: .
+    container_name: vrc-karaoke
+    ports:
+      - "3000:3000"
+    environment:
+      # 走本机 mihomo 代理(YouTube/catbox 需翻墙)
+      - YTDLP_PROXY=http://192.168.100.1:7890
+      - CATBOX_PROXY=http://192.168.100.1:7890
+    volumes:
+      - ./output:/app/output
+      - ./tmp:/app/tmp
+    restart: unless-stopped

@@ -82,11 +82,27 @@ module.exports = {
 - Noto Sans CJK 字体(放 `fonts/` 目录,SC/TC/JP/KR 全覆盖)
 - yt-dlp(仅 YouTube 平台,需 node 作 JS runtime)
 
-## 部署(iStoreOS 路由器)
+## 部署(iStoreOS 路由器, Docker)
 
+```bash
+# 构建 + 启动
+docker compose up -d --build
+
+# 访问 WebUI
+# http://192.168.100.1:3000
+```
+
+镜像内含:Node 22 + ffmpeg(libass) + Noto Sans CJK 字体 + yt-dlp + curl。
+
+关键点:
+- **代理**:YouTube/catbox 需翻墙,compose 里已配 `YTDLP_PROXY`/`CATBOX_PROXY` 指向本机 mihomo(`192.168.100.1:7890`)
+- **字体**:构建时从系统复制 Noto Sans CJK 到 `fonts/`
+- **输出**:`output/` 挂载到宿主机,成品 mp4 和直链都在这里
+
+本地运行(非 Docker):
 1. **字体**:复制 Noto Sans CJK(`NotoSansCJK-Regular.ttc` / `-Bold.ttc`)到 `fonts/`
-2. **代理**:YouTube 需翻墙,设 `YTDLP_PROXY` 环境变量(默认 `http://192.168.100.1:7890`,即本机 mihomo)
-3. **Docker**:对齐 vrchat-assistant 的部署方式,端口映射 + restart=unless-stopped
+2. **依赖**:装 ffmpeg(含 libass) + yt-dlp
+3. `node src/server.js`
 
 ## 输出
 
