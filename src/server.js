@@ -39,7 +39,7 @@ app.post('/api/search', async (req, res) => {
 
 // 生成（异步任务）
 app.post('/api/generate', (req, res) => {
-  const { input, highlight, bilingual, background, upload, cookie } = req.body || {};
+  const { input, highlight, bilingual, background, upload, cookie, cover } = req.body || {};
   if (!input) return res.json({ ok: false, error: '缺少输入' });
   const taskId = 't' + (++taskSeq);
   tasks.set(taskId, { status: 'running', result: null, error: null });
@@ -50,6 +50,7 @@ app.post('/api/generate', (req, res) => {
     bilingual: !!bilingual,
     background: background || '0x1a1a2e',
     upload: !!upload,
+    cover: !!cover,
     cookie: cookie || '',
   })
     .then(result => tasks.set(taskId, { status: 'done', result }))

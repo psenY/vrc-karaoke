@@ -6,12 +6,13 @@ const { findPlatform } = require('./platforms');
 const { generateAss } = require('./core/ass');
 const { runFfmpeg, buildArgs } = require('./core/ffmpeg');
 const { uploadCatbox } = require('./core/catbox');
+const { download } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
 
 /**
  * 核心生成流程（CLI 与 WebUI 共用）：
- * 识别平台 → 抓歌词/音频 → 生成 ASS → ffmpeg 合成 → (可选)catbox 直链。
+ * 识别平台 → 抓歌词/音频 → (可选)封面 → 生成 ASS → ffmpeg 合成 → (可选)catbox 直链。
  * @param {string} input 关键词或平台链接
  * @returns {Promise<{outPath:string, url:string|null, meta:object, highlight:string}>}
  */
@@ -26,6 +27,7 @@ async function generateVideo(input, options = {}) {
     cookie = '',
     songId,                     // 网易云 --id
     upload = false,
+    cover = false,              // 封面背景
   } = options;
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
@@ -37,6 +39,18 @@ async function generateVideo(input, options = {}) {
   // 2. 高亮默认值
   let h = highlight;
   if (h === undefined) h = result.meta.source === 'youtube' ? 'word' : 'line';
+
+  // 2.5 下载封面（可选，失败退回纯色）
+  let coverPath = null;
+  if (cover && result.meta.coverUrl) {
+    try {
+      coverPath = path.join(workDir, `${result.meta.id}_cover.jpg`);
+      await download(result.meta.coverUrl, coverPath);
+    } catch (e) {
+      console.log('[提示] 封面下载失败，退回纯色背景:', e.message.split('\n')[0]);
+      coverPath = null;
+    }
+  }
 
   // 3. 生成 ASS
   const assPath = path.join(workDir, `${result.meta.id}.ass`);
@@ -54,6 +68,7 @@ async function generateVideo(input, options = {}) {
     fontDir,
     outPath,
     background,
+    coverPath,
   });
   await runFfmpeg(ffargs);
 

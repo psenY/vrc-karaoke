@@ -51,6 +51,7 @@
   </label>
   <label><input type="checkbox" id="bilingual"> 双语</label>
   <label><input type="checkbox" id="upload" checked> 上传catbox直链</label>
+  <label><input type="checkbox" id="cover"> 封面背景</label>
   <label>背景 <input id="background" value="0x1a1a2e" style="width:90px"></label>
 </div>
 
@@ -99,6 +100,7 @@ async function doGenerate() {
       highlight: document.getElementById('highlight').value || undefined,
       bilingual: document.getElementById('bilingual').checked,
       upload: document.getElementById('upload').checked,
+      cover: document.getElementById('cover').checked,
       background: document.getElementById('background').value,
     })
   }).then(r => r.json());

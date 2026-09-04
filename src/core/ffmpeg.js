@@ -22,7 +22,10 @@ function probeDuration(filePath) {
   });
 }
 
-/** 构建 ffmpeg 合成参数：纯色背景 + 音频 + 烧 ASS 字幕 */
+/**
+ * 构建 ffmpeg 合成参数。
+ * coverPath 存在时用封面图（模糊铺满）作背景，否则纯色背景。
+ */
 function buildArgs(opts) {
   const {
     audioPath,
@@ -36,15 +39,33 @@ function buildArgs(opts) {
     crf = 20,
     preset = 'medium',
     audioBitrate = '192k',
+    coverPath = null,
   } = opts;
 
-  const vf = `ass=${assPath}` + (fontDir ? `:fontsdir=${fontDir}` : '');
+  const assFilter = `ass=${assPath}` + (fontDir ? `:fontsdir=${fontDir}` : '');
 
+  // 封面背景：缩放铺满 + 模糊，歌词叠加
+  if (coverPath) {
+    const filterComplex = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=15:3[bg];[bg]${assFilter}[v]`;
+    return [
+      '-y',
+      '-loop', '1', '-i', coverPath,
+      '-i', audioPath,
+      '-filter_complex', filterComplex,
+      '-map', '[v]', '-map', '1:a',
+      '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', audioBitrate,
+      '-shortest', '-movflags', '+faststart',
+      outPath,
+    ];
+  }
+
+  // 纯色背景
   return [
     '-y',
     '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
     '-i', audioPath,
-    '-vf', vf,
+    '-vf', assFilter,
     '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', audioBitrate,
     '-shortest',

@@ -49,6 +49,7 @@ async function getSongDetail(songId) {
     name: s.name,
     artists: (s.ar || []).map(a => a.name).join(' / '),
     dt: s.dt || 0,
+    picUrl: s.al?.picUrl || '',
   };
 }
 

@@ -43,6 +43,7 @@ async function main() {
     cookie: args.cookie || '',
     songId: hasId ? args.id : undefined,
     upload: !!args.upload,
+    cover: !!args.cover,
   });
 
   console.log(`[完成] ${result.outPath}`);
