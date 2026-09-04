@@ -17,6 +17,24 @@ app.use('/output', express.static(path.join(ROOT, 'output')));
 
 const tasks = new Map();
 let taskSeq = 0;
+const queue = [];
+let running = false;
+
+function runNext() {
+  if (running || queue.length === 0) return;
+  running = true;
+  const { id, input, options } = queue.shift();
+  const t = tasks.get(id);
+  t.status = 'running';
+  generateVideo(input, options)
+    .then(result => {
+      t.status = 'done';
+      t.result = result;
+      appendHistory({ input, title: result.meta.title, source: result.meta.source, outPath: result.outPath, url: result.url, time: Date.now() });
+    })
+    .catch(err => { t.status = 'failed'; t.error = err.message; })
+    .finally(() => { running = false; runNext(); });
+}
 
 // ---- 历史记录 ----
 function readHistory() {
@@ -84,32 +102,23 @@ app.post('/api/generate', (req, res) => {
   const { input, highlight, bilingual, background, upload, cookie, cover } = req.body || {};
   if (!input) return res.json({ ok: false, error: '缺少输入' });
   const taskId = 't' + (++taskSeq);
-  tasks.set(taskId, { status: 'running', result: null, error: null });
-  res.json({ ok: true, taskId });
-
   const cfg = readConfig();
   const finalCookie = cookie || cfg.cookie || '';
-
-  generateVideo(input, {
-    highlight: highlight || undefined,
-    bilingual: !!bilingual,
-    background: background || '0x1a1a2e',
-    upload: !!upload,
-    cover: !!cover,
-    cookie: finalCookie,
-  })
-    .then(result => {
-      tasks.set(taskId, { status: 'done', result });
-      appendHistory({
-        input,
-        title: result.meta.title,
-        source: result.meta.source,
-        outPath: result.outPath,
-        url: result.url,
-        time: Date.now(),
-      });
-    })
-    .catch(err => tasks.set(taskId, { status: 'failed', error: err.message }));
+  tasks.set(taskId, { status: 'pending', result: null, error: null });
+  queue.push({
+    id: taskId,
+    input,
+    options: {
+      highlight: highlight || undefined,
+      bilingual: !!bilingual,
+      background: background || '0x1a1a2e',
+      upload: !!upload,
+      cover: !!cover,
+      cookie: finalCookie,
+    },
+  });
+  res.json({ ok: true, taskId });
+  runNext();
 });
 
 // 历史记录
