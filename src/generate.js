@@ -28,6 +28,7 @@ async function generateVideo(input, options = {}) {
     songId,                     // 网易云 --id
     upload = false,
     cover = false,              // 封面背景
+    out = null,                 // 输出文件名
   } = options;
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
@@ -61,7 +62,7 @@ async function generateVideo(input, options = {}) {
   }), 'utf8');
 
   // 4. 合成
-  const outPath = path.join(outDir, `${result.meta.id}_${h}.mp4`);
+  const outPath = path.join(outDir, out || `${result.meta.id}_${h}.mp4`);
   const ffargs = buildArgs({
     audioPath: result.audioPath,
     assPath,

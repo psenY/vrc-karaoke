@@ -44,6 +44,7 @@ async function main() {
     songId: hasId ? args.id : undefined,
     upload: !!args.upload,
     cover: !!args.cover,
+    out: args.out,
   });
 
   console.log(`[完成] ${result.outPath}`);
