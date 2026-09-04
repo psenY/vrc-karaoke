@@ -5,6 +5,7 @@ const fs = require('fs');
 const { generateAss } = require('./core/ass');
 const { runFfmpeg, buildArgs } = require('./core/ffmpeg');
 const { findPlatform } = require('./platforms');
+const { uploadCatbox } = require('./core/catbox');
 
 const ROOT = path.join(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'output');
@@ -108,7 +109,13 @@ async function main() {
   console.log(`[命中] ${title} (${result.lines.length} 句)`);
   if (result.audioMs) console.log(`[时长] ${(result.audioMs / 1000).toFixed(1)}s`);
 
-  await synth(result, result.meta.id, args);
+  const outPath = await synth(result, result.meta.id, args);
+
+  if (args.upload) {
+    console.log('[上传] catbox.moe ...');
+    const url = await uploadCatbox(outPath);
+    console.log(`[直链] ${url}`);
+  }
 }
 
 main().catch(err => {
