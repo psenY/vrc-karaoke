@@ -53,6 +53,20 @@ async function getSongDetail(songId) {
   };
 }
 
+/** 获取歌单（含歌曲列表） */
+async function getPlaylist(playlistId) {
+  const res = await api.playlist_detail({ id: String(playlistId) });
+  const p = res.body?.playlist || {};
+  return {
+    name: p.name || '',
+    songs: (p.tracks || []).map(t => ({
+      id: t.id,
+      name: t.name,
+      artists: (t.ar || []).map(a => a.name).join(' / '),
+    })),
+  };
+}
+
 /** 下载文件到本地，自动跟随重定向 */
 function download(url, destPath) {
   return new Promise((resolve, reject) => {
@@ -75,4 +89,4 @@ function download(url, destPath) {
   });
 }
 
-module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, download };
+module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, download };

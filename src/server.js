@@ -5,6 +5,7 @@ const fs = require('fs');
 const express = require('express');
 const { platforms } = require('./platforms');
 const { generateVideo } = require('./generate');
+const { getPlaylist } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
 const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
@@ -81,6 +82,19 @@ app.post('/api/search', async (req, res) => {
         url: urlFor(platform.id, s),
       })),
     });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// 解析歌单（网易云 playlist 链接）
+app.post('/api/playlist', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    const m = String(url || '').match(/playlist[?/]id[=/](\d+)/) || String(url || '').match(/[?&]id=(\d+)/);
+    if (!m) return res.json({ ok: false, error: '无法识别歌单链接（需网易云 playlist 链接）' });
+    const playlist = await getPlaylist(m[1]);
+    res.json({ ok: true, name: playlist.name, songs: playlist.songs });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
