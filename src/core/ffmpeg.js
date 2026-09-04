@@ -80,7 +80,14 @@ function runFfmpeg(args, onProgress) {
     let stderr = '';
     proc.stderr.on('data', d => {
       stderr += d;
-      if (typeof onProgress === 'function') onProgress(String(d));
+      if (typeof onProgress === 'function') {
+        // 解析 time=HH:MM:SS.xx 进度 → 已处理秒数
+        const m = String(d).match(/time=(\d+):(\d+):(\d+(?:\.\d+)?)/);
+        if (m) {
+          const sec = parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseFloat(m[3]);
+          onProgress(sec);
+        }
+      }
     });
     proc.on('error', reject);
     proc.on('close', code => {

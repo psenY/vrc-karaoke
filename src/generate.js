@@ -29,6 +29,7 @@ async function generateVideo(input, options = {}) {
     upload = false,
     cover = false,              // 封面背景
     out = null,                 // 输出文件名
+    onProgress = null,          // 合成进度回调 (0~1)
   } = options;
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
@@ -71,7 +72,11 @@ async function generateVideo(input, options = {}) {
     background,
     coverPath,
   });
-  await runFfmpeg(ffargs);
+  await runFfmpeg(ffargs, (sec) => {
+    if (typeof onProgress === 'function' && result.audioMs > 0) {
+      onProgress(Math.min(1, sec / (result.audioMs / 1000)));
+    }
+  });
 
   // 5. 可选上传 catbox
   let url = null;

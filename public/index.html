@@ -133,6 +133,8 @@ async function poll(taskId) {
     document.getElementById('progress').textContent = '';
     document.getElementById('result').innerHTML = '<p class="error">❌ 失败: ' + r.error + '</p>';
   } else {
+    const pct = (r.progress !== undefined && r.progress !== null) ? Math.round(r.progress * 100) + '%' : '';
+    document.getElementById('progress').textContent = (r.status === 'pending' ? '排队中... ' : '生成中... ') + pct;
     setTimeout(() => poll(taskId), 2000);
   }
 }

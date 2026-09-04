@@ -26,6 +26,8 @@ function runNext() {
   const { id, input, options } = queue.shift();
   const t = tasks.get(id);
   t.status = 'running';
+  t.progress = 0;
+  options.onProgress = (progress) => { t.progress = progress; };
   generateVideo(input, options)
     .then(result => {
       t.status = 'done';
@@ -130,7 +132,7 @@ app.get('/api/history', (req, res) => {
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
   if (!t) return res.json({ ok: false, error: '任务不存在' });
-  res.json({ ok: true, status: t.status, result: t.result, error: t.error });
+  res.json({ ok: true, status: t.status, result: t.result, error: t.error, progress: t.progress });
 });
 
 const PORT = process.env.PORT || 3000;
