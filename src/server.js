@@ -1,19 +1,44 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const { platforms } = require('./platforms');
 const { generateVideo } = require('./generate');
 
+const ROOT = path.join(__dirname, '..');
+const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
+const CONFIG_FILE = path.join(ROOT, 'config.json');
+
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use('/output', express.static(path.join(__dirname, '..', 'output')));
+app.use(express.static(path.join(ROOT, 'public')));
+app.use('/output', express.static(path.join(ROOT, 'output')));
 
 const tasks = new Map();
 let taskSeq = 0;
 
-// 搜索（网易云 / QQ音乐）
+// ---- 历史记录 ----
+function readHistory() {
+  try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); }
+  catch (e) { return []; }
+}
+function appendHistory(entry) {
+  const h = readHistory();
+  h.unshift(entry);
+  try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(h.slice(0, 100), null, 2)); } catch (e) {}
+}
+
+// ---- 配置(cookie) ----
+function readConfig() {
+  try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); }
+  catch (e) { return {}; }
+}
+function writeConfig(cfg) {
+  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {}
+}
+
+// 搜索（网易云 / QQ音乐 / 酷我）
 app.post('/api/search', async (req, res) => {
   try {
     const { query, platform: platformId } = req.body || {};
@@ -21,20 +46,37 @@ app.post('/api/search', async (req, res) => {
     const platform = platforms.find(p => p.id === platformId) || platforms[0];
     if (!platform.search) return res.json({ ok: false, error: `${platform.name} 不支持关键词搜索` });
     const songs = await platform.search(query);
+    const urlFor = (p, s) => {
+      if (p === 'netease') return `https://music.163.com/song?id=${s.id}`;
+      if (p === 'qqmusic') return `https://y.qq.com/n/ryqq/songDetail/${s.id}`;
+      if (p === 'kuwo') return `http://www.kuwo.cn/play_detail/${s.id}`;
+      return s.id;
+    };
     res.json({
       ok: true,
       songs: songs.slice(0, 20).map(s => ({
         id: s.id,
         name: s.name,
         artists: s.artists,
-        url: platform.id === 'netease'
-          ? `https://music.163.com/song?id=${s.id}`
-          : `https://y.qq.com/n/ryqq/songDetail/${s.id}`,
+        url: urlFor(platform.id, s),
       })),
     });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
+});
+
+// 配置：读 cookie 状态
+app.get('/api/config', (req, res) => {
+  const cfg = readConfig();
+  res.json({ ok: true, hasCookie: !!cfg.cookie });
+});
+
+// 配置：保存 cookie
+app.post('/api/config', (req, res) => {
+  const { cookie } = req.body || {};
+  writeConfig({ cookie: cookie || '' });
+  res.json({ ok: true, hasCookie: !!cookie });
 });
 
 // 生成（异步任务）
@@ -45,16 +87,34 @@ app.post('/api/generate', (req, res) => {
   tasks.set(taskId, { status: 'running', result: null, error: null });
   res.json({ ok: true, taskId });
 
+  const cfg = readConfig();
+  const finalCookie = cookie || cfg.cookie || '';
+
   generateVideo(input, {
     highlight: highlight || undefined,
     bilingual: !!bilingual,
     background: background || '0x1a1a2e',
     upload: !!upload,
     cover: !!cover,
-    cookie: cookie || '',
+    cookie: finalCookie,
   })
-    .then(result => tasks.set(taskId, { status: 'done', result }))
+    .then(result => {
+      tasks.set(taskId, { status: 'done', result });
+      appendHistory({
+        input,
+        title: result.meta.title,
+        source: result.meta.source,
+        outPath: result.outPath,
+        url: result.url,
+        time: Date.now(),
+      });
+    })
     .catch(err => tasks.set(taskId, { status: 'failed', error: err.message }));
+});
+
+// 历史记录
+app.get('/api/history', (req, res) => {
+  res.json({ ok: true, history: readHistory() });
 });
 
 // 查询任务状态

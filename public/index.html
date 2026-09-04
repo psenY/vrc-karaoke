@@ -62,6 +62,18 @@
 
 <div id="result"></div>
 
+<div class="row" style="margin-top:24px">
+  <label>网易云 cookie(拿高音质/会员歌):
+    <input type="text" id="cookieInput" placeholder="粘贴 cookie" style="width:260px">
+  </label>
+  <button onclick="saveCookie()">保存</button>
+  <span id="cookieStatus" class="sub"></span>
+</div>
+
+<hr style="border-color:#333; margin:24px 0">
+<h2>历史记录</h2>
+<div id="history"></div>
+
 <script>
 let selected = null; // { name, artists, url }
 
@@ -124,6 +136,28 @@ async function poll(taskId) {
     setTimeout(() => poll(taskId), 2000);
   }
 }
+async function loadHistory() {
+  const r = await fetch('/api/history').then(r => r.json());
+  if (!r.ok || !r.history.length) { document.getElementById('history').innerHTML = '<p class="sub">暂无记录</p>'; return; }
+  document.getElementById('history').innerHTML = r.history.map(h => {
+    const fn = h.outPath.split('/').pop();
+    const t = new Date(h.time).toLocaleString('zh-CN');
+    return `<div class="song"><div class="name">${h.title || h.input}</div><div class="artists">${t}` +
+      (h.url ? ` · <a href="${h.url}" target="_blank">直链</a>` : '') +
+      ` · <a href="/output/${fn}" download>下载</a></div></div>`;
+  }).join('');
+}
+async function loadConfig() {
+  const r = await fetch('/api/config').then(r => r.json());
+  if (r.ok && r.hasCookie) document.getElementById('cookieStatus').textContent = '已配置';
+}
+async function saveCookie() {
+  const cookie = document.getElementById('cookieInput').value.trim();
+  const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cookie }) }).then(r => r.json());
+  document.getElementById('cookieStatus').textContent = r.ok ? (r.hasCookie ? '已保存' : '已清空') : '失败';
+}
+loadHistory();
+loadConfig();
 </script>
 </body>
 </html>
