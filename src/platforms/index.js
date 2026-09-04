@@ -3,8 +3,9 @@
 const netease = require('./netease');
 const youtube = require('./youtube');
 const qqmusic = require('./qqmusic');
+const kuwo = require('./kuwo');
 
-const platforms = [netease, youtube, qqmusic];
+const platforms = [netease, youtube, qqmusic, kuwo];
 
 /**
  * 根据输入找到匹配的平台。

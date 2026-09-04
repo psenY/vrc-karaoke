@@ -25,7 +25,8 @@ src/
 │   ├── index.js       #   注册表 + 平台自动识别
 │   ├── netease.js     #   网易云
 │   ├── youtube.js     #   YouTube
-│   └── qqmusic.js     #   QQ音乐
+│   ├── qqmusic.js     #   QQ音乐
+│   └── kuwo.js        #   酷我音乐
 └── index.js           # CLI 入口(只调平台接口)
 ```
 
@@ -43,6 +44,9 @@ node src/index.js --url "https://www.youtube.com/watch?v=..."
 
 # QQ音乐(链接)
 node src/index.js --url "https://y.qq.com/n/ryqq/songDetail/<songmid>"
+
+# 酷我音乐(链接)
+node src/index.js --url "http://www.kuwo.cn/play_detail/<musicid>"
 
 # 双语歌词(外文歌显示中文翻译)
 node src/index.js --id 496869422 --bilingual
