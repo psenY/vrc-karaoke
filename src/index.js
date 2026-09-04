@@ -54,6 +54,7 @@ async function synth(result, outBase, args) {
     highlight,
     fontName: args.font || DEFAULTS.fontName,
     audioDurationMs: result.audioMs,
+    bilingual: !!args.bilingual,
   }), 'utf8');
   console.log(`[字幕] 已生成 ASS (高亮=${highlight})`);
 

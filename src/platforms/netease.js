@@ -54,12 +54,22 @@ module.exports = {
       }
     }
 
-    // 2. 歌词
-    const { lrc } = await getLyric(id);
+    // 2. 歌词（原文 + 翻译）
+    const { lrc, tlyric } = await getLyric(id);
     if (!lrc) throw new Error('未获取到歌词');
     const parsed = parseLrc(lrc).lines;
     if (!parsed.length) throw new Error('歌词解析为空');
-    const lines = parsed.map(l => ({ startMs: l.time, text: l.text }));
+    const transMap = {};
+    if (tlyric) {
+      for (const t of parseLrc(tlyric).lines) {
+        transMap[t.time] = t.text;
+      }
+    }
+    const lines = parsed.map(l => ({
+      startMs: l.time,
+      text: l.text,
+      translation: transMap[l.time] || '',
+    }));
 
     // 3. 音频（下载 + 时长验证）
     const detail = await getSongDetail(id);

@@ -9,11 +9,14 @@
  *   切换时：当前句原地变灰消失，下一句在对侧槽位原地变亮——歌词不做上下移动。
  *
  * 支持两种歌词数据：
- *   网易云：{time, text}（逐句，无逐字时间戳 → 逐字用估算）
- *   YouTube：{startMs, endMs, words:[{text, startMs}]}（含精确词级时间戳 → 真逐字）
+ *   网易云：{time, text, translation?}（逐句，无逐字 → 逐字用估算）
+ *   YouTube：{startMs, endMs, words:[{text, startMs}]}（含词级时间戳 → 真逐字）
+ *
+ * 双语：bilingual 开启时，每句在原文下方附加翻译（Trans 样式小字灰）。
  */
 
 function buildHeader(playResX, playResY, fontName, fontSize) {
+  const transSize = Math.round(fontSize * 0.6);
   return `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${playResX}
@@ -25,6 +28,7 @@ ScaledBorderAndShadow: yes
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Current,${fontName},${fontSize},&H00FFFFFF,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,2,100,100,200,1
 Style: Next,${fontName},${fontSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
+Style: Trans,${fontName},${transSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -113,6 +117,7 @@ function generateAss(lines, options = {}) {
     fontSize = 150,
     topMarginV = 420,
     bottomMarginV = 200,
+    bilingual = false,        // 双语（原文 + 翻译）
   } = options;
 
   const events = [];
@@ -139,21 +144,32 @@ function generateAss(lines, options = {}) {
       highlightText = buildEstimatedHighlight(curText, startMs, endMs, highlight);
     }
 
+    // 双语：当前句附加翻译
+    let curFull = highlightText;
+    if (bilingual && cur.translation) {
+      curFull += `\\N{\\rTrans}${escapeAssText(cur.translation)}`;
+    }
+
     // 交替槽位：句 i 在槽位 i%2
     const curSlot = i % 2;
     const curMarginV = curSlot === 0 ? topMarginV : bottomMarginV;
     events.push(
-      `Dialogue: 0,${formatAssTime(startMs)},${formatAssTime(endMs)},Current,,0,0,${curMarginV},,${highlightText}`
+      `Dialogue: 0,${formatAssTime(startMs)},${formatAssTime(endMs)},Current,,0,0,${curMarginV},,${curFull}`
     );
 
     // 下一句（灰，对侧槽位）
     if (showNext && i + 1 < lines.length) {
-      const nextText = getLineText(lines[i + 1]);
+      const next = lines[i + 1];
+      const nextText = getLineText(next);
       if (nextText) {
+        let nextFull = escapeAssText(nextText);
+        if (bilingual && next.translation) {
+          nextFull += `\\N{\\rTrans}${escapeAssText(next.translation)}`;
+        }
         const nextSlot = (i + 1) % 2;
         const nextMarginV = nextSlot === 0 ? topMarginV : bottomMarginV;
         events.push(
-          `Dialogue: 0,${formatAssTime(startMs)},${formatAssTime(endMs)},Next,,0,0,${nextMarginV},,${escapeAssText(nextText)}`
+          `Dialogue: 0,${formatAssTime(startMs)},${formatAssTime(endMs)},Next,,0,0,${nextMarginV},,${nextFull}`
         );
       }
     }
