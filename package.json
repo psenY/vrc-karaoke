@@ -1,0 +1,14 @@
+{
+  "name": "vrc-karaoke",
+  "version": "0.1.0",
+  "description": "VRChat 卡拉OK歌词视频生成器 - 自动生成带「下一句预览」的唱歌视频",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "generate": "node src/index.js"
+  },
+  "dependencies": {
+    "NeteaseCloudMusicApi": "^4.24.1"
+  }
+}
