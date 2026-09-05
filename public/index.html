@@ -509,11 +509,20 @@ createApp({
     async batchGenerate() {
       const selected = this.playlist.filter(s => s.selected);
       if (!selected.length) return this.$message.warning('请先勾选要生成的歌曲');
-      const total = selected.length;
+      // 已生成的歌曲 ID（跳过重复生成）
+      const doneIds = new Set(this.history.map(h => {
+        const m = (h.input || '').match(/id=(\d+)/);
+        return m ? m[1] : '';
+      }).filter(Boolean));
+      const todo = selected.filter(s => !doneIds.has(String(s.id)));
+      const skipped = selected.length - todo.length;
+      if (!todo.length) return this.$message.info('所选歌曲都已生成过，无需重复生成');
+      const total = todo.length;
       let done = 0;
       this.batchTaskIds = [];
       this.batchProgress = `(0/${total} 已入队)`;
-      for (const s of selected) {
+      if (skipped) this.$message.info(`已跳过 ${skipped} 首已生成过的歌`);
+      for (const s of todo) {
         const r = await this.post('/api/generate', this.buildGenerateBody(`https://music.163.com/song?id=${s.id}`));
         if (r.ok && r.taskId) this.batchTaskIds.push(r.taskId);
         done++;
