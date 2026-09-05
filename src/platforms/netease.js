@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const { searchSong, getLyric, getSongUrl, getSongDetail, download } = require('../core/netease-api');
+const { searchSong, getLyric, getSongUrl, getSongDetail, getOuterUrl, download } = require('../core/netease-api');
 const { parseLrc } = require('../core/lyrics');
 const { probeDuration } = require('../core/ffmpeg');
 
@@ -73,9 +73,17 @@ module.exports = {
       translation: transMap[l.time] || '',
     }));
 
-    // 3. 音频（下载 + 时长验证）
+    // 3. 音频（outer/url 优先拿免费歌，失败走 song_url 试听拦截）
     const detail = await getSongDetail(id);
-    const audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id)), detail.dt || 0);
+    const outerUrl = await getOuterUrl(id);
+    let audio;
+    if (outerUrl) {
+      const audioPath = path.join(workDir, String(id) + '.mp3');
+      await download(outerUrl, audioPath);
+      audio = { durationMs: await probeDuration(audioPath), path: audioPath };
+    } else {
+      audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id)), detail.dt || 0);
+    }
 
     if (!title && detail.name) {
       title = `${detail.name} - ${detail.artists}`;

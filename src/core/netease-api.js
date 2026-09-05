@@ -67,6 +67,23 @@ async function getPlaylist(playlistId) {
   };
 }
 
+/** 网易云官方外链接口：免费歌返回真实 mp3 直链，VIP/版权歌返回 404 */
+function getOuterUrl(songId) {
+  return new Promise((resolve) => {
+    const req = https.get(
+      `https://music.163.com/song/media/outer/url?id=${songId}.mp3`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } },
+      res => {
+        const loc = res.headers.location || '';
+        res.resume();
+        resolve(loc && !loc.includes('404') ? loc : null);
+      }
+    );
+    req.on('error', () => resolve(null));
+    req.setTimeout(8000, () => { req.destroy(); resolve(null); });
+  });
+}
+
 /** 下载文件到本地，自动跟随重定向 */
 function download(url, destPath) {
   return new Promise((resolve, reject) => {
@@ -89,4 +106,4 @@ function download(url, destPath) {
   });
 }
 
-module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, download };
+module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, getOuterUrl, download };
