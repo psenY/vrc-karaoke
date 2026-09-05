@@ -59,6 +59,7 @@ async function generateVideo(input, options = {}) {
     bilingual,
     audioDurationMs: result.audioMs,
     title: result.meta.title || '',
+    showProgress: true,
   }), 'utf8');
 
   // 4. 合成

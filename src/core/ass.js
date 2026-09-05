@@ -30,6 +30,7 @@ Style: Current,${fontName},${fontSize},&H00FFFFFF,&H00969696,&H00000000,&H960000
 Style: Next,${fontName},${fontSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
 Style: Trans,${fontName},${transSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
 Style: Title,${fontName},54,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,8,100,100,60,1
+Style: Progress,${fontName},48,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,9,100,100,60,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -44,6 +45,13 @@ function formatAssTime(ms) {
   const s = Math.floor((cs % 6000) / 100);
   const c = cs % 100;
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`;
+}
+
+// 秒 -> mm:ss
+function formatClock(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function escapeAssText(text) {
@@ -120,6 +128,7 @@ function generateAss(lines, options = {}) {
     bottomMarginV = 200,
     bilingual = false,        // 双语（原文 + 翻译）
     title = '',               // 顶部歌曲信息（歌名-歌手）
+    showProgress = false,     // 右上角进度 [当前/总时长]
   } = options;
 
   const events = [];
@@ -183,6 +192,17 @@ function generateAss(lines, options = {}) {
     events.unshift(
       `Dialogue: 0,0:00:00.00,${formatAssTime(titleEnd)},Title,,0,0,0,,${escapeAssText(title)}`
     );
+  }
+
+  // 右上角进度 [当前/总时长]（每秒一条）
+  if (showProgress && audioDurationMs) {
+    const totalSec = Math.max(1, Math.round(audioDurationMs / 1000));
+    const totalStr = formatClock(totalSec);
+    for (let sec = 0; sec < totalSec; sec++) {
+      events.push(
+        `Dialogue: 0,${formatAssTime(sec * 1000)},${formatAssTime((sec + 1) * 1000)},Progress,,0,0,0,,[${formatClock(sec)} / ${totalStr}]`
+      );
+    }
   }
 
   return buildHeader(playResX, playResY, fontName, fontSize) + events.join('\n') + '\n';
