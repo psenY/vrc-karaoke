@@ -6,6 +6,7 @@ fonts/
 *.log
 test/
 config.json
+data/
 .DS_Store
 *.tar.gz
 *.md

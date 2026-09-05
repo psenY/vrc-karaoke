@@ -9,7 +9,7 @@ const { getPlaylist, getQrKey, getQrImg, checkQrLogin, getUserInfo, getLyric } =
 
 const ROOT = path.join(__dirname, '..');
 const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
-const CONFIG_FILE = path.join(ROOT, 'config.json');
+const CONFIG_FILE = path.join(ROOT, 'data', 'config.json');
 
 const crypto = require('crypto');
 
@@ -93,7 +93,10 @@ function readConfig() {
   catch (e) { return {}; }
 }
 function writeConfig(cfg) {
-  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {}
+  try {
+    fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  } catch (e) {}
 }
 
 function sha256(s) {

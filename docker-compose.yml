@@ -13,6 +13,7 @@ services:
     volumes:
       - ./output:/app/output
       - ./tmp:/app/tmp
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/auth-status"]
       interval: 30s

@@ -2,7 +2,9 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#141414">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>vrc-karaoke</title>
 <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
 <link rel="stylesheet" href="https://unpkg.com/element-plus/theme-chalk/dark/css-vars.css">
@@ -40,6 +42,27 @@
   .opt { display: flex; align-items: center; gap: 6px; }
   .result-box { margin-top: 16px; }
   .result-box a { color: #4a6cf7; word-break: break-all; }
+  .hist-item { padding: 10px 0; border-bottom: 1px solid var(--el-border-color-light); }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-title { font-weight: 600; color: var(--text); word-break: break-all; }
+  .hist-meta { color: var(--muted); font-size: 12px; margin: 2px 0 6px; }
+  .hist-actions { display: flex; gap: 10px; align-items: center; }
+
+  /* 移动端适配 */
+  @media (max-width: 640px) {
+    #app { padding: 14px 12px 48px; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+    .hero { font-size: 20px; }
+    .el-card__body { padding: 14px !important; }
+    .el-card__header { padding: 12px 14px !important; }
+    .opts { gap: 12px; }
+    /* 触控友好：控件与按钮加高 */
+    .el-button { min-height: 38px; }
+    .el-input__wrapper, .el-select__wrapper { min-height: 38px; }
+    /* 行内多列在移动端换行后留出间距 */
+    .el-col { margin-bottom: 8px; }
+    .el-row { margin-bottom: 0; }
+  }
 </style>
 </head>
 <body>
@@ -58,17 +81,17 @@
       <el-col :xs="24" :sm="14" :md="14">
         <el-input v-model="query" placeholder="歌名/关键词，或直接粘贴链接" clearable @keyup.enter="doSearch"></el-input>
       </el-col>
-      <el-col :xs="12" :sm="4" :md="4">
+      <el-col :xs="24" :sm="4" :md="4">
         <el-select v-model="platform" placeholder="搜索平台" style="width:100%">
           <el-option label="网易云" value="netease"></el-option>
           <el-option label="QQ音乐" value="qqmusic"></el-option>
         </el-select>
       </el-col>
-      <el-col :xs="6" :sm="3" :md="3">
-        <el-button @click="doSearch">搜索选歌</el-button>
+      <el-col :xs="12" :sm="3" :md="3">
+        <el-button @click="doSearch" style="width:100%">搜索选歌</el-button>
       </el-col>
-      <el-col :xs="6" :sm="3" :md="3">
-        <el-button type="primary" @click="doGenerate" :loading="generating">直接生成</el-button>
+      <el-col :xs="12" :sm="3" :md="3">
+        <el-button type="primary" @click="doGenerate" :loading="generating" style="width:100%">直接生成</el-button>
       </el-col>
     </el-row>
   </el-card>
@@ -198,11 +221,11 @@
       </el-collapse-item>
     </el-collapse>
     <div style="margin-top:16px">
-      <el-button type="primary" @click="doGenerate" :loading="generating">生成视频</el-button>
-      <el-progress v-if="progressText && phase==='download'" :percentage="downloadProgress" style="width:320px;margin-left:16px"></el-progress>
-      <el-progress v-if="progressText && phase==='assemble' && !Array.isArray(progress)" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
-      <span v-if="progressText" style="color:#e6a23c;margin-left:8px">{{ progressText }}</span>
-      <div v-if="progressText && Array.isArray(progress)" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%">
+      <el-button type="primary" @click="doGenerate" :loading="generating" :style="isMobile ? 'width:100%' : ''">生成视频</el-button>
+      <el-progress v-if="progressText && phase==='download'" :percentage="downloadProgress" :style="isMobile ? 'margin-top:10px' : 'width:320px;margin-left:16px'"></el-progress>
+      <el-progress v-if="progressText && phase==='assemble' && !Array.isArray(progress)" :percentage="progress" :status="progressStatus" :style="isMobile ? 'margin-top:10px' : 'width:320px;margin-left:16px'"></el-progress>
+      <span v-if="progressText" :style="isMobile ? 'color:#e6a23c;display:block;margin-top:6px' : 'color:#e6a23c;margin-left:8px'">{{ progressText }}</span>
+      <div v-if="progressText && Array.isArray(progress)" :style="'margin-top:12px;display:grid;gap:10px;width:100%;grid-template-columns:repeat(auto-fill,minmax(' + (isMobile ? '110' : '150') + 'px,1fr))'">
         <div v-for="(p, i) in progress" :key="i">
           <div style="font-size:12px;color:var(--muted);margin-bottom:2px">线程 {{ i + 1 }}</div>
           <el-progress :percentage="Math.round((p || 0) * 100)" :stroke-width="6"></el-progress>
@@ -215,8 +238,8 @@
 
   <el-card class="card" shadow="never" v-if="queue.length">
     <template #header><b>任务队列</b></template>
-    <div v-for="q in queue" :key="q.id" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
-      <span style="color:var(--text)">{{ q.status === 'running' ? '生成中' : '排队中' }}：{{ q.title }}</span>
+    <div v-for="q in queue" :key="q.id" :style="'display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--el-border-color-light);' + (isMobile ? 'flex-direction:column;align-items:flex-start' : 'align-items:center;justify-content:space-between')">
+      <span style="color:var(--text);word-break:break-all">{{ q.status === 'running' ? '生成中' : '排队中' }}：{{ q.title }}</span>
       <span style="display:flex;gap:8px">
         <el-button v-if="q.status === 'pending'" size="small" @click="queueTop(q.id)">插队</el-button>
         <el-button size="small" type="danger" plain @click="queueCancel(q.id)">取消</el-button>
@@ -231,8 +254,10 @@
         <el-input v-model="playlistUrl" placeholder="https://music.163.com/playlist?id=xxx"></el-input>
       </el-col>
       <el-col :xs="24" :sm="8" :md="8">
-        <el-button @click="parsePlaylist">解析歌单</el-button>
-        <el-button type="primary" @click="batchGenerate" v-if="playlistName" style="margin-left:8px">批量生成</el-button>
+        <div style="display:flex;gap:8px">
+          <el-button @click="parsePlaylist" style="flex:1">解析歌单</el-button>
+          <el-button type="primary" @click="batchGenerate" v-if="playlistName" style="flex:1">批量生成</el-button>
+        </div>
       </el-col>
     </el-row>
     <div v-if="playlistName" style="margin-top:10px">
@@ -267,9 +292,11 @@
         <el-input v-model="cookie" placeholder="粘贴 cookie" clearable></el-input>
       </el-col>
       <el-col :xs="24" :sm="8" :md="8">
-        <el-button @click="saveCookie">保存</el-button>
-        <el-button type="success" @click="startQrLogin">扫码登录</el-button>
-        <el-button v-if="loginNickname" type="danger" plain @click="logout">退出登录</el-button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <el-button @click="saveCookie" style="flex:1;min-width:70px">保存</el-button>
+          <el-button type="success" @click="startQrLogin" style="flex:1;min-width:90px">扫码登录</el-button>
+          <el-button v-if="loginNickname" type="danger" plain @click="logout" style="flex:1;min-width:90px">退出登录</el-button>
+        </div>
       </el-col>
     </el-row>
   </el-card>
@@ -281,7 +308,7 @@
         <el-input v-model="adminPassword" type="password" placeholder="设置访问密码（留空不启用）" show-password clearable></el-input>
       </el-col>
       <el-col :xs="24" :sm="8" :md="8">
-        <el-button @click="setPassword">保存密码</el-button>
+        <el-button @click="setPassword" style="width:100%">保存密码</el-button>
       </el-col>
     </el-row>
   </el-card>
@@ -290,16 +317,17 @@
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <b>历史记录</b>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span style="color:var(--muted);font-size:13px">成品 {{ formatSize(outputSize) }} / 缓存 {{ formatSize(tmpSize) }}</span>
+          <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:150px"></el-input>
           <el-button size="small" plain @click="cleanCache">清理缓存</el-button>
-          <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:160px"></el-input>
-          <el-button size="small" plain @click="cleanOrphan">清理孤儿文件</el-button>
+          <el-button size="small" plain @click="cleanOrphan">清理孤儿</el-button>
           <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
         </div>
       </div>
     </template>
-    <el-table :data="filteredHistory" stripe size="small" empty-text="暂无记录">
+    <!-- 桌面端：表格 -->
+    <el-table v-if="!isMobile" :data="filteredHistory" stripe size="small" empty-text="暂无记录">
       <el-table-column prop="title" label="歌曲" min-width="200"></el-table-column>
       <el-table-column label="时间" width="170">
         <template #default="scope">{{ fmtTime(scope.row.time) }}</template>
@@ -312,13 +340,26 @@
         </template>
       </el-table-column>
     </el-table>
+    <!-- 移动端：卡片列表（表格在窄屏难用） -->
+    <div v-else>
+      <div v-if="!filteredHistory.length" style="color:var(--muted);padding:8px 0">暂无记录</div>
+      <div class="hist-item" v-for="h in filteredHistory" :key="h.outPath + h.time">
+        <div class="hist-title">{{ h.title || h.input }}</div>
+        <div class="hist-meta">{{ fmtTime(h.time) }}</div>
+        <div class="hist-actions">
+          <a :href="'/output/' + h.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
+          <el-button size="small" type="primary" text @click="previewVideo(h.outPath.split('/').pop())">预览</el-button>
+          <el-button size="small" type="danger" text @click="deleteHistory(h.outPath.split('/').pop())">删除</el-button>
+        </div>
+      </div>
+    </div>
   </el-card>
 
-  <el-dialog v-model="previewVisible" title="预览" width="680px">
+  <el-dialog v-model="previewVisible" title="预览" :width="isMobile ? '92%' : '680px'">
     <video :src="previewUrl" controls autoplay style="width:100%;max-height:70vh;background:#000;border-radius:8px"></video>
   </el-dialog>
 
-  <el-dialog v-model="qrVisible" title="网易云扫码登录" width="320px" :close-on-click-modal="false">
+  <el-dialog v-model="qrVisible" title="网易云扫码登录" :width="isMobile ? '86%' : '320px'" :close-on-click-modal="false">
     <div style="text-align:center">
       <p v-if="qrStatus === 'wait'" style="color:var(--muted)">请用网易云音乐 App 扫码</p>
       <p v-else-if="qrStatus === 'scanned'" style="color:#e6a23c">已扫码，请在手机上确认登录</p>
@@ -330,7 +371,7 @@
     </div>
   </el-dialog>
 
-  <el-dialog v-model="loginVisible" title="登录" width="320px" :close-on-click-modal="false" :show-close="false">
+  <el-dialog v-model="loginVisible" title="登录" :width="isMobile ? '86%' : '320px'" :close-on-click-modal="false" :show-close="false">
     <el-input v-model="loginPassword" type="password" placeholder="访问密码" show-password @keyup.enter="doLogin"></el-input>
     <div style="margin-top:14px;text-align:right">
       <el-button type="primary" @click="doLogin">登录</el-button>
@@ -370,6 +411,8 @@ createApp({
       qrKey: '',
       qrStatus: 'wait',
       isSystemDark: mql.matches,
+      isMobile: window.innerWidth <= 640,
+      queueTimer: null,
       generating: false,
       isDark: false,
       segCount: 8,
@@ -762,13 +805,30 @@ createApp({
       this.loginVisible = false;
       this.loginPassword = '';
       this.$message.success('登录成功');
+      this.loadAll();          // 登录后立刻拉数据
+      this.startQueuePoll();
     },
-    async checkAuth() {
+    // 启动流程：先确认是否需要登录，未登录不发无效请求（避免控制台刷 401 报错）
+    async bootstrap() {
       const r = await this.get('/api/auth-status');
-      if (r.ok && r.needAuth && !this.token) {
-        this.needAuth = true;
+      const needAuth = !!(r.ok && r.needAuth);
+      this.needAuth = needAuth;
+      if (needAuth && !this.token) {
         this.loginVisible = true;
+        return;
       }
+      this.loadAll();
+      this.startQueuePoll();
+    },
+    loadAll() {
+      this.loadHistory();
+      this.loadConfig();
+      this.loadQueue();
+      this.loadStats();
+    },
+    startQueuePoll() {
+      if (this.queueTimer) return;
+      this.queueTimer = setInterval(() => this.loadQueue(), 3000);
     },
     async setPassword() {
       if (!this.adminPassword) return this.$message.warning('请输入访问密码');
@@ -782,12 +842,12 @@ createApp({
       this.isSystemDark = e.matches;
       if (this.theme === 'system') this.applyTheme();
     });
-    this.loadHistory();
-    this.loadConfig();
-    this.loadQueue();
-    setInterval(() => this.loadQueue(), 3000);
-    this.checkAuth();
-    this.loadStats();
+    // 视口变化时切换移动端/桌面端布局
+    window.addEventListener('resize', () => {
+      this.isMobile = window.innerWidth <= 640;
+    });
+    // 先确认登录状态，再拉数据（未登录时不发无效请求）
+    this.bootstrap();
     try { this.presets = JSON.parse(localStorage.getItem('vrc-presets') || '[]'); } catch (e) {}
   },
   updated() {
