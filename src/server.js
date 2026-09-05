@@ -399,6 +399,13 @@ app.post('/api/task/:id/top', (req, res) => {
   res.json({ ok: true });
 });
 
+// 全局错误处理（兜底，避免未捕获异常导致进程崩溃）
+app.use((err, req, res, next) => {
+  console.error('[错误]', err.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ ok: false, error: '服务器内部错误' });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`vrc-karaoke WebUI 运行在 http://127.0.0.1:${PORT}`);
