@@ -26,6 +26,14 @@ const queue = [];
 let running = 0;
 const MAX_CONCURRENT = 1; // 串行(用户要求一首一首来, 单首内部用分段并行吃多核)
 
+// 清理完成的旧任务（限制 tasks Map 大小，避免长期运行内存累积）
+function cleanupTasks() {
+  while (tasks.size > 100) {
+    const oldestKey = tasks.keys().next().value;
+    tasks.delete(oldestKey);
+  }
+}
+
 function runNext() {
   while (running < MAX_CONCURRENT && queue.length > 0) {
     const { id, input, options } = queue.shift();
@@ -64,7 +72,7 @@ function runNext() {
         if (t.status === 'cancelled') return;
         t.status = 'failed'; t.error = err.message;
       })
-      .finally(() => { running--; runNext(); });
+      .finally(() => { running--; cleanupTasks(); runNext(); });
   }
 }
 
