@@ -396,6 +396,7 @@ createApp({
       presets: [],
       presetName: '',
       selectedPreset: '',
+      batchTaskIds: [],
     };
   },
   computed: {
@@ -495,28 +496,30 @@ createApp({
       if (!selected.length) return this.$message.warning('请先勾选要生成的歌曲');
       const total = selected.length;
       let done = 0;
+      this.batchTaskIds = [];
       this.batchProgress = `(0/${total} 已入队)`;
       for (const s of selected) {
-        await this.post('/api/generate', {
-          input: `https://music.163.com/song?id=${s.id}`,
-          highlight: this.highlight || undefined,
-          bilingual: this.bilingual,
-          cover: this.cover,
-          background: this.bgHex(),
-          segCount: this.segCount,
-          resolution: this.resolution,
-          codec: this.codec,
-          preset: this.preset,
-          crf: this.crf,
-          fps: this.fps,
-          audioBitrate: this.audioBitrate,
-          currentColor: this.currentColor,
-          nextColor: this.nextColor,
-          titleColor: this.titleColor,
-          progressColor: this.progressColor,
-        });
+        const r = await this.post('/api/generate', this.buildGenerateBody(`https://music.163.com/song?id=${s.id}`));
+        if (r.ok && r.taskId) this.batchTaskIds.push(r.taskId);
         done++;
         this.batchProgress = `(${done}/${total} 已入队)`;
+      }
+      this.pollBatch();
+    },
+    async pollBatch() {
+      const ids = this.batchTaskIds;
+      if (!ids.length) return;
+      let completed = 0;
+      for (const id of ids) {
+        const r = await this.get('/api/task/' + id);
+        if (r.status === 'done' || r.status === 'failed' || r.status === 'cancelled') completed++;
+      }
+      this.batchProgress = `(${completed}/${ids.length} 已完成)`;
+      if (completed < ids.length) {
+        setTimeout(() => this.pollBatch(), 3000);
+      } else {
+        this.batchProgress = `(全部完成 ${ids.length} 首)`;
+        this.loadHistory();
       }
     },
     async poll(taskId) {
