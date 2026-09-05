@@ -5,7 +5,7 @@ const fs = require('fs');
 const express = require('express');
 const { platforms } = require('./platforms');
 const { generateVideo } = require('./generate');
-const { getPlaylist, getQrKey, getQrImg, checkQrLogin, getUserInfo } = require('./core/netease-api');
+const { getPlaylist, getQrKey, getQrImg, checkQrLogin, getUserInfo, getLyric } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
 const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
@@ -169,6 +169,19 @@ app.post('/api/playlist', async (req, res) => {
     if (!m) return res.json({ ok: false, error: '无法识别歌单链接（需网易云 playlist 链接）' });
     const playlist = await getPlaylist(m[1]);
     res.json({ ok: true, name: playlist.name, songs: playlist.songs });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// 歌词预览（生成前确认歌词）
+app.post('/api/lyric', async (req, res) => {
+  try {
+    const { input } = req.body || {};
+    const m = String(input || '').match(/[?&]id=(\d+)/);
+    if (!m) return res.json({ ok: false, error: '无法识别歌曲链接' });
+    const { lrc, tlyric } = await getLyric(Number(m[1]));
+    res.json({ ok: true, lrc: lrc || '', tlyric: tlyric || '' });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }

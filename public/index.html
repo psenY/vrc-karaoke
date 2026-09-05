@@ -84,6 +84,8 @@
   <el-card class="card" shadow="never" v-if="selected">
     <template #header><b>已选歌曲</b></template>
     <span>{{ selected.name }} - {{ selected.artists }}</span>
+    <div v-if="lyricPreview" style="margin-top:8px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted);white-space:pre-wrap;line-height:1.8">{{ lyricPreview }}</div>
+    <div v-else style="margin-top:8px;font-size:13px;color:var(--muted)">歌词加载中或暂无歌词...</div>
   </el-card>
 
   <el-card class="card" shadow="never">
@@ -397,6 +399,7 @@ createApp({
       presetName: '',
       selectedPreset: '',
       batchTaskIds: [],
+      selectedLyric: '',
     };
   },
   computed: {
@@ -406,6 +409,13 @@ createApp({
     filteredHistory() {
       const f = this.historyFilter.trim().toLowerCase();
       return f ? this.history.filter(h => (h.title || h.input || '').toLowerCase().includes(f)) : this.history;
+    },
+    lyricPreview() {
+      if (!this.selectedLyric) return '';
+      return this.selectedLyric.split('\n').map(line => {
+        const m = line.match(/\[\d+:\d+[.:]\d+\](.*)/);
+        return m ? m[1].trim() : '';
+      }).filter(t => t).join('\n');
     },
   },
   methods: {
@@ -431,7 +441,11 @@ createApp({
     selectSong(i) {
       this.selected = this.songs[i];
       this.songs = [];
+      this.selectedLyric = '';
       this.$message.success('已选: ' + this.selected.name);
+      this.post('/api/lyric', { input: this.selected.url }).then(r => {
+        if (r.ok) this.selectedLyric = r.lrc || '';
+      });
     },
     bgHex() {
       return '0x' + (this.background || '#1a1a2e').replace('#', '');
