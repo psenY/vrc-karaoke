@@ -11,6 +11,10 @@ const ROOT = path.join(__dirname, '..');
 const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
 const CONFIG_FILE = path.join(ROOT, 'config.json');
 
+const crypto = require('crypto');
+
+const tokens = new Map(); // token -> 登录时间戳
+
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(ROOT, 'public')));
@@ -83,6 +87,51 @@ function readConfig() {
 function writeConfig(cfg) {
   try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2)); } catch (e) {}
 }
+
+function sha256(s) {
+  return crypto.createHash('sha256').update(String(s)).digest('hex');
+}
+
+// 登录（启用密码后需登录）
+app.post('/api/login', (req, res) => {
+  const cfg = readConfig();
+  if (!cfg.adminPassword) return res.json({ ok: true, needAuth: false, token: null });
+  const { password } = req.body || {};
+  if (sha256(password) === cfg.adminPassword) {
+    const token = crypto.randomBytes(32).toString('hex');
+    tokens.set(token, Date.now());
+    return res.json({ ok: true, needAuth: true, token });
+  }
+  res.json({ ok: false, error: '密码错误' });
+});
+
+// 查询是否需要登录
+app.get('/api/auth-status', (req, res) => {
+  res.json({ ok: true, needAuth: !!readConfig().adminPassword });
+});
+
+// 鉴权中间件（未启用密码时放行；启用后需 token）
+function requireAuth(req, res, next) {
+  const cfg = readConfig();
+  if (!cfg.adminPassword) return next();
+  const token = req.headers['x-auth-token'] || req.query.token || '';
+  if (token && tokens.has(token)) return next();
+  return res.status(401).json({ ok: false, error: '未登录或登录已过期', needAuth: true });
+}
+app.use('/api', requireAuth);
+
+// 设置/修改访问密码（需已登录；空密码=取消密码保护）
+app.post('/api/set-password', (req, res) => {
+  const { password } = req.body || {};
+  const cfg = readConfig();
+  if (password) {
+    writeConfig({ ...cfg, adminPassword: sha256(password) });
+  } else {
+    const { adminPassword, ...rest } = cfg;
+    writeConfig(rest);
+  }
+  res.json({ ok: true });
+});
 
 // 搜索（网易云 / QQ音乐 / 酷我）
 app.post('/api/search', async (req, res) => {
