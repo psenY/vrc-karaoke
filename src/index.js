@@ -42,13 +42,11 @@ async function main() {
     background: args.background || '0x1a1a2e',
     cookie: args.cookie || '',
     songId: hasId ? args.id : undefined,
-    upload: !!args.upload,
     cover: !!args.cover,
     out: args.out,
   });
 
   console.log(`[完成] ${result.outPath}`);
-  if (result.url) console.log(`[直链] ${result.url}`);
 }
 
 main().catch(err => {

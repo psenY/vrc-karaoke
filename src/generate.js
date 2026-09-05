@@ -18,7 +18,7 @@ function hexToAssBgr(hex) {
 
 /**
  * 核心生成流程（CLI 与 WebUI 共用）：
- * 识别平台 → 抓歌词/音频 → (可选)封面 → 生成 ASS → ffmpeg 合成 → (可选)catbox 直链。
+ * 识别平台 → 抓歌词/音频 → (可选)封面 → 生成 ASS → ffmpeg 合成。
  * @param {string} input 关键词或平台链接
  * @returns {Promise<{outPath:string, url:string|null, meta:object, highlight:string}>}
  */
