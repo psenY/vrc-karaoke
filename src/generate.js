@@ -5,7 +5,6 @@ const fs = require('fs');
 const { findPlatform } = require('./platforms');
 const { generateAss } = require('./core/ass');
 const { runFfmpeg, buildArgs } = require('./core/ffmpeg');
-const { uploadCatbox } = require('./core/catbox');
 const { download } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
@@ -26,7 +25,6 @@ async function generateVideo(input, options = {}) {
     background = '0x1a1a2e',
     cookie = '',
     songId,                     // 网易云 --id
-    upload = false,
     cover = false,              // 封面背景
     out = null,                 // 输出文件名
     onProgress = null,          // 合成进度回调 (0~1)
@@ -78,18 +76,7 @@ async function generateVideo(input, options = {}) {
     }
   });
 
-  // 5. 可选上传 catbox（失败不阻断，仅记录错误，仍可下载本地文件）
-  let url = null;
-  let uploadError = null;
-  if (upload) {
-    try {
-      url = await uploadCatbox(outPath);
-    } catch (e) {
-      uploadError = e.message;
-    }
-  }
-
-  return { outPath, url, uploadError, meta: result.meta, highlight: h };
+  return { outPath, meta: result.meta, highlight: h };
 }
 
 module.exports = { generateVideo };

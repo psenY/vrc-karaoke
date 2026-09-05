@@ -5,9 +5,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # 走本机 mihomo 代理(YouTube/catbox 需翻墙)
+      # 走本机 mihomo 代理(YouTube 需翻墙)
       - YTDLP_PROXY=http://192.168.100.1:7890
-      - CATBOX_PROXY=http://192.168.100.1:7890
+    dns:
+      - 223.5.5.5
+      - 114.114.114.114
     volumes:
       - ./output:/app/output
       - ./tmp:/app/tmp
