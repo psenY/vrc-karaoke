@@ -276,19 +276,23 @@
 
   <el-card class="card" shadow="never">
     <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <b>历史记录</b>
-        <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:160px"></el-input>
+          <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
+        </div>
       </div>
     </template>
-    <el-table :data="history" stripe size="small" empty-text="暂无记录">
+    <el-table :data="filteredHistory" stripe size="small" empty-text="暂无记录">
       <el-table-column prop="title" label="歌曲" min-width="200"></el-table-column>
       <el-table-column label="时间" width="170">
         <template #default="scope">{{ fmtTime(scope.row.time) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="140">
+      <el-table-column label="操作" width="150">
         <template #default="scope">
           <a :href="'/output/' + scope.row.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
+          <el-button size="small" type="danger" text @click="deleteHistory(scope.row.outPath.split('/').pop())">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -367,12 +371,17 @@ createApp({
       loginVisible: false,
       loginPassword: '',
       adminPassword: '',
+      historyFilter: '',
     };
   },
   computed: {
     selectedCount() { return this.playlist.filter(s => s.selected).length; },
     allSelected() { return this.playlist.length > 0 && this.selectedCount === this.playlist.length; },
     someSelected() { return this.selectedCount > 0 && this.selectedCount < this.playlist.length; },
+    filteredHistory() {
+      const f = this.historyFilter.trim().toLowerCase();
+      return f ? this.history.filter(h => (h.title || h.input || '').toLowerCase().includes(f)) : this.history;
+    },
   },
   methods: {
     applyTheme() {
@@ -515,6 +524,10 @@ createApp({
     async clearHistory() {
       const r = await this.get('/api/history/clear');
       if (r.ok) { this.history = []; this.$message.success('已清空历史'); }
+    },
+    async deleteHistory(filename) {
+      const r = await this.post('/api/history/delete', { filename });
+      if (r.ok) { this.$message.success('已删除'); this.loadHistory(); }
     },
     async saveCookie() {
       const r = await this.post('/api/config', { cookie: this.cookie.trim() });

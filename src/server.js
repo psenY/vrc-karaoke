@@ -265,6 +265,18 @@ app.get('/api/history/clear', (req, res) => {
   res.json({ ok: true });
 });
 
+// 删除单条历史（同时删除输出文件）
+app.post('/api/history/delete', (req, res) => {
+  const { filename } = req.body || {};
+  if (!filename) return res.json({ ok: false, error: '缺少文件名' });
+  const h = readHistory();
+  const newH = h.filter(item => item.outPath.split('/').pop() !== filename);
+  try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(newH, null, 2)); } catch (e) {}
+  const filePath = path.join(ROOT, 'output', filename);
+  try { fs.unlinkSync(filePath); } catch (e) {}
+  res.json({ ok: true });
+});
+
 // 查询任务状态
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
