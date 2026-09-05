@@ -167,6 +167,22 @@
               <el-option label="320k" value="320k"></el-option>
             </el-select>
           </div>
+          <div class="opt">
+            <span>当前句色</span>
+            <el-color-picker v-model="currentColor"></el-color-picker>
+          </div>
+          <div class="opt">
+            <span>下一句色</span>
+            <el-color-picker v-model="nextColor"></el-color-picker>
+          </div>
+          <div class="opt">
+            <span>标题色</span>
+            <el-color-picker v-model="titleColor"></el-color-picker>
+          </div>
+          <div class="opt">
+            <span>进度色</span>
+            <el-color-picker v-model="progressColor"></el-color-picker>
+          </div>
         </div>
       </el-collapse-item>
     </el-collapse>
@@ -296,6 +312,10 @@ createApp({
       crf: 20,
       fps: 24,
       audioBitrate: '192k',
+      currentColor: '#FFFFFF',
+      nextColor: '#969696',
+      titleColor: '#FFFFFF',
+      progressColor: '#FFFFFF',
       downloadProgress: 0,
       phase: 'download',
     };
@@ -348,6 +368,10 @@ createApp({
         crf: this.crf,
         fps: this.fps,
         audioBitrate: this.audioBitrate,
+        currentColor: this.currentColor,
+        nextColor: this.nextColor,
+        titleColor: this.titleColor,
+        progressColor: this.progressColor,
       });
       if (!r.ok) { this.progressText = ''; return this.$message.error(r.error); }
       this.poll(r.taskId);
@@ -378,6 +402,10 @@ createApp({
           crf: this.crf,
           fps: this.fps,
           audioBitrate: this.audioBitrate,
+          currentColor: this.currentColor,
+          nextColor: this.nextColor,
+          titleColor: this.titleColor,
+          progressColor: this.progressColor,
         });
         done++;
         this.batchProgress = `(${done}/${total} 已入队)`;

@@ -163,7 +163,7 @@ app.post('/api/config', (req, res) => {
 
 // 生成（异步任务）
 app.post('/api/generate', (req, res) => {
-  const { input, highlight, bilingual, background, upload, cookie, cover, segCount, resolution, codec, preset, crf, fps, audioBitrate } = req.body || {};
+  const { input, highlight, bilingual, background, upload, cookie, cover, segCount, resolution, codec, preset, crf, fps, audioBitrate, currentColor, nextColor, titleColor, progressColor } = req.body || {};
   if (!input) return res.json({ ok: false, error: '缺少输入' });
   const taskId = 't' + (++taskSeq);
   const cfg = readConfig();
@@ -186,6 +186,10 @@ app.post('/api/generate', (req, res) => {
       crf: Number(crf) || 20,
       fps: Number(fps) || 24,
       audioBitrate: audioBitrate || '192k',
+      currentColor: currentColor || '#FFFFFF',
+      nextColor: nextColor || '#969696',
+      titleColor: titleColor || '#FFFFFF',
+      progressColor: progressColor || '#FFFFFF',
     },
   });
   res.json({ ok: true, taskId });

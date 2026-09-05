@@ -9,6 +9,13 @@ const { download } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
 
+// #RRGGBB → ASS &H00BBGGRR
+function hexToAssBgr(hex) {
+  const h = String(hex || '').replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  return `&H00${h.slice(4, 6)}${h.slice(2, 4)}${h.slice(0, 2)}`;
+}
+
 /**
  * 核心生成流程（CLI 与 WebUI 共用）：
  * 识别平台 → 抓歌词/音频 → (可选)封面 → 生成 ASS → ffmpeg 合成 → (可选)catbox 直链。
@@ -35,6 +42,10 @@ async function generateVideo(input, options = {}) {
     crf = 20,                   // 质量(越小越高)
     fps = 24,                   // 帧率
     audioBitrate = '192k',      // 音频码率
+    currentColor = '#FFFFFF',   // 当前句颜色
+    nextColor = '#969696',      // 下一句/翻译颜色
+    titleColor = '#FFFFFF',     // 标题颜色
+    progressColor = '#FFFFFF',  // 进度颜色
   } = options;
 
   const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480] };
@@ -73,6 +84,10 @@ async function generateVideo(input, options = {}) {
     audioDurationMs: result.audioMs,
     title: result.meta.title || '',
     showProgress: true,
+    currentColor: hexToAssBgr(currentColor) || '&H00FFFFFF',
+    nextColor: hexToAssBgr(nextColor) || '&H00969696',
+    titleColor: hexToAssBgr(titleColor) || '&H00FFFFFF',
+    progressColor: hexToAssBgr(progressColor) || '&H00FFFFFF',
   });
   fs.writeFileSync(assPath, assText, 'utf8');
 

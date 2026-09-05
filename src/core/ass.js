@@ -15,8 +15,14 @@
  * 双语：bilingual 开启时，每句在原文下方附加翻译（Trans 样式小字灰）。
  */
 
-function buildHeader(playResX, playResY, fontName, fontSize) {
+function buildHeader(playResX, playResY, fontName, fontSize, colors = {}) {
   const transSize = Math.round(fontSize * 0.6);
+  const {
+    currentColor = '&H00FFFFFF',
+    nextColor = '&H00969696',
+    titleColor = '&H00FFFFFF',
+    progressColor = '&H00FFFFFF',
+  } = colors;
   return `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${playResX}
@@ -26,11 +32,11 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Current,${fontName},${fontSize},&H00FFFFFF,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,2,100,100,200,1
-Style: Next,${fontName},${fontSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
-Style: Trans,${fontName},${transSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
-Style: Title,${fontName},54,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,8,100,100,60,1
-Style: Progress,${fontName},48,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,9,100,100,60,1
+Style: Current,${fontName},${fontSize},${currentColor},&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,2,100,100,200,1
+Style: Next,${fontName},${fontSize},${nextColor},${nextColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
+Style: Trans,${fontName},${transSize},${nextColor},${nextColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
+Style: Title,${fontName},54,${titleColor},${titleColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,8,100,100,60,1
+Style: Progress,${fontName},48,${progressColor},${progressColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,9,100,100,60,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -163,6 +169,10 @@ function generateAss(lines, options = {}) {
     bilingual = false,        // 双语（原文 + 翻译）
     title = '',               // 顶部歌曲信息（歌名-歌手）
     showProgress = false,     // 右上角进度 [当前/总时长]
+    currentColor = '&H00FFFFFF',   // 当前句颜色
+    nextColor = '&H00969696',      // 下一句/翻译颜色
+    titleColor = '&H00FFFFFF',     // 标题颜色
+    progressColor = '&H00FFFFFF',  // 进度颜色
   } = options;
 
   const events = [];
@@ -239,7 +249,7 @@ function generateAss(lines, options = {}) {
     }
   }
 
-  return buildHeader(playResX, playResY, fontName, fontSize) + events.join('\n') + '\n';
+  return buildHeader(playResX, playResY, fontName, fontSize, { currentColor, nextColor, titleColor, progressColor }) + events.join('\n') + '\n';
 }
 
 module.exports = { generateAss, formatAssTime, segmentAss, buildWordHighlight, buildEstimatedHighlight };
