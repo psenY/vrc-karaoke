@@ -59,9 +59,11 @@ module.exports = {
     const videoId = meta.id;
     const base = path.join(workDir, videoId);
 
-    // 2. 下载音频（转 mp3）
-    await runYtdlp(['-x', '--audio-format', 'mp3', '-o', base + '.%(ext)s', '--no-warnings', input]);
+    // 2. 下载音频（转 mp3，有缓存则复用）
     const audioPath = base + '.mp3';
+    if (!fs.existsSync(audioPath)) {
+      await runYtdlp(['-x', '--audio-format', 'mp3', '-o', base + '.%(ext)s', '--no-warnings', input]);
+    }
 
     // 3. json3 自动字幕（按语言优先级逐个尝试）
     let lines = [];
