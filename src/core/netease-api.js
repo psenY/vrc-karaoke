@@ -84,25 +84,36 @@ function getOuterUrl(songId) {
   });
 }
 
-/** 下载文件到本地，自动跟随重定向 */
-function download(url, destPath) {
+/** 下载文件到本地，自动跟随重定向 + 网络/DNS 错误自动重试 */
+function download(url, destPath, retries = 3) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http;
-    const req = mod.get(url, res => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        res.resume();
-        return download(res.headers.location, destPath).then(resolve, reject);
-      }
-      if (res.statusCode !== 200) {
-        res.resume();
-        return reject(new Error(`下载失败 HTTP ${res.statusCode}`));
-      }
-      const file = fs.createWriteStream(destPath);
-      res.pipe(file);
-      file.on('finish', () => { file.close(); resolve(); });
-      file.on('error', reject);
-    });
-    req.on('error', reject);
+    const attempt = (n) => {
+      const req = mod.get(url, res => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          return download(res.headers.location, destPath, 0).then(resolve, reject);
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`下载失败 HTTP ${res.statusCode}`));
+        }
+        const file = fs.createWriteStream(destPath);
+        res.pipe(file);
+        file.on('finish', () => { file.close(); resolve(); });
+        file.on('error', reject);
+      });
+      req.on('error', (err) => {
+        // 网络/DNS 错误（ENOTFOUND/ECONNRESET 等）→ 自动重试
+        if (n > 1) {
+          console.log(`[重试] 网络错误(${err.code || err.message})，第 ${retries - n + 2}/${retries} 次重试...`);
+          setTimeout(() => attempt(n - 1), 2000);
+        } else {
+          reject(err);
+        }
+      });
+    };
+    attempt(retries);
   });
 }
 

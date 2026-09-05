@@ -4,197 +4,262 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>vrc-karaoke · VRChat 卡拉OK歌词视频生成器</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
 <style>
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, sans-serif; max-width: 820px; margin: 40px auto; padding: 0 20px; background: #16162a; color: #e8e8f0; }
-  h1 { color: #fff; font-size: 28px; margin-bottom: 4px; }
-  .sub { color: #888; margin: 0 0 24px; font-size: 14px; }
-  input, select, button { font-size: 15px; padding: 10px 12px; border-radius: 8px; border: 1px solid #3a3a55; background: #23233a; color: #eee; }
-  input[type=text] { flex: 1; }
-  button { cursor: pointer; background: #4a6cf7; border: none; color: #fff; font-weight: 600; }
-  button:hover { background: #5a7cff; }
-  .row { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
-  .song { padding: 10px 12px; border: 1px solid #333; border-radius: 8px; margin: 6px 0; cursor: pointer; transition: background .15s; }
-  .song:hover { background: #23233a; }
-  .song .name { font-weight: 600; }
-  .song .artists { color: #999; font-size: 13px; }
-  label { font-size: 14px; color: #bbb; display: inline-flex; align-items: center; gap: 5px; }
-  #progress { color: #ffcc00; }
-  #result a { color: #6ab0ff; word-break: break-all; }
-  .error { color: #ff7b7b; }
-  .done-title { color: #6dd98c; font-weight: 600; }
+  body { margin: 0; background: #16162a; font-family: system-ui, -apple-system, sans-serif; }
+  #app { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
+  .hero { color: #fff; margin-bottom: 6px; }
+  .sub { color: #889; margin: 0 0 20px; font-size: 14px; }
+  .card { margin-bottom: 16px; }
+  .song-item { padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: background .15s; border-bottom: 1px solid #2a2a3e; }
+  .song-item:hover { background: #2a2a3e; }
+  .song-item .name { font-weight: 600; color: #e8e8f0; }
+  .song-item .artists { color: #889; font-size: 13px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .opt { display: flex; align-items: center; gap: 6px; }
+  .result-box { margin-top: 16px; }
+  .result-box a { color: #6ab0ff; word-break: break-all; }
 </style>
 </head>
 <body>
-<h1>🎤 vrc-karaoke</h1>
-<p class="sub">VRChat 卡拉OK歌词视频生成器 · 下一句预览 + AB切换 + 逐字/双语</p>
+<div id="app">
+  <h2 class="hero">🎤 vrc-karaoke</h2>
+  <p class="sub">VRChat 卡拉OK歌词视频生成器 · 下一句预览 + AB切换 + 逐字/双语</p>
 
-<div class="row">
-  <input type="text" id="query" placeholder="歌名/关键词（搜索），或直接粘贴链接">
-  <select id="platform">
-    <option value="">搜索:网易云</option>
-    <option value="netease">搜索:网易云</option>
-    <option value="qqmusic">搜索:QQ音乐</option>
-  </select>
-  <button onclick="doSearch()">搜索选歌</button>
-  <button onclick="doGenerate()">直接生成</button>
+  <el-card class="card" shadow="never">
+    <el-row :gutter="8">
+      <el-col :span="14">
+        <el-input v-model="query" placeholder="歌名/关键词，或直接粘贴链接" clearable @keyup.enter="doSearch"></el-input>
+      </el-col>
+      <el-col :span="4">
+        <el-select v-model="platform" placeholder="搜索平台" style="width:100%">
+          <el-option label="网易云" value="netease"></el-option>
+          <el-option label="QQ音乐" value="qqmusic"></el-option>
+        </el-select>
+      </el-col>
+      <el-col :span="3">
+        <el-button @click="doSearch">搜索选歌</el-button>
+      </el-col>
+      <el-col :span="3">
+        <el-button type="primary" @click="doGenerate">直接生成</el-button>
+      </el-col>
+    </el-row>
+  </el-card>
+
+  <el-card class="card" shadow="never" v-if="songs.length">
+    <template #header><b>搜索结果</b>（点选一首）</template>
+    <div class="song-item" v-for="(s, i) in songs" :key="s.id" @click="selectSong(i)">
+      <div class="name">{{ s.name }}</div>
+      <div class="artists">{{ s.artists }}</div>
+    </div>
+  </el-card>
+
+  <el-card class="card" shadow="never" v-if="selected">
+    <template #header><b>已选歌曲</b></template>
+    <span>{{ selected.name }} - {{ selected.artists }}</span>
+  </el-card>
+
+  <el-card class="card" shadow="never">
+    <template #header><b>生成设置</b></template>
+    <div class="opts">
+      <div class="opt">
+        <span>高亮</span>
+        <el-select v-model="highlight" style="width:110px">
+          <el-option label="自动" value=""></el-option>
+          <el-option label="整句" value="line"></el-option>
+          <el-option label="逐字" value="word"></el-option>
+        </el-select>
+      </div>
+      <el-checkbox v-model="bilingual">双语</el-checkbox>
+      <el-checkbox v-model="cover">封面背景</el-checkbox>
+      <div class="opt">
+        <span>背景色</span>
+        <el-color-picker v-model="background"></el-color-picker>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <el-button type="primary" @click="doGenerate">生成视频</el-button>
+      <el-progress v-if="progressText" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
+      <span v-if="progressText" style="color:#ffcc00;margin-left:8px">{{ progressText }}</span>
+    </div>
+    <div class="result-box" v-html="result"></div>
+  </el-card>
+
+  <el-card class="card" shadow="never">
+    <template #header><b>歌单批量生成</b>（网易云歌单链接）</template>
+    <el-row :gutter="8">
+      <el-col :span="16">
+        <el-input v-model="playlistUrl" placeholder="https://music.163.com/playlist?id=xxx"></el-input>
+      </el-col>
+      <el-col :span="8">
+        <el-button @click="parsePlaylist">解析歌单</el-button>
+        <el-button type="primary" @click="batchGenerate" v-if="playlistName" style="margin-left:8px">批量生成</el-button>
+      </el-col>
+    </el-row>
+    <div v-if="playlistName" style="margin-top:10px">
+      <span>歌单 <b>{{ playlistName }}</b> 共 {{ playlist.length }} 首</span>
+      <span v-if="batchProgress" style="color:#ffcc00;margin-left:12px">{{ batchProgress }}</span>
+    </div>
+  </el-card>
+
+  <el-card class="card" shadow="never">
+    <template #header><b>网易云 cookie</b>（拿高音质/会员歌）</template>
+    <el-row :gutter="8">
+      <el-col :span="18">
+        <el-input v-model="cookie" placeholder="粘贴 cookie" clearable></el-input>
+      </el-col>
+      <el-col :span="6">
+        <el-button @click="saveCookie">保存</el-button>
+        <span v-if="cookieStatus" style="margin-left:8px;color:#6dd98c">{{ cookieStatus }}</span>
+      </el-col>
+    </el-row>
+  </el-card>
+
+  <el-card class="card" shadow="never">
+    <template #header><b>历史记录</b></template>
+    <el-table :data="history" stripe size="small" empty-text="暂无记录">
+      <el-table-column prop="title" label="歌曲" min-width="200"></el-table-column>
+      <el-table-column label="时间" width="170">
+        <template #default="scope">{{ fmtTime(scope.row.time) }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="140">
+        <template #default="scope">
+          <a :href="'/output/' + scope.row.outPath.split('/').pop()" download style="color:#6ab0ff">下载</a>
+        </template>
+      </el-table-column>
+    </el-table>
+  </el-card>
 </div>
-
-<div id="songs"></div>
-
-<div class="row">
-  <input type="text" id="playlistUrl" placeholder="网易云歌单链接 (批量生成)" style="flex:1">
-  <button onclick="parsePlaylist()">解析歌单</button>
-</div>
-<div id="playlistInfo"></div>
-
-<div class="row">
-  <label>高亮:
-    <select id="highlight">
-      <option value="">自动</option>
-      <option value="line">整句</option>
-      <option value="word">逐字</option>
-    </select>
-  </label>
-  <label><input type="checkbox" id="bilingual"> 双语</label>
-  <label><input type="checkbox" id="cover"> 封面背景</label>
-  <label>背景 <input type="color" id="background" value="#1a1a2e" style="width:44px;height:32px;padding:2px;border:none"></label>
-</div>
-
-<div class="row">
-  <button onclick="doGenerate()">生成视频</button>
-  <span id="progress"></span>
-</div>
-
-<div id="result"></div>
-
-<div class="row" style="margin-top:24px">
-  <label>网易云 cookie(拿高音质/会员歌):
-    <input type="text" id="cookieInput" placeholder="粘贴 cookie" style="width:260px">
-  </label>
-  <button onclick="saveCookie()">保存</button>
-  <span id="cookieStatus" class="sub"></span>
-</div>
-
-<hr style="border-color:#333; margin:24px 0">
-<h2>历史记录</h2>
-<div id="history"></div>
 
 <script>
-let selected = null; // { name, artists, url }
+const { createApp } = Vue;
 
-async function doSearch() {
-  const query = document.getElementById('query').value.trim();
-  const platform = document.getElementById('platform').value;
-  if (!query) return alert('请输入关键词');
-  document.getElementById('songs').innerHTML = '<p>搜索中...</p>';
-  const r = await fetch('/api/search', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, platform })
-  }).then(r => r.json());
-  if (!r.ok) return document.getElementById('songs').innerHTML = '<p class="error">错误: ' + r.error + '</p>';
-  if (!r.songs.length) return document.getElementById('songs').innerHTML = '<p>无结果</p>';
-  window._songs = r.songs;
-  document.getElementById('songs').innerHTML = r.songs.map((s, i) =>
-    `<div class="song" onclick="selectSong(${i})"><div class="name">${s.name}</div><div class="artists">${s.artists}</div></div>`
-  ).join('');
-}
-
-function selectSong(i) {
-  selected = window._songs[i];
-  document.getElementById('songs').innerHTML = `<p>已选: <b>${selected.name}</b> - ${selected.artists}</p>`;
-}
-
-function bgValue() {
-  return '0x' + document.getElementById('background').value.replace('#', '');
-}
-
-async function doGenerate() {
-  const query = document.getElementById('query').value.trim();
-  const input = selected ? selected.url : query;
-  if (!input) return alert('请先搜索选歌,或直接输入链接');
-  document.getElementById('progress').textContent = '生成中...';
-  document.getElementById('result').innerHTML = '';
-  const r = await fetch('/api/generate', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      input,
-      highlight: document.getElementById('highlight').value || undefined,
-      bilingual: document.getElementById('bilingual').checked,
-      cover: document.getElementById('cover').checked,
-      background: bgValue(),
-    })
-  }).then(r => r.json());
-  if (!r.ok) { document.getElementById('progress').textContent = ''; return alert('错误: ' + r.error); }
-  poll(r.taskId);
-}
-
-let playlistSongs = [];
-async function parsePlaylist() {
-  const url = document.getElementById('playlistUrl').value.trim();
-  if (!url) return alert('请输入歌单链接');
-  document.getElementById('playlistInfo').innerHTML = '<p>解析中...</p>';
-  const r = await fetch('/api/playlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then(r => r.json());
-  if (!r.ok) return document.getElementById('playlistInfo').innerHTML = '<p class="error">错误: ' + r.error + '</p>';
-  playlistSongs = r.songs;
-  document.getElementById('playlistInfo').innerHTML = `<p>歌单 <b>${r.name}</b> 共 ${r.songs.length} 首 <button onclick="batchGenerate()">批量生成</button> <span id="batchProgress"></span></p>`;
-}
-async function batchGenerate() {
-  if (!playlistSongs.length) return;
-  const total = playlistSongs.length;
-  let done = 0;
-  document.getElementById('batchProgress').textContent = `(0/${total} 已入队)`;
-  for (const s of playlistSongs) {
-    await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: `https://music.163.com/song?id=${s.id}`, highlight: document.getElementById('highlight').value || undefined, bilingual: document.getElementById('bilingual').checked, cover: document.getElementById('cover').checked, background: bgValue() }) });
-    done++;
-    document.getElementById('batchProgress').textContent = `(${done}/${total} 已入队)`;
-  }
-}
-
-async function poll(taskId) {
-  const r = await fetch('/api/task/' + taskId).then(r => r.json());
-  if (r.status === 'done') {
-    document.getElementById('progress').textContent = '';
-    const res = r.result;
-    const filename = res.outPath.split('/').pop();
-    let html = '<p class="done-title">✅ 生成完成</p><p><a href="/output/' + filename + '" download>📥 下载 MP4</a></p>';
-    if (res.url) {
-      html += '<p>🔗 直链: <a href="' + res.url + '" target="_blank">' + res.url + '</a><br><span class="sub">贴进 VRChat 播放器即可</span></p>';
-    } else if (res.uploadError) {
-      html += '<p class="error">⚠️ 直链上传失败: ' + res.uploadError + '<br><span class="sub">但本地文件已生成，可直接下载</span></p>';
-    }
-    document.getElementById('result').innerHTML = html;
-  } else if (r.status === 'failed') {
-    document.getElementById('progress').textContent = '';
-    document.getElementById('result').innerHTML = '<p class="error">❌ 失败: ' + r.error + '</p>';
-  } else {
-    const pct = (r.progress !== undefined && r.progress !== null) ? Math.round(r.progress * 100) + '%' : '';
-    document.getElementById('progress').textContent = (r.status === 'pending' ? '排队中... ' : '生成中... ') + pct;
-    setTimeout(() => poll(taskId), 2000);
-  }
-}
-async function loadHistory() {
-  const r = await fetch('/api/history').then(r => r.json());
-  if (!r.ok || !r.history.length) { document.getElementById('history').innerHTML = '<p class="sub">暂无记录</p>'; return; }
-  document.getElementById('history').innerHTML = r.history.map(h => {
-    const fn = h.outPath.split('/').pop();
-    const t = new Date(h.time).toLocaleString('zh-CN');
-    return `<div class="song"><div class="name">${h.title || h.input}</div><div class="artists">${t}` +
-      (h.url ? ` · <a href="${h.url}" target="_blank">直链</a>` : '') +
-      ` · <a href="/output/${fn}" download>下载</a></div></div>`;
-  }).join('');
-}
-async function loadConfig() {
-  const r = await fetch('/api/config').then(r => r.json());
-  if (r.ok && r.hasCookie) document.getElementById('cookieStatus').textContent = '已配置';
-}
-async function saveCookie() {
-  const cookie = document.getElementById('cookieInput').value.trim();
-  const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cookie }) }).then(r => r.json());
-  document.getElementById('cookieStatus').textContent = r.ok ? (r.hasCookie ? '已保存' : '已清空') : '失败';
-}
-loadHistory();
-loadConfig();
+createApp({
+  data() {
+    return {
+      query: '',
+      platform: 'netease',
+      songs: [],
+      selected: null,
+      highlight: '',
+      bilingual: false,
+      cover: false,
+      background: '#1a1a2e',
+      progress: 0,
+      progressText: '',
+      progressStatus: '',
+      result: '',
+      playlistUrl: '',
+      playlistName: '',
+      playlist: [],
+      batchProgress: '',
+      cookie: '',
+      cookieStatus: '',
+      history: [],
+    };
+  },
+  methods: {
+    async doSearch() {
+      if (!this.query.trim()) return this.$message.warning('请输入关键词');
+      const r = await this.post('/api/search', { query: this.query.trim(), platform: this.platform });
+      if (!r.ok) return this.$message.error(r.error);
+      this.songs = r.songs;
+      if (!r.songs.length) this.$message.info('无结果');
+    },
+    selectSong(i) {
+      this.selected = this.songs[i];
+      this.songs = [];
+      this.$message.success('已选: ' + this.selected.name);
+    },
+    bgHex() {
+      return '0x' + (this.background || '#1a1a2e').replace('#', '');
+    },
+    async doGenerate() {
+      const input = this.selected ? this.selected.url : this.query.trim();
+      if (!input) return this.$message.warning('请先搜索选歌，或直接粘贴链接');
+      this.progressText = '生成中...';
+      this.progress = 0;
+      this.result = '';
+      const r = await this.post('/api/generate', {
+        input,
+        highlight: this.highlight || undefined,
+        bilingual: this.bilingual,
+        cover: this.cover,
+        background: this.bgHex(),
+      });
+      if (!r.ok) { this.progressText = ''; return this.$message.error(r.error); }
+      this.poll(r.taskId);
+    },
+    async parsePlaylist() {
+      if (!this.playlistUrl.trim()) return this.$message.warning('请输入歌单链接');
+      const r = await this.post('/api/playlist', { url: this.playlistUrl.trim() });
+      if (!r.ok) return this.$message.error(r.error);
+      this.playlistName = r.name;
+      this.playlist = r.songs;
+      this.$message.success(`歌单 ${r.name} 共 ${r.songs.length} 首`);
+    },
+    async batchGenerate() {
+      if (!this.playlist.length) return;
+      const total = this.playlist.length;
+      let done = 0;
+      for (const s of this.playlist) {
+        await this.post('/api/generate', {
+          input: `https://music.163.com/song?id=${s.id}`,
+          highlight: this.highlight || undefined,
+          bilingual: this.bilingual,
+          cover: this.cover,
+          background: this.bgHex(),
+        });
+        done++;
+        this.batchProgress = `(${done}/${total} 已入队)`;
+      }
+    },
+    async poll(taskId) {
+      const r = await this.get('/api/task/' + taskId);
+      if (r.status === 'done') {
+        this.progressText = '';
+        const res = r.result;
+        const filename = res.outPath.split('/').pop();
+        this.result = '<p style="color:#6dd98c;font-weight:600">✅ 生成完成</p>' +
+          '<p><a href="/output/' + filename + '" download>📥 下载 MP4</a></p>';
+        this.loadHistory();
+      } else if (r.status === 'failed') {
+        this.progressText = '';
+        this.result = '<p style="color:#ff7b7b">❌ 失败: ' + r.error + '</p>';
+      } else {
+        this.progressText = (r.status === 'pending' ? '排队中... ' : '生成中... ');
+        this.progress = Math.round((r.progress || 0) * 100);
+        this.progressStatus = r.status === 'pending' ? 'warning' : '';
+        setTimeout(() => this.poll(taskId), 2000);
+      }
+    },
+    async loadHistory() {
+      const r = await this.get('/api/history');
+      this.history = r.ok ? r.history : [];
+    },
+    async saveCookie() {
+      const r = await this.post('/api/config', { cookie: this.cookie.trim() });
+      this.cookieStatus = r.ok ? (r.hasCookie ? '已保存' : '已清空') : '失败';
+      if (r.ok) this.$message.success(r.hasCookie ? 'cookie 已保存' : 'cookie 已清空');
+    },
+    fmtTime(ts) {
+      return new Date(ts).toLocaleString('zh-CN');
+    },
+    async post(url, body) {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return r.json();
+    },
+    async get(url) {
+      const r = await fetch(url);
+      return r.json();
+    },
+  },
+  mounted() {
+    this.loadHistory();
+  },
+}).use(ElementPlus).mount('#app');
 </script>
 </body>
 </html>
