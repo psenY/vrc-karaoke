@@ -13,4 +13,10 @@ services:
     volumes:
       - ./output:/app/output
       - ./tmp:/app/tmp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/auth-status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
