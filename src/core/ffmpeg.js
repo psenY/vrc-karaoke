@@ -159,8 +159,9 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
       segOut,
     ];
     await runFfmpeg(segArgs, (sec) => {
-      if (typeof onProgress === 'function' && audioMs > 0) {
-        onProgress(Math.min(1, (seg.startMs / 1000 + sec) / (audioMs / 1000)));
+      if (typeof onProgress === 'function') {
+        const segDurSec = (seg.endMs - seg.startMs) / 1000;
+        onProgress({ segIdx: seg.idx, progress: Math.min(1, sec / segDurSec) });
       }
     });
   }));

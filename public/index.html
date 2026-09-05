@@ -103,11 +103,28 @@
         <span>背景色</span>
         <el-color-picker v-model="background"></el-color-picker>
       </div>
+      <div class="opt">
+        <span>并行分段</span>
+        <el-select v-model="segCount" style="width:90px">
+          <el-option label="1" :value="1"></el-option>
+          <el-option label="2" :value="2"></el-option>
+          <el-option label="4" :value="4"></el-option>
+          <el-option label="8" :value="8"></el-option>
+          <el-option label="12" :value="12"></el-option>
+          <el-option label="16" :value="16"></el-option>
+        </el-select>
+      </div>
     </div>
     <div style="margin-top:16px">
       <el-button type="primary" @click="doGenerate" :loading="generating">生成视频</el-button>
-      <el-progress v-if="progressText" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
+      <el-progress v-if="progressText && !Array.isArray(progress)" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
       <span v-if="progressText" style="color:#e6a23c;margin-left:8px">{{ progressText }}</span>
+      <div v-if="progressText && Array.isArray(progress)" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%">
+        <div v-for="(p, i) in progress" :key="i">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:2px">线程 {{ i + 1 }}</div>
+          <el-progress :percentage="Math.round((p || 0) * 100)" :stroke-width="6"></el-progress>
+        </div>
+      </div>
     </div>
     <div class="result-box" v-html="result"></div>
   </el-card>
@@ -216,6 +233,7 @@ createApp({
       isSystemDark: mql.matches,
       generating: false,
       isDark: false,
+      segCount: 8,
     };
   },
   methods: {
@@ -259,6 +277,7 @@ createApp({
         bilingual: this.bilingual,
         cover: this.cover,
         background: this.bgHex(),
+        segCount: this.segCount,
       });
       if (!r.ok) { this.progressText = ''; return this.$message.error(r.error); }
       this.poll(r.taskId);
@@ -282,6 +301,7 @@ createApp({
           bilingual: this.bilingual,
           cover: this.cover,
           background: this.bgHex(),
+          segCount: this.segCount,
         });
         done++;
         this.batchProgress = `(${done}/${total} 已入队)`;
@@ -306,7 +326,11 @@ createApp({
         this.result = '<p style="color:#f56c6c">失败: ' + r.error + '</p>';
       } else {
         this.progressText = (r.status === 'pending' ? '排队中... ' : '生成中... ');
-        this.progress = Math.round((r.progress || 0) * 100);
+        if (Array.isArray(r.progress)) {
+          this.progress = r.progress;
+        } else {
+          this.progress = Math.round((r.progress || 0) * 100);
+        }
         this.progressStatus = r.status === 'pending' ? 'warning' : '';
         setTimeout(() => this.poll(taskId), 2000);
       }

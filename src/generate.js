@@ -27,7 +27,8 @@ async function generateVideo(input, options = {}) {
     songId,                     // 网易云 --id
     cover = false,              // 封面背景
     out = null,                 // 输出文件名
-    onProgress = null,          // 合成进度回调 (0~1)
+    onProgress = null,          // 进度回调 (0~1 数字, 或 {segIdx,progress} 对象)
+    segCount = 8,               // 分段并行数(线程数)
   } = options;
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
@@ -65,8 +66,7 @@ async function generateVideo(input, options = {}) {
 
   // 4. 合成（纯色背景分段并行编码吃多核；封面背景单段）
   const outPath = path.join(outDir, out || `${result.meta.id}_${h}.mp4`);
-  const SEG_COUNT = 8; // 分段数(D1581 16核, 8段并行)
-  if (!coverPath && result.audioMs > 60000) {
+  if (!coverPath && segCount > 1 && result.audioMs > 60000) {
     await runFfmpegSegmented({
       audioPath: result.audioPath,
       assText,
@@ -74,7 +74,7 @@ async function generateVideo(input, options = {}) {
       outPath,
       background,
       audioMs: result.audioMs,
-    }, SEG_COUNT, (p) => {
+    }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress(p);
     });
   } else {
