@@ -303,20 +303,43 @@ app.post('/api/history/delete', (req, res) => {
   res.json({ ok: true });
 });
 
-// 输出目录磁盘占用
-app.get('/api/stats', (req, res) => {
-  const outputDir = path.join(ROOT, 'output');
+// 计算目录文件总大小
+function dirSize(dir) {
   let total = 0;
   let count = 0;
   try {
-    for (const f of fs.readdirSync(outputDir)) {
+    for (const f of fs.readdirSync(dir)) {
       try {
-        const st = fs.statSync(path.join(outputDir, f));
+        const st = fs.statSync(path.join(dir, f));
         if (st.isFile()) { total += st.size; count++; }
       } catch (e) {}
     }
   } catch (e) {}
-  res.json({ ok: true, outputSize: total, outputCount: count });
+  return { total, count };
+}
+
+// 磁盘占用（output 成品 + tmp 缓存）
+app.get('/api/stats', (req, res) => {
+  const out = dirSize(path.join(ROOT, 'output'));
+  const tmp = dirSize(path.join(ROOT, 'tmp'));
+  res.json({ ok: true, outputSize: out.total, outputCount: out.count, tmpSize: tmp.total, tmpCount: tmp.count });
+});
+
+// 清理 tmp 缓存（释放磁盘，下次生成重新下载）
+app.post('/api/cache/clean', (req, res) => {
+  const tmpDir = path.join(ROOT, 'tmp');
+  let removed = 0;
+  let freed = 0;
+  try {
+    for (const f of fs.readdirSync(tmpDir)) {
+      const p = path.join(tmpDir, f);
+      try {
+        const st = fs.statSync(p);
+        if (st.isFile()) { freed += st.size; fs.unlinkSync(p); removed++; }
+      } catch (e) {}
+    }
+  } catch (e) {}
+  res.json({ ok: true, removed, freed });
 });
 
 // 清理孤儿文件（output 目录里历史记录没有的 mp4）

@@ -291,7 +291,8 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <b>历史记录</b>
         <div style="display:flex;gap:8px;align-items:center">
-          <span style="color:var(--muted);font-size:13px">占用 {{ formatSize(outputSize) }}</span>
+          <span style="color:var(--muted);font-size:13px">成品 {{ formatSize(outputSize) }} / 缓存 {{ formatSize(tmpSize) }}</span>
+          <el-button size="small" plain @click="cleanCache">清理缓存</el-button>
           <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:160px"></el-input>
           <el-button size="small" plain @click="cleanOrphan">清理孤儿文件</el-button>
           <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
@@ -396,6 +397,7 @@ createApp({
       previewVisible: false,
       previewUrl: '',
       outputSize: 0,
+      tmpSize: 0,
       presets: [],
       presetName: '',
       selectedPreset: '',
@@ -603,7 +605,14 @@ createApp({
     },
     async loadStats() {
       const r = await this.get('/api/stats');
-      if (r.ok) this.outputSize = r.outputSize;
+      if (r.ok) { this.outputSize = r.outputSize; this.tmpSize = r.tmpSize; }
+    },
+    async cleanCache() {
+      const r = await this.post('/api/cache/clean', {});
+      if (r.ok) {
+        this.$message.success(`已清理缓存(释放 ${this.formatSize(r.freed)})`);
+        this.loadStats();
+      }
     },
     async cleanOrphan() {
       const r = await this.post('/api/output/clean', {});
