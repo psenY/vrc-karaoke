@@ -3,29 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vrc-karaoke · VRChat 卡拉OK歌词视频生成器</title>
+<title>vrc-karaoke</title>
 <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<link rel="stylesheet" href="https://unpkg.com/element-plus/theme-chalk/dark/css-vars.css">
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
 <style>
-  body { margin: 0; background: #16162a; font-family: system-ui, -apple-system, sans-serif; }
+  /* 浅色(默认) */
+  :root {
+    --bg: #f5f6f8;
+    --text: #1f2329;
+    --muted: #86909c;
+    --card: #ffffff;
+    --hover: #f0f2f5;
+    --border: #e5e6eb;
+  }
+  /* 深色 */
+  html.dark {
+    --bg: #141414;
+    --text: #e5e6eb;
+    --muted: #86909c;
+    --card: #1d1e1f;
+    --hover: #262728;
+    --border: #333435;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    transition: background .2s, color .2s;
+  }
   #app { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
-  .hero { color: #fff; margin-bottom: 6px; }
-  .sub { color: #889; margin: 0 0 20px; font-size: 14px; }
-  .card { margin-bottom: 16px; }
-  .song-item { padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: background .15s; border-bottom: 1px solid #2a2a3e; }
-  .song-item:hover { background: #2a2a3e; }
-  .song-item .name { font-weight: 600; color: #e8e8f0; }
-  .song-item .artists { color: #889; font-size: 13px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .hero { color: var(--text); margin: 0; }
+  .card { margin-bottom: 16px; background: var(--card) !important; border: 1px solid var(--border) !important; }
+  .song-item { padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: background .15s; border-bottom: 1px solid var(--border); }
+  .song-item:hover { background: var(--hover); }
+  .song-item .name { font-weight: 600; color: var(--text); }
+  .song-item .artists { color: var(--muted); font-size: 13px; }
   .opts { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
   .opt { display: flex; align-items: center; gap: 6px; }
   .result-box { margin-top: 16px; }
-  .result-box a { color: #6ab0ff; word-break: break-all; }
+  .result-box a { color: #4a6cf7; word-break: break-all; }
 </style>
 </head>
 <body>
 <div id="app">
-  <h2 class="hero">vrc-karaoke</h2>
+  <div class="topbar">
+    <h2 class="hero">vrc-karaoke</h2>
+    <el-radio-group v-model="theme" size="small" @change="applyTheme">
+      <el-radio-button value="light">浅色</el-radio-button>
+      <el-radio-button value="dark">深色</el-radio-button>
+      <el-radio-button value="system">跟随系统</el-radio-button>
+    </el-radio-group>
+  </div>
 
   <el-card class="card" shadow="never">
     <el-row :gutter="8">
@@ -81,7 +113,7 @@
     <div style="margin-top:16px">
       <el-button type="primary" @click="doGenerate">生成视频</el-button>
       <el-progress v-if="progressText" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
-      <span v-if="progressText" style="color:#ffcc00;margin-left:8px">{{ progressText }}</span>
+      <span v-if="progressText" style="color:#e6a23c;margin-left:8px">{{ progressText }}</span>
     </div>
     <div class="result-box" v-html="result"></div>
   </el-card>
@@ -99,7 +131,7 @@
     </el-row>
     <div v-if="playlistName" style="margin-top:10px">
       <span>歌单 <b>{{ playlistName }}</b> 共 {{ playlist.length }} 首</span>
-      <span v-if="batchProgress" style="color:#ffcc00;margin-left:12px">{{ batchProgress }}</span>
+      <span v-if="batchProgress" style="color:#e6a23c;margin-left:12px">{{ batchProgress }}</span>
     </div>
   </el-card>
 
@@ -107,8 +139,8 @@
     <template #header>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <b>网易云登录</b>
-        <span v-if="loginNickname" style="color:#6dd98c">已登录：{{ loginNickname }}</span>
-        <span v-else style="color:#889">未登录</span>
+        <span v-if="loginNickname" style="color:#67c23a">已登录：{{ loginNickname }}</span>
+        <span v-else style="color:var(--muted)">未登录</span>
       </div>
     </template>
     <el-row :gutter="8">
@@ -132,7 +164,7 @@
       </el-table-column>
       <el-table-column label="操作" width="140">
         <template #default="scope">
-          <a :href="'/output/' + scope.row.outPath.split('/').pop()" download style="color:#6ab0ff">下载</a>
+          <a :href="'/output/' + scope.row.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
         </template>
       </el-table-column>
     </el-table>
@@ -140,9 +172,9 @@
 
   <el-dialog v-model="qrVisible" title="网易云扫码登录" width="320px" :close-on-click-modal="false">
     <div style="text-align:center">
-      <p v-if="qrStatus === 'wait'" style="color:#889">请用网易云音乐 App 扫码</p>
-      <p v-else-if="qrStatus === 'scanned'" style="color:#ffcc00">已扫码，请在手机上确认登录</p>
-      <p v-else-if="qrStatus === 'expired'" style="color:#ff7b7b">二维码已过期</p>
+      <p v-if="qrStatus === 'wait'" style="color:var(--muted)">请用网易云音乐 App 扫码</p>
+      <p v-else-if="qrStatus === 'scanned'" style="color:#e6a23c">已扫码，请在手机上确认登录</p>
+      <p v-else-if="qrStatus === 'expired'" style="color:#f56c6c">二维码已过期</p>
       <img v-if="qrImg" :src="qrImg" style="width:220px;height:220px">
       <div v-if="qrStatus === 'expired'" style="margin-top:8px">
         <el-button size="small" @click="startQrLogin">重新获取</el-button>
@@ -153,10 +185,12 @@
 
 <script>
 const { createApp } = Vue;
+const mql = window.matchMedia('(prefers-color-scheme: dark)');
 
 createApp({
   data() {
     return {
+      theme: localStorage.getItem('vrc-theme') || 'system',
       query: '',
       platform: 'netease',
       songs: [],
@@ -174,16 +208,21 @@ createApp({
       playlist: [],
       batchProgress: '',
       cookie: '',
-      cookieStatus: '',
+      loginNickname: '',
       history: [],
       qrVisible: false,
       qrImg: '',
       qrKey: '',
       qrStatus: 'wait',
-      loginNickname: '',
+      isSystemDark: mql.matches,
     };
   },
   methods: {
+    applyTheme() {
+      const isDark = this.theme === 'dark' || (this.theme === 'system' && this.isSystemDark);
+      document.documentElement.classList.toggle('dark', isDark);
+      localStorage.setItem('vrc-theme', this.theme);
+    },
     async doSearch() {
       if (!this.query.trim()) return this.$message.warning('请输入关键词');
       const r = await this.post('/api/search', { query: this.query.trim(), platform: this.platform });
@@ -246,13 +285,13 @@ createApp({
         const res = r.result;
         const filename = res.outPath.split('/').pop();
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
-          '<p style="color:#6dd98c;font-weight:600;margin:0 0 12px">生成完成</p>' +
+          '<p style="color:#67c23a;font-weight:600;margin:0 0 12px">生成完成</p>' +
           '<a href="/output/' + filename + '" download style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
           '</div>';
         this.loadHistory();
       } else if (r.status === 'failed') {
         this.progressText = '';
-        this.result = '<p style="color:#ff7b7b">失败: ' + r.error + '</p>';
+        this.result = '<p style="color:#f56c6c">失败: ' + r.error + '</p>';
       } else {
         this.progressText = (r.status === 'pending' ? '排队中... ' : '生成中... ');
         this.progress = Math.round((r.progress || 0) * 100);
@@ -299,7 +338,6 @@ createApp({
       } else if (r.code === 802) {
         this.qrStatus = 'scanned';
       }
-      // 801 = 等待扫码，保持 wait 继续轮询
       setTimeout(() => this.qrPoll(), 2000);
     },
     fmtTime(ts) {
@@ -315,6 +353,11 @@ createApp({
     },
   },
   mounted() {
+    this.applyTheme();
+    mql.addEventListener('change', (e) => {
+      this.isSystemDark = e.matches;
+      if (this.theme === 'system') this.applyTheme();
+    });
     this.loadHistory();
     this.loadConfig();
   },
