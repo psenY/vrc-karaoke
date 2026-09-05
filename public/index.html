@@ -30,13 +30,14 @@
 <p class="sub">VRChat 卡拉OK歌词视频生成器 · 下一句预览 + AB切换 + 逐字/双语</p>
 
 <div class="row">
-  <input type="text" id="query" placeholder="输入歌名/关键词/链接 (网易云 / YouTube / QQ音乐)">
+  <input type="text" id="query" placeholder="歌名/关键词（搜索），或直接粘贴链接">
   <select id="platform">
     <option value="">搜索:网易云</option>
     <option value="netease">搜索:网易云</option>
     <option value="qqmusic">搜索:QQ音乐</option>
   </select>
-  <button onclick="doSearch()">搜索</button>
+  <button onclick="doSearch()">搜索选歌</button>
+  <button onclick="doGenerate()">直接生成</button>
 </div>
 
 <div id="songs"></div>
@@ -58,7 +59,7 @@
   <label><input type="checkbox" id="bilingual"> 双语</label>
   <label><input type="checkbox" id="upload" checked> 上传catbox直链</label>
   <label><input type="checkbox" id="cover"> 封面背景</label>
-  <label>背景 <input id="background" value="0x1a1a2e" style="width:90px"></label>
+  <label>背景 <input type="color" id="background" value="#1a1a2e" style="width:44px;height:32px;padding:2px;border:none"></label>
 </div>
 
 <div class="row">
@@ -105,6 +106,10 @@ function selectSong(i) {
   document.getElementById('songs').innerHTML = `<p>已选: <b>${selected.name}</b> - ${selected.artists}</p>`;
 }
 
+function bgValue() {
+  return '0x' + document.getElementById('background').value.replace('#', '');
+}
+
 async function doGenerate() {
   const query = document.getElementById('query').value.trim();
   const input = selected ? selected.url : query;
@@ -119,7 +124,7 @@ async function doGenerate() {
       bilingual: document.getElementById('bilingual').checked,
       upload: document.getElementById('upload').checked,
       cover: document.getElementById('cover').checked,
-      background: document.getElementById('background').value,
+      background: bgValue(),
     })
   }).then(r => r.json());
   if (!r.ok) { document.getElementById('progress').textContent = ''; return alert('错误: ' + r.error); }
@@ -142,7 +147,7 @@ async function batchGenerate() {
   let done = 0;
   document.getElementById('batchProgress').textContent = `(0/${total} 已入队)`;
   for (const s of playlistSongs) {
-    await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: `https://music.163.com/song?id=${s.id}`, highlight: document.getElementById('highlight').value || undefined, bilingual: document.getElementById('bilingual').checked, upload: document.getElementById('upload').checked, cover: document.getElementById('cover').checked }) });
+    await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: `https://music.163.com/song?id=${s.id}`, highlight: document.getElementById('highlight').value || undefined, bilingual: document.getElementById('bilingual').checked, upload: document.getElementById('upload').checked, cover: document.getElementById('cover').checked, background: bgValue() }) });
     done++;
     document.getElementById('batchProgress').textContent = `(${done}/${total} 已入队)`;
   }
