@@ -199,6 +199,7 @@
       </div>
     </div>
     <div class="result-box" v-html="result"></div>
+    <el-button v-if="retryVisible" type="warning" size="small" @click="retry" style="margin-top:8px">重试</el-button>
   </el-card>
 
   <el-card class="card" shadow="never" v-if="queue.length">
@@ -372,6 +373,8 @@ createApp({
       loginPassword: '',
       adminPassword: '',
       historyFilter: '',
+      lastGenerate: null,
+      retryVisible: false,
     };
   },
   computed: {
@@ -411,14 +414,8 @@ createApp({
     bgHex() {
       return '0x' + (this.background || '#1a1a2e').replace('#', '');
     },
-    async doGenerate() {
-      const input = this.selected ? this.selected.url : this.query.trim();
-      if (!input) return this.$message.warning('请先搜索选歌，或直接粘贴链接');
-      this.generating = true;
-      this.progressText = '生成中...';
-      this.progress = 0;
-      this.result = '';
-      const r = await this.post('/api/generate', {
+    buildGenerateBody(input) {
+      return {
         input,
         highlight: this.highlight || undefined,
         bilingual: this.bilingual,
@@ -435,8 +432,30 @@ createApp({
         nextColor: this.nextColor,
         titleColor: this.titleColor,
         progressColor: this.progressColor,
-      });
-      if (!r.ok) { this.progressText = ''; return this.$message.error(r.error); }
+      };
+    },
+    async doGenerate() {
+      const input = this.selected ? this.selected.url : this.query.trim();
+      if (!input) return this.$message.warning('请先搜索选歌，或直接粘贴链接');
+      this.lastGenerate = this.buildGenerateBody(input);
+      this.retryVisible = false;
+      this.generating = true;
+      this.progressText = '生成中...';
+      this.progress = 0;
+      this.result = '';
+      const r = await this.post('/api/generate', this.lastGenerate);
+      if (!r.ok) { this.progressText = ''; this.retryVisible = true; return this.$message.error(r.error); }
+      this.poll(r.taskId);
+    },
+    async retry() {
+      if (!this.lastGenerate) return;
+      this.retryVisible = false;
+      this.generating = true;
+      this.progressText = '生成中...';
+      this.progress = 0;
+      this.result = '';
+      const r = await this.post('/api/generate', this.lastGenerate);
+      if (!r.ok) { this.progressText = ''; this.retryVisible = true; return this.$message.error(r.error); }
       this.poll(r.taskId);
     },
     async parsePlaylist() {
@@ -494,6 +513,7 @@ createApp({
         this.loadHistory();
       } else if (r.status === 'failed') {
         this.generating = false;
+        this.retryVisible = true;
         this.progressText = '';
         this.result = '<p style="color:#f56c6c">失败: ' + r.error + '</p>';
       } else {
