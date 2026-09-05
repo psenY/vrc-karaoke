@@ -76,8 +76,8 @@
   <el-card class="card" shadow="never" v-if="songs.length">
     <template #header><b>搜索结果</b>（点选一首）</template>
     <div class="song-item" v-for="(s, i) in songs" :key="s.id" @click="selectSong(i)">
-      <div class="name">{{ s.name }}</div>
-      <div class="artists">{{ s.artists }}</div>
+      <div class="name">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span></div>
+      <div class="artists">{{ s.artists }}<span v-if="s.duration"> · {{ fmtDuration(s.duration) }}</span></div>
     </div>
   </el-card>
 
@@ -698,6 +698,13 @@ createApp({
     },
     fmtTime(ts) {
       return new Date(ts).toLocaleString('zh-CN');
+    },
+    fmtDuration(ms) {
+      if (!ms) return '';
+      const sec = Math.round(ms / 1000);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${String(s).padStart(2, '0')}`;
     },
     async post(url, body) {
       const headers = { 'Content-Type': 'application/json' };

@@ -14,6 +14,8 @@ async function searchSong(keywords, limit = 5) {
     name: s.name,
     artists: (s.artists || s.ar || []).map(a => a.name).join(' / '),
     album: s.album?.name || s.al?.name || '',
+    duration: s.duration || s.dt || 0,
+    fee: s.fee,
   }));
 }
 

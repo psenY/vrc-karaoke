@@ -153,6 +153,8 @@ app.post('/api/search', async (req, res) => {
         id: s.id,
         name: s.name,
         artists: s.artists,
+        duration: s.duration || 0,
+        fee: s.fee,
         url: urlFor(platform.id, s),
       })),
     });
