@@ -103,6 +103,17 @@ async function checkQrLogin(key) {
   return { code: body.code, cookie: body.cookie || '' };
 }
 
+/** 用 cookie 获取账号信息（昵称） */
+async function getUserInfo(cookie) {
+  try {
+    const res = await api.login_status({ cookie });
+    const profile = res.body?.data?.profile || res.body?.profile || {};
+    return { nickname: profile.nickname || '' };
+  } catch (e) {
+    return { nickname: '' };
+  }
+}
+
 /** 下载文件到本地，自动跟随重定向 + 网络/DNS 错误自动重试 */
 function download(url, destPath, retries = 3) {
   return new Promise((resolve, reject) => {
@@ -136,4 +147,4 @@ function download(url, destPath, retries = 3) {
   });
 }
 
-module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, getOuterUrl, getQrKey, getQrImg, checkQrLogin, download };
+module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, getOuterUrl, getQrKey, getQrImg, checkQrLogin, getUserInfo, download };

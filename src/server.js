@@ -5,7 +5,7 @@ const fs = require('fs');
 const express = require('express');
 const { platforms } = require('./platforms');
 const { generateVideo } = require('./generate');
-const { getPlaylist, getQrKey, getQrImg, checkQrLogin } = require('./core/netease-api');
+const { getPlaylist, getQrKey, getQrImg, checkQrLogin, getUserInfo } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
 const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
@@ -128,9 +128,14 @@ app.get('/api/login/check', async (req, res) => {
 });
 
 // 配置：读 cookie 状态
-app.get('/api/config', (req, res) => {
+app.get('/api/config', async (req, res) => {
   const cfg = readConfig();
-  res.json({ ok: true, hasCookie: !!cfg.cookie });
+  let nickname = '';
+  if (cfg.cookie) {
+    const info = await getUserInfo(cfg.cookie);
+    nickname = info.nickname;
+  }
+  res.json({ ok: true, hasCookie: !!cfg.cookie, nickname });
 });
 
 // 配置：保存 cookie

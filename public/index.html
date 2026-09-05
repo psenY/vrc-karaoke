@@ -25,8 +25,7 @@
 </head>
 <body>
 <div id="app">
-  <h2 class="hero">🎤 vrc-karaoke</h2>
-  <p class="sub">VRChat 卡拉OK歌词视频生成器 · 下一句预览 + AB切换 + 逐字/双语</p>
+  <h2 class="hero">vrc-karaoke</h2>
 
   <el-card class="card" shadow="never">
     <el-row :gutter="8">
@@ -105,15 +104,21 @@
   </el-card>
 
   <el-card class="card" shadow="never">
-    <template #header><b>网易云 cookie</b>（拿高音质/会员歌）</template>
+    <template #header>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>网易云登录</b>
+        <span v-if="loginNickname" style="color:#6dd98c">已登录：{{ loginNickname }}</span>
+        <span v-else style="color:#889">未登录</span>
+      </div>
+    </template>
     <el-row :gutter="8">
-      <el-col :span="18">
+      <el-col :span="16">
         <el-input v-model="cookie" placeholder="粘贴 cookie" clearable></el-input>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-button @click="saveCookie">保存</el-button>
         <el-button type="success" @click="startQrLogin">扫码登录</el-button>
-        <span v-if="cookieStatus" style="margin-left:8px;color:#6dd98c">{{ cookieStatus }}</span>
+        <el-button v-if="loginNickname" type="danger" plain @click="logout">退出登录</el-button>
       </el-col>
     </el-row>
   </el-card>
@@ -175,6 +180,7 @@ createApp({
       qrImg: '',
       qrKey: '',
       qrStatus: 'wait',
+      loginNickname: '',
     };
   },
   methods: {
@@ -239,12 +245,14 @@ createApp({
         this.progressText = '';
         const res = r.result;
         const filename = res.outPath.split('/').pop();
-        this.result = '<p style="color:#6dd98c;font-weight:600">✅ 生成完成</p>' +
-          '<p><a href="/output/' + filename + '" download>📥 下载 MP4</a></p>';
+        this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
+          '<p style="color:#6dd98c;font-weight:600;margin:0 0 12px">生成完成</p>' +
+          '<a href="/output/' + filename + '" download style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
+          '</div>';
         this.loadHistory();
       } else if (r.status === 'failed') {
         this.progressText = '';
-        this.result = '<p style="color:#ff7b7b">❌ 失败: ' + r.error + '</p>';
+        this.result = '<p style="color:#ff7b7b">失败: ' + r.error + '</p>';
       } else {
         this.progressText = (r.status === 'pending' ? '排队中... ' : '生成中... ');
         this.progress = Math.round((r.progress || 0) * 100);
@@ -258,8 +266,16 @@ createApp({
     },
     async saveCookie() {
       const r = await this.post('/api/config', { cookie: this.cookie.trim() });
-      this.cookieStatus = r.ok ? (r.hasCookie ? '已保存' : '已清空') : '失败';
       if (r.ok) this.$message.success(r.hasCookie ? 'cookie 已保存' : 'cookie 已清空');
+      this.loadConfig();
+    },
+    async loadConfig() {
+      const r = await this.get('/api/config');
+      if (r.ok) this.loginNickname = r.nickname || '';
+    },
+    async logout() {
+      const r = await this.post('/api/config', { cookie: '' });
+      if (r.ok) { this.loginNickname = ''; this.cookie = ''; this.$message.success('已退出登录'); }
     },
     async startQrLogin() {
       const r = await this.post('/api/login/qr', {});
@@ -275,7 +291,7 @@ createApp({
       if (r.code === 803) {
         this.qrVisible = false;
         this.$message.success('登录成功，cookie 已自动保存');
-        this.cookieStatus = '已通过扫码登录';
+        this.loadConfig();
         return;
       } else if (r.code === 800) {
         this.qrStatus = 'expired';
@@ -300,6 +316,7 @@ createApp({
   },
   mounted() {
     this.loadHistory();
+    this.loadConfig();
   },
 }).use(ElementPlus).mount('#app');
 </script>
