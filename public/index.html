@@ -160,7 +160,11 @@ async function poll(taskId) {
     const res = r.result;
     const filename = res.outPath.split('/').pop();
     let html = '<p class="done-title">✅ 生成完成</p><p><a href="/output/' + filename + '" download>📥 下载 MP4</a></p>';
-    if (res.url) html += '<p>🔗 直链: <a href="' + res.url + '" target="_blank">' + res.url + '</a><br><span class="sub">贴进 VRChat 播放器即可</span></p>';
+    if (res.url) {
+      html += '<p>🔗 直链: <a href="' + res.url + '" target="_blank">' + res.url + '</a><br><span class="sub">贴进 VRChat 播放器即可</span></p>';
+    } else if (res.uploadError) {
+      html += '<p class="error">⚠️ 直链上传失败: ' + res.uploadError + '<br><span class="sub">但本地文件已生成，可直接下载</span></p>';
+    }
     document.getElementById('result').innerHTML = html;
   } else if (r.status === 'failed') {
     document.getElementById('progress').textContent = '';

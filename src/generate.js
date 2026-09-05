@@ -78,11 +78,18 @@ async function generateVideo(input, options = {}) {
     }
   });
 
-  // 5. 可选上传 catbox
+  // 5. 可选上传 catbox（失败不阻断，仅记录错误，仍可下载本地文件）
   let url = null;
-  if (upload) url = await uploadCatbox(outPath);
+  let uploadError = null;
+  if (upload) {
+    try {
+      url = await uploadCatbox(outPath);
+    } catch (e) {
+      uploadError = e.message;
+    }
+  }
 
-  return { outPath, url, meta: result.meta, highlight: h };
+  return { outPath, url, uploadError, meta: result.meta, highlight: h };
 }
 
 module.exports = { generateVideo };
