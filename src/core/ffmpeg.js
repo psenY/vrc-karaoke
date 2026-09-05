@@ -48,9 +48,9 @@ function buildArgs(opts) {
 
   const assFilter = `ass=${assPath}` + (fontDir ? `:fontsdir=${fontDir}` : '');
 
-  // 封面背景：缩放铺满 + 模糊，歌词叠加
+  // 封面背景：coverPath 已是预生成的模糊背景图，歌词叠加
   if (coverPath) {
-    const filterComplex = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2[bg];[bg]${assFilter}[v]`;
+    const filterComplex = `[0:v]${assFilter}[v]`;
     return [
       '-y',
       '-loop', '1', '-i', coverPath,
@@ -143,15 +143,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   const aacPath = path.join(tmpDir, '_audio.aac');
   await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ar', '44100', '-ac', '2', aacPath], null, onSpawn);
 
-  // 1.5 封面背景：预生成模糊背景图（blur 只做一次，分段直接复用，避免每段重复 blur）
-  let bgPath = coverPath;
-  if (coverPath) {
-    const blurredPath = path.join(tmpDir, '_bg.jpg');
-    await runFfmpeg(['-y', '-loop', '1', '-i', coverPath, '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2`, '-frames:v', '1', blurredPath], null, onSpawn);
-    bgPath = blurredPath;
-  }
-
-  // 2. 视频分段并行编码（无音频 -an）
+  // 2. 视频分段并行编码（无音频 -an；coverPath 已是预生成的模糊背景图）
   const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
   const segOuts = segments.map(s => path.join(tmpDir, `seg_${s.idx}.mp4`));
   const segAsses = segments.map(s => path.join(tmpDir, `seg_${s.idx}.ass`));
@@ -162,7 +154,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     fs.writeFileSync(segAssPath, segmentAss(assText, seg.startMs, seg.endMs));
     const segArgs = coverPath ? [
       '-y',
-      '-loop', '1', '-i', bgPath,
+      '-loop', '1', '-i', coverPath,
       '-vf', assFilter(segAssPath),
       '-an',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
@@ -193,8 +185,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   await runFfmpeg(['-y', '-i', videoPath, '-i', aacPath, '-c', 'copy', '-shortest', '-movflags', '+faststart', outPath], null, onSpawn);
 
   // 清理临时文件
-  const extraCleanup = coverPath ? [path.join(tmpDir, '_bg.jpg')] : [];
-  for (const p of [...segOuts, ...segAsses, videoPath, aacPath, ...extraCleanup]) { try { fs.unlinkSync(p); } catch (e) {} }
+  for (const p of [...segOuts, ...segAsses, videoPath, aacPath]) { try { fs.unlinkSync(p); } catch (e) {} }
 }
 
 module.exports = { probeDuration, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };

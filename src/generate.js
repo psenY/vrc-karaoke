@@ -65,14 +65,17 @@ async function generateVideo(input, options = {}) {
   let h = highlight;
   if (h === undefined) h = result.meta.source === 'youtube' ? 'word' : 'line';
 
-  // 2.5 下载封面（可选，失败退回纯色）
+  // 2.5 下载封面（可选，失败退回纯色）+ 预生成模糊背景图（blur 只做一次，分段/单段共用）
   let coverPath = null;
   if (cover && result.meta.coverUrl) {
     try {
       coverPath = path.join(workDir, `${result.meta.id}_cover.jpg`);
       await download(result.meta.coverUrl, coverPath);
+      const blurredPath = path.join(workDir, `${result.meta.id}_bg.jpg`);
+      await runFfmpeg(['-y', '-loop', '1', '-i', coverPath, '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2`, '-frames:v', '1', blurredPath], null, onSpawn);
+      coverPath = blurredPath;  // 后续用已模糊的背景图
     } catch (e) {
-      console.log('[提示] 封面下载失败，退回纯色背景:', e.message.split('\n')[0]);
+      console.log('[提示] 封面处理失败，退回纯色背景:', e.message.split('\n')[0]);
       coverPath = null;
     }
   }
