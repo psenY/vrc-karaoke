@@ -265,7 +265,7 @@ createApp({
       const r = await this.post('/api/login/qr', {});
       if (!r.ok) return this.$message.error(r.error);
       this.qrKey = r.key;
-      this.qrImg = r.qrimg ? 'data:image/png;base64,' + r.qrimg : '';
+      this.qrImg = r.qrimg ? (r.qrimg.startsWith('data:') ? r.qrimg : 'data:image/png;base64,' + r.qrimg) : '';
       this.qrStatus = 'wait';
       this.qrVisible = true;
       this.qrPoll();
