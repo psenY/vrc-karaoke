@@ -143,6 +143,14 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   const aacPath = path.join(tmpDir, '_audio.aac');
   await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ar', '44100', '-ac', '2', aacPath], null, onSpawn);
 
+  // 1.5 封面背景：预生成模糊背景图（blur 只做一次，分段直接复用，避免每段重复 blur）
+  let bgPath = coverPath;
+  if (coverPath) {
+    const blurredPath = path.join(tmpDir, '_bg.jpg');
+    await runFfmpeg(['-y', '-loop', '1', '-i', coverPath, '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2`, '-frames:v', '1', blurredPath], null, onSpawn);
+    bgPath = blurredPath;
+  }
+
   // 2. 视频分段并行编码（无音频 -an）
   const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
   const segOuts = segments.map(s => path.join(tmpDir, `seg_${s.idx}.mp4`));
@@ -154,8 +162,8 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     fs.writeFileSync(segAssPath, segmentAss(assText, seg.startMs, seg.endMs));
     const segArgs = coverPath ? [
       '-y',
-      '-loop', '1', '-i', coverPath,
-      '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2,${assFilter(segAssPath)}`,
+      '-loop', '1', '-i', bgPath,
+      '-vf', assFilter(segAssPath),
       '-an',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
       '-t', String((seg.endMs - seg.startMs) / 1000),
@@ -185,7 +193,8 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   await runFfmpeg(['-y', '-i', videoPath, '-i', aacPath, '-c', 'copy', '-shortest', '-movflags', '+faststart', outPath], null, onSpawn);
 
   // 清理临时文件
-  for (const p of [...segOuts, ...segAsses, videoPath, aacPath]) { try { fs.unlinkSync(p); } catch (e) {} }
+  const extraCleanup = coverPath ? [path.join(tmpDir, '_bg.jpg')] : [];
+  for (const p of [...segOuts, ...segAsses, videoPath, aacPath, ...extraCleanup]) { try { fs.unlinkSync(p); } catch (e) {} }
 }
 
 module.exports = { probeDuration, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };
