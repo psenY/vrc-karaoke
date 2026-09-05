@@ -277,12 +277,13 @@ createApp({
         this.$message.success('登录成功，cookie 已自动保存');
         this.cookieStatus = '已通过扫码登录';
         return;
-      } else if (r.code === 802) {
+      } else if (r.code === 800) {
         this.qrStatus = 'expired';
         return;
-      } else if (r.code === 801) {
+      } else if (r.code === 802) {
         this.qrStatus = 'scanned';
       }
+      // 801 = 等待扫码，保持 wait 继续轮询
       setTimeout(() => this.qrPoll(), 2000);
     },
     fmtTime(ts) {
