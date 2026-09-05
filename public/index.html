@@ -61,19 +61,19 @@
 
   <el-card class="card" shadow="never">
     <el-row :gutter="8">
-      <el-col :span="14">
+      <el-col :xs="24" :sm="14" :md="14">
         <el-input v-model="query" placeholder="歌名/关键词，或直接粘贴链接" clearable @keyup.enter="doSearch"></el-input>
       </el-col>
-      <el-col :span="4">
+      <el-col :xs="12" :sm="4" :md="4">
         <el-select v-model="platform" placeholder="搜索平台" style="width:100%">
           <el-option label="网易云" value="netease"></el-option>
           <el-option label="QQ音乐" value="qqmusic"></el-option>
         </el-select>
       </el-col>
-      <el-col :span="3">
+      <el-col :xs="6" :sm="3" :md="3">
         <el-button @click="doSearch">搜索选歌</el-button>
       </el-col>
-      <el-col :span="3">
+      <el-col :xs="6" :sm="3" :md="3">
         <el-button type="primary" @click="doGenerate">直接生成</el-button>
       </el-col>
     </el-row>
@@ -121,10 +121,10 @@
   <el-card class="card" shadow="never">
     <template #header><b>歌单批量生成</b>（网易云歌单链接）</template>
     <el-row :gutter="8">
-      <el-col :span="16">
+      <el-col :xs="24" :sm="16" :md="16">
         <el-input v-model="playlistUrl" placeholder="https://music.163.com/playlist?id=xxx"></el-input>
       </el-col>
-      <el-col :span="8">
+      <el-col :xs="24" :sm="8" :md="8">
         <el-button @click="parsePlaylist">解析歌单</el-button>
         <el-button type="primary" @click="batchGenerate" v-if="playlistName" style="margin-left:8px">批量生成</el-button>
       </el-col>
@@ -144,10 +144,10 @@
       </div>
     </template>
     <el-row :gutter="8">
-      <el-col :span="16">
+      <el-col :xs="24" :sm="16" :md="16">
         <el-input v-model="cookie" placeholder="粘贴 cookie" clearable></el-input>
       </el-col>
-      <el-col :span="8">
+      <el-col :xs="24" :sm="8" :md="8">
         <el-button @click="saveCookie">保存</el-button>
         <el-button type="success" @click="startQrLogin">扫码登录</el-button>
         <el-button v-if="loginNickname" type="danger" plain @click="logout">退出登录</el-button>
@@ -286,6 +286,7 @@ createApp({
         const filename = res.outPath.split('/').pop();
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
           '<p style="color:#67c23a;font-weight:600;margin:0 0 12px">生成完成</p>' +
+          '<video src="/output/' + filename + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
           '<a href="/output/' + filename + '" download style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
           '</div>';
         this.loadHistory();
