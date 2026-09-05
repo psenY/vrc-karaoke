@@ -293,6 +293,7 @@
         <div style="display:flex;gap:8px;align-items:center">
           <span style="color:var(--muted);font-size:13px">占用 {{ formatSize(outputSize) }}</span>
           <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:160px"></el-input>
+          <el-button size="small" plain @click="cleanOrphan">清理孤儿文件</el-button>
           <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
         </div>
       </div>
@@ -594,6 +595,13 @@ createApp({
     async loadStats() {
       const r = await this.get('/api/stats');
       if (r.ok) this.outputSize = r.outputSize;
+    },
+    async cleanOrphan() {
+      const r = await this.post('/api/output/clean', {});
+      if (r.ok) {
+        this.$message.success(`已清理 ${r.removed} 个孤儿文件`);
+        this.loadStats();
+      }
     },
     formatSize(bytes) {
       if (!bytes) return '0 MB';

@@ -308,6 +308,22 @@ app.get('/api/stats', (req, res) => {
   res.json({ ok: true, outputSize: total, outputCount: count });
 });
 
+// 清理孤儿文件（output 目录里历史记录没有的 mp4）
+app.post('/api/output/clean', (req, res) => {
+  const outputDir = path.join(ROOT, 'output');
+  const h = readHistory();
+  const known = new Set(h.map(item => item.outPath.split('/').pop()));
+  let removed = 0;
+  try {
+    for (const f of fs.readdirSync(outputDir)) {
+      if (f.endsWith('.mp4') && !known.has(f)) {
+        try { fs.unlinkSync(path.join(outputDir, f)); removed++; } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  res.json({ ok: true, removed });
+});
+
 // 查询任务状态
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
