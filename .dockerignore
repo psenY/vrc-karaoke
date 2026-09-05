@@ -4,3 +4,8 @@ tmp/
 fonts/
 .git/
 *.log
+test/
+config.json
+.DS_Store
+*.tar.gz
+*.md
