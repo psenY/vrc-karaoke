@@ -410,3 +410,17 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`vrc-karaoke WebUI 运行在 http://127.0.0.1:${PORT}`);
 });
+
+// 进程级异常处理（常驻服务兜底，避免未处理异常导致进程崩溃）
+process.on('unhandledRejection', (reason) => {
+  console.error('[错误] 未处理的 Promise 拒绝:', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[错误] 未捕获异常:', err.message || err);
+});
+
+// 优雅关闭（docker stop 时收到 SIGTERM）
+process.on('SIGTERM', () => {
+  console.log('[提示] 收到 SIGTERM，正在关闭...');
+  process.exit(0);
+});
