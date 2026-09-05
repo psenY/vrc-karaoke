@@ -1,6 +1,7 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const { searchSong, getLyric, getSongUrl, getSongDetail, getOuterUrl, download } = require('../core/netease-api');
 const { parseLrc } = require('../core/lyrics');
 const { probeDuration } = require('../core/ffmpeg');
@@ -73,16 +74,27 @@ module.exports = {
       translation: transMap[l.time] || '',
     }));
 
-    // 3. 音频（outer/url 优先拿免费歌，失败走 song_url 试听拦截）
+    // 3. 音频（缓存复用 + outer/url 优先拿免费歌，失败走 song_url 试听拦截）
     const detail = await getSongDetail(id);
-    const outerUrl = await getOuterUrl(id);
+    const cachedPath = path.join(workDir, String(id) + '.mp3');
     let audio;
-    if (outerUrl) {
-      const audioPath = path.join(workDir, String(id) + '.mp3');
-      await download(outerUrl, audioPath);
-      audio = { durationMs: await probeDuration(audioPath), path: audioPath };
-    } else {
-      audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id)), detail.dt || 0);
+    // 缓存命中：已有完整音频（时长匹配），跳过下载
+    if (fs.existsSync(cachedPath)) {
+      try {
+        const cachedMs = await probeDuration(cachedPath);
+        if (detail.dt <= 0 || cachedMs >= detail.dt * 0.95) {
+          audio = { durationMs: cachedMs, path: cachedPath };
+        }
+      } catch (e) {}
+    }
+    if (!audio) {
+      const outerUrl = await getOuterUrl(id);
+      if (outerUrl) {
+        await download(outerUrl, cachedPath);
+        audio = { durationMs: await probeDuration(cachedPath), path: cachedPath };
+      } else {
+        audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id)), detail.dt || 0);
+      }
     }
 
     if (!title && detail.name) {
