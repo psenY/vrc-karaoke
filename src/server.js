@@ -19,24 +19,26 @@ app.use('/output', express.static(path.join(ROOT, 'output')));
 const tasks = new Map();
 let taskSeq = 0;
 const queue = [];
-let running = false;
+let running = 0;
+const MAX_CONCURRENT = 4; // 并发数(充分利用多核, D1581 16核32线程)
 
 function runNext() {
-  if (running || queue.length === 0) return;
-  running = true;
-  const { id, input, options } = queue.shift();
-  const t = tasks.get(id);
-  t.status = 'running';
-  t.progress = 0;
-  options.onProgress = (progress) => { t.progress = progress; };
-  generateVideo(input, options)
-    .then(result => {
-      t.status = 'done';
-      t.result = result;
-      appendHistory({ input, title: result.meta.title, source: result.meta.source, outPath: result.outPath, url: result.url, time: Date.now() });
-    })
-    .catch(err => { t.status = 'failed'; t.error = err.message; })
-    .finally(() => { running = false; runNext(); });
+  while (running < MAX_CONCURRENT && queue.length > 0) {
+    const { id, input, options } = queue.shift();
+    const t = tasks.get(id);
+    t.status = 'running';
+    t.progress = 0;
+    running++;
+    options.onProgress = (progress) => { t.progress = progress; };
+    generateVideo(input, options)
+      .then(result => {
+        t.status = 'done';
+        t.result = result;
+        appendHistory({ input, title: result.meta.title, source: result.meta.source, outPath: result.outPath, url: result.url, time: Date.now() });
+      })
+      .catch(err => { t.status = 'failed'; t.error = err.message; })
+      .finally(() => { running--; runNext(); });
+  }
 }
 
 // ---- 历史记录 ----
