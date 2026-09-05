@@ -74,7 +74,7 @@
         <el-button @click="doSearch">搜索选歌</el-button>
       </el-col>
       <el-col :xs="6" :sm="3" :md="3">
-        <el-button type="primary" @click="doGenerate">直接生成</el-button>
+        <el-button type="primary" @click="doGenerate" :loading="generating">直接生成</el-button>
       </el-col>
     </el-row>
   </el-card>
@@ -111,7 +111,7 @@
       </div>
     </div>
     <div style="margin-top:16px">
-      <el-button type="primary" @click="doGenerate">生成视频</el-button>
+      <el-button type="primary" @click="doGenerate" :loading="generating">生成视频</el-button>
       <el-progress v-if="progressText" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
       <span v-if="progressText" style="color:#e6a23c;margin-left:8px">{{ progressText }}</span>
     </div>
@@ -156,7 +156,12 @@
   </el-card>
 
   <el-card class="card" shadow="never">
-    <template #header><b>历史记录</b></template>
+    <template #header>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>历史记录</b>
+        <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
+      </div>
+    </template>
     <el-table :data="history" stripe size="small" empty-text="暂无记录">
       <el-table-column prop="title" label="歌曲" min-width="200"></el-table-column>
       <el-table-column label="时间" width="170">
@@ -215,6 +220,7 @@ createApp({
       qrKey: '',
       qrStatus: 'wait',
       isSystemDark: mql.matches,
+      generating: false,
     };
   },
   methods: {
@@ -241,6 +247,7 @@ createApp({
     async doGenerate() {
       const input = this.selected ? this.selected.url : this.query.trim();
       if (!input) return this.$message.warning('请先搜索选歌，或直接粘贴链接');
+      this.generating = true;
       this.progressText = '生成中...';
       this.progress = 0;
       this.result = '';
@@ -281,6 +288,7 @@ createApp({
     async poll(taskId) {
       const r = await this.get('/api/task/' + taskId);
       if (r.status === 'done') {
+        this.generating = false;
         this.progressText = '';
         const res = r.result;
         const filename = res.outPath.split('/').pop();
@@ -291,6 +299,7 @@ createApp({
           '</div>';
         this.loadHistory();
       } else if (r.status === 'failed') {
+        this.generating = false;
         this.progressText = '';
         this.result = '<p style="color:#f56c6c">失败: ' + r.error + '</p>';
       } else {
@@ -303,6 +312,10 @@ createApp({
     async loadHistory() {
       const r = await this.get('/api/history');
       this.history = r.ok ? r.history : [];
+    },
+    async clearHistory() {
+      const r = await this.get('/api/history/clear');
+      if (r.ok) { this.history = []; this.$message.success('已清空历史'); }
     },
     async saveCookie() {
       const r = await this.post('/api/config', { cookie: this.cookie.trim() });

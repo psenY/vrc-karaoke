@@ -174,6 +174,12 @@ app.get('/api/history', (req, res) => {
   res.json({ ok: true, history: readHistory() });
 });
 
+// 清空历史
+app.get('/api/history/clear', (req, res) => {
+  try { fs.writeFileSync(HISTORY_FILE, '[]'); } catch (e) {}
+  res.json({ ok: true });
+});
+
 // 查询任务状态
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
