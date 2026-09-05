@@ -34,10 +34,10 @@ function buildArgs(opts) {
     outPath,
     width = 1920,
     height = 1080,
-    fps = 30,
+    fps = 24,
     background = '0x1a1a2e',
     crf = 20,
-    preset = 'medium',
+    preset = 'veryfast',
     audioBitrate = '192k',
     coverPath = null,
   } = opts;
@@ -46,7 +46,7 @@ function buildArgs(opts) {
 
   // 封面背景：缩放铺满 + 模糊，歌词叠加
   if (coverPath) {
-    const filterComplex = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=15:3[bg];[bg]${assFilter}[v]`;
+    const filterComplex = `[0:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2[bg];[bg]${assFilter}[v]`;
     return [
       '-y',
       '-loop', '1', '-i', coverPath,
