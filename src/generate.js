@@ -35,7 +35,10 @@ async function generateVideo(input, options = {}) {
 
   // 1. 识别平台 + 抓取
   const platform = findPlatform(input, { explicitId: !!songId });
-  const result = await platform.fetch(input, { workDir, cookie, songId });
+  const result = await platform.fetch(input, {
+    workDir, cookie, songId,
+    onProgress: (p) => { if (typeof onProgress === 'function') onProgress({ phase: 'download', progress: p }); },
+  });
 
   // 2. 高亮默认值
   let h = highlight;
@@ -66,16 +69,17 @@ async function generateVideo(input, options = {}) {
 
   // 4. 合成（纯色背景分段并行编码吃多核；封面背景单段）
   const outPath = path.join(outDir, out || `${result.meta.id}_${h}.mp4`);
-  if (!coverPath && segCount > 1 && result.audioMs > 60000) {
+  if (segCount > 1 && result.audioMs > 60000) {
     await runFfmpegSegmented({
       audioPath: result.audioPath,
       assText,
       fontDir,
       outPath,
       background,
+      coverPath,
       audioMs: result.audioMs,
     }, segCount, (p) => {
-      if (typeof onProgress === 'function') onProgress(p);
+      if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });
     });
   } else {
     const ffargs = buildArgs({
@@ -88,7 +92,7 @@ async function generateVideo(input, options = {}) {
     });
     await runFfmpeg(ffargs, (sec) => {
       if (typeof onProgress === 'function' && result.audioMs > 0) {
-        onProgress(Math.min(1, sec / (result.audioMs / 1000)));
+        onProgress({ phase: 'assemble', progress: Math.min(1, sec / (result.audioMs / 1000)) });
       }
     });
   }

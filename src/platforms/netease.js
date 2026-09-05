@@ -40,7 +40,7 @@ module.exports = {
   },
 
   async fetch(input, options = {}) {
-    const { workDir, cookie = '', songId } = options;
+    const { workDir, cookie = '', songId, onProgress } = options;
 
     // 1. 解析歌曲 ID
     let id = songId ? Number(songId) : null;
@@ -90,7 +90,7 @@ module.exports = {
     if (!audio) {
       const outerUrl = await getOuterUrl(id);
       if (outerUrl) {
-        await download(outerUrl, cachedPath);
+        await download(outerUrl, cachedPath, 3, onProgress);
         audio = { durationMs: await probeDuration(cachedPath), path: cachedPath };
       } else {
         audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id)), detail.dt || 0);

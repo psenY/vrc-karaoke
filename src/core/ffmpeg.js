@@ -113,7 +113,7 @@ function concatVideos(segPaths, outPath) {
  */
 async function runFfmpegSegmented(opts, segCount, onProgress) {
   const {
-    audioPath, assText, fontDir, outPath, background,
+    audioPath, assText, fontDir, outPath, background, coverPath = null,
     audioMs, width = 1920, height = 1080, fps = 24,
     crf = 20, preset = 'veryfast', audioBitrate = '192k',
   } = opts;
@@ -149,7 +149,15 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     const segAssPath = segAsses[seg.idx];
     const segOut = segOuts[seg.idx];
     fs.writeFileSync(segAssPath, segmentAss(assText, seg.startMs, seg.endMs));
-    const segArgs = [
+    const segArgs = coverPath ? [
+      '-y',
+      '-loop', '1', '-i', coverPath,
+      '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2,${assFilter(segAssPath)}`,
+      '-an',
+      '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
+      '-t', String((seg.endMs - seg.startMs) / 1000),
+      segOut,
+    ] : [
       '-y',
       '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
       '-vf', assFilter(segAssPath),

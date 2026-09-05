@@ -29,13 +29,19 @@ function runNext() {
     t.status = 'running';
     t.progress = 0;
     running++;
-    options.onProgress = (progress) => {
-      if (progress && typeof progress === 'object' && progress.segIdx !== undefined) {
-        // 分段进度：progress 是 {segIdx, progress}
-        if (!Array.isArray(t.progress)) t.progress = [];
-        t.progress[progress.segIdx] = progress.progress;
+    options.onProgress = (event) => {
+      const p = event && typeof event === 'object' ? event : { phase: 'assemble', progress: event };
+      if (p.phase === 'download') {
+        t.phase = 'download';
+        t.downloadProgress = p.progress;
       } else {
-        t.progress = progress;
+        t.phase = 'assemble';
+        if (p.segIdx !== undefined) {
+          if (!Array.isArray(t.progress)) t.progress = [];
+          t.progress[p.segIdx] = p.progress;
+        } else {
+          t.progress = p.progress;
+        }
       }
     };
     generateVideo(input, options)
@@ -162,7 +168,7 @@ app.post('/api/generate', (req, res) => {
   const taskId = 't' + (++taskSeq);
   const cfg = readConfig();
   const finalCookie = cookie || cfg.cookie || '';
-  tasks.set(taskId, { status: 'pending', result: null, error: null });
+  tasks.set(taskId, { status: 'pending', result: null, error: null, phase: 'download', downloadProgress: 0 });
   queue.push({
     id: taskId,
     input,
@@ -195,7 +201,7 @@ app.get('/api/history/clear', (req, res) => {
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
   if (!t) return res.json({ ok: false, error: '任务不存在' });
-  res.json({ ok: true, status: t.status, result: t.result, error: t.error, progress: t.progress });
+  res.json({ ok: true, status: t.status, result: t.result, error: t.error, progress: t.progress, phase: t.phase, downloadProgress: t.downloadProgress });
 });
 
 const PORT = process.env.PORT || 3000;

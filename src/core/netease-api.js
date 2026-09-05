@@ -114,21 +114,27 @@ async function getUserInfo(cookie) {
   }
 }
 
-/** 下载文件到本地，自动跟随重定向 + 网络/DNS 错误自动重试 */
-function download(url, destPath, retries = 3) {
+/** 下载文件到本地，自动跟随重定向 + 网络/DNS 错误自动重试 + 下载进度回调 */
+function download(url, destPath, retries = 3, onProgress = null) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http;
     const attempt = (n) => {
       const req = mod.get(url, res => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          return download(res.headers.location, destPath, 0).then(resolve, reject);
+          return download(res.headers.location, destPath, 0, onProgress).then(resolve, reject);
         }
         if (res.statusCode !== 200) {
           res.resume();
           return reject(new Error(`下载失败 HTTP ${res.statusCode}`));
         }
+        const total = parseInt(res.headers['content-length'], 10) || 0;
+        let downloaded = 0;
         const file = fs.createWriteStream(destPath);
+        res.on('data', (chunk) => {
+          downloaded += chunk.length;
+          if (total > 0 && typeof onProgress === 'function') onProgress(Math.min(1, downloaded / total));
+        });
         res.pipe(file);
         file.on('finish', () => { file.close(); resolve(); });
         file.on('error', reject);

@@ -117,7 +117,8 @@
     </div>
     <div style="margin-top:16px">
       <el-button type="primary" @click="doGenerate" :loading="generating">生成视频</el-button>
-      <el-progress v-if="progressText && !Array.isArray(progress)" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
+      <el-progress v-if="progressText && phase==='download'" :percentage="downloadProgress" style="width:320px;margin-left:16px"></el-progress>
+      <el-progress v-if="progressText && phase==='assemble' && !Array.isArray(progress)" :percentage="progress" :status="progressStatus" style="width:320px;margin-left:16px"></el-progress>
       <span v-if="progressText" style="color:#e6a23c;margin-left:8px">{{ progressText }}</span>
       <div v-if="progressText && Array.isArray(progress)" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;width:100%">
         <div v-for="(p, i) in progress" :key="i">
@@ -234,6 +235,8 @@ createApp({
       generating: false,
       isDark: false,
       segCount: 8,
+      downloadProgress: 0,
+      phase: 'download',
     };
   },
   methods: {
@@ -325,11 +328,21 @@ createApp({
         this.progressText = '';
         this.result = '<p style="color:#f56c6c">失败: ' + r.error + '</p>';
       } else {
-        this.progressText = (r.status === 'pending' ? '排队中... ' : '生成中... ');
-        if (Array.isArray(r.progress)) {
-          this.progress = r.progress;
+        if (r.status === 'pending') {
+          this.progressText = '排队中... ';
+        } else if (r.phase === 'download') {
+          this.progressText = '下载音频中... ';
+          this.phase = 'download';
+          this.downloadProgress = Math.round((r.downloadProgress || 0) * 100);
+          this.progress = 0;
         } else {
-          this.progress = Math.round((r.progress || 0) * 100);
+          this.progressText = '生成中... ';
+          this.phase = 'assemble';
+          if (Array.isArray(r.progress)) {
+            this.progress = r.progress;
+          } else {
+            this.progress = Math.round((r.progress || 0) * 100);
+          }
         }
         this.progressStatus = r.status === 'pending' ? 'warning' : '';
         setTimeout(() => this.poll(taskId), 2000);
