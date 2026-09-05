@@ -5,7 +5,7 @@ const fs = require('fs');
 const express = require('express');
 const { platforms } = require('./platforms');
 const { generateVideo } = require('./generate');
-const { getPlaylist } = require('./core/netease-api');
+const { getPlaylist, getQrKey, getQrImg, checkQrLogin } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
 const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
@@ -95,6 +95,33 @@ app.post('/api/playlist', async (req, res) => {
     if (!m) return res.json({ ok: false, error: '无法识别歌单链接（需网易云 playlist 链接）' });
     const playlist = await getPlaylist(m[1]);
     res.json({ ok: true, name: playlist.name, songs: playlist.songs });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// 扫码登录：生成二维码
+app.post('/api/login/qr', async (req, res) => {
+  try {
+    const key = await getQrKey();
+    if (!key) return res.json({ ok: false, error: '获取二维码失败' });
+    const qrimg = await getQrImg(key);
+    res.json({ ok: true, key, qrimg });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// 扫码登录：轮询检查状态（800等待/801已扫码/802过期/803成功）
+app.get('/api/login/check', async (req, res) => {
+  try {
+    const { key } = req.query;
+    if (!key) return res.json({ ok: false, error: '缺少 key' });
+    const r = await checkQrLogin(key);
+    if (r.code === 803 && r.cookie) {
+      writeConfig({ cookie: r.cookie });
+    }
+    res.json({ ok: true, code: r.code, cookie: r.cookie });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }

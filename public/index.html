@@ -112,6 +112,7 @@
       </el-col>
       <el-col :span="6">
         <el-button @click="saveCookie">保存</el-button>
+        <el-button type="success" @click="startQrLogin">扫码登录</el-button>
         <span v-if="cookieStatus" style="margin-left:8px;color:#6dd98c">{{ cookieStatus }}</span>
       </el-col>
     </el-row>
@@ -131,6 +132,18 @@
       </el-table-column>
     </el-table>
   </el-card>
+
+  <el-dialog v-model="qrVisible" title="网易云扫码登录" width="320px" :close-on-click-modal="false">
+    <div style="text-align:center">
+      <p v-if="qrStatus === 'wait'" style="color:#889">请用网易云音乐 App 扫码</p>
+      <p v-else-if="qrStatus === 'scanned'" style="color:#ffcc00">已扫码，请在手机上确认登录</p>
+      <p v-else-if="qrStatus === 'expired'" style="color:#ff7b7b">二维码已过期</p>
+      <img v-if="qrImg" :src="qrImg" style="width:220px;height:220px">
+      <div v-if="qrStatus === 'expired'" style="margin-top:8px">
+        <el-button size="small" @click="startQrLogin">重新获取</el-button>
+      </div>
+    </div>
+  </el-dialog>
 </div>
 
 <script>
@@ -158,6 +171,10 @@ createApp({
       cookie: '',
       cookieStatus: '',
       history: [],
+      qrVisible: false,
+      qrImg: '',
+      qrKey: '',
+      qrStatus: 'wait',
     };
   },
   methods: {
@@ -243,6 +260,30 @@ createApp({
       const r = await this.post('/api/config', { cookie: this.cookie.trim() });
       this.cookieStatus = r.ok ? (r.hasCookie ? '已保存' : '已清空') : '失败';
       if (r.ok) this.$message.success(r.hasCookie ? 'cookie 已保存' : 'cookie 已清空');
+    },
+    async startQrLogin() {
+      const r = await this.post('/api/login/qr', {});
+      if (!r.ok) return this.$message.error(r.error);
+      this.qrKey = r.key;
+      this.qrImg = r.qrimg ? 'data:image/png;base64,' + r.qrimg : '';
+      this.qrStatus = 'wait';
+      this.qrVisible = true;
+      this.qrPoll();
+    },
+    async qrPoll() {
+      const r = await this.get('/api/login/check?key=' + this.qrKey);
+      if (r.code === 803) {
+        this.qrVisible = false;
+        this.$message.success('登录成功，cookie 已自动保存');
+        this.cookieStatus = '已通过扫码登录';
+        return;
+      } else if (r.code === 802) {
+        this.qrStatus = 'expired';
+        return;
+      } else if (r.code === 801) {
+        this.qrStatus = 'scanned';
+      }
+      setTimeout(() => this.qrPoll(), 2000);
     },
     fmtTime(ts) {
       return new Date(ts).toLocaleString('zh-CN');

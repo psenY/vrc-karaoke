@@ -84,6 +84,25 @@ function getOuterUrl(songId) {
   });
 }
 
+/** 二维码登录：获取 unikey */
+async function getQrKey() {
+  const res = await api.login_qr_key({});
+  return res.body?.data?.unikey || null;
+}
+
+/** 二维码登录：生成二维码图片（base64） */
+async function getQrImg(key) {
+  const res = await api.login_qr_create({ key, qrimg: true });
+  return res.body?.data?.qrimg || null;
+}
+
+/** 二维码登录：轮询检查状态（800等待/801已扫码/802过期/803成功含cookie） */
+async function checkQrLogin(key) {
+  const res = await api.login_qr_check({ key });
+  const body = res.body || {};
+  return { code: body.code, cookie: body.cookie || '' };
+}
+
 /** 下载文件到本地，自动跟随重定向 + 网络/DNS 错误自动重试 */
 function download(url, destPath, retries = 3) {
   return new Promise((resolve, reject) => {
@@ -117,4 +136,4 @@ function download(url, destPath, retries = 3) {
   });
 }
 
-module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, getOuterUrl, download };
+module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, getOuterUrl, getQrKey, getQrImg, checkQrLogin, download };
