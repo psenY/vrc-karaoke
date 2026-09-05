@@ -42,6 +42,7 @@ function buildArgs(opts) {
     crf = 20,
     preset = 'veryfast',
     audioBitrate = '192k',
+    codec = 'libx264',
     coverPath = null,
   } = opts;
 
@@ -56,7 +57,7 @@ function buildArgs(opts) {
       '-i', audioPath,
       '-filter_complex', filterComplex,
       '-map', '[v]', '-map', '1:a',
-      '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
+      '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
       '-c:a', 'aac', '-b:a', audioBitrate,
       '-shortest', '-movflags', '+faststart',
       outPath,
@@ -69,7 +70,7 @@ function buildArgs(opts) {
     '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
     '-i', audioPath,
     '-vf', assFilter,
-    '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
+    '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
     '-c:a', 'aac', '-b:a', audioBitrate,
     '-shortest',
     '-movflags', '+faststart',
@@ -115,7 +116,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   const {
     audioPath, assText, fontDir, outPath, background, coverPath = null,
     audioMs, width = 1920, height = 1080, fps = 24,
-    crf = 20, preset = 'veryfast', audioBitrate = '192k',
+    crf = 20, preset = 'veryfast', audioBitrate = '192k', codec = 'libx264',
   } = opts;
   const tmpDir = path.dirname(outPath);
   const segMs = Math.ceil(audioMs / segCount);
@@ -154,7 +155,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
       '-loop', '1', '-i', coverPath,
       '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2,${assFilter(segAssPath)}`,
       '-an',
-      '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
+      '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
       '-t', String((seg.endMs - seg.startMs) / 1000),
       segOut,
     ] : [
@@ -162,7 +163,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
       '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
       '-vf', assFilter(segAssPath),
       '-an',
-      '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
+      '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
       '-t', String((seg.endMs - seg.startMs) / 1000),
       segOut,
     ];

@@ -29,7 +29,16 @@ async function generateVideo(input, options = {}) {
     out = null,                 // 输出文件名
     onProgress = null,          // 进度回调 (0~1 数字, 或 {segIdx,progress} 对象)
     segCount = 8,               // 分段并行数(线程数)
+    resolution = '1080p',       // 分辨率
+    codec = 'libx264',          // 编码器
+    preset = 'veryfast',        // 编码预设(速度↔压缩)
+    crf = 20,                   // 质量(越小越高)
+    fps = 24,                   // 帧率
+    audioBitrate = '192k',      // 音频码率
   } = options;
+
+  const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480] };
+  const [width, height] = RESOLUTIONS[resolution] || RESOLUTIONS['1080p'];
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
 
@@ -78,6 +87,7 @@ async function generateVideo(input, options = {}) {
       background,
       coverPath,
       audioMs: result.audioMs,
+      width, height, fps, crf, preset, audioBitrate, codec,
     }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });
     });
@@ -89,6 +99,7 @@ async function generateVideo(input, options = {}) {
       outPath,
       background,
       coverPath,
+      width, height, fps, crf, preset, audioBitrate, codec,
     });
     await runFfmpeg(ffargs, (sec) => {
       if (typeof onProgress === 'function' && result.audioMs > 0) {

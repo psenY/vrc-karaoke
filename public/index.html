@@ -115,6 +115,61 @@
         </el-select>
       </div>
     </div>
+    <el-collapse style="margin-top:8px">
+      <el-collapse-item title="高级设置（分辨率 / 编码 / 质量）" name="adv">
+        <div class="opts">
+          <div class="opt">
+            <span>分辨率</span>
+            <el-select v-model="resolution" style="width:100px">
+              <el-option label="1080p" value="1080p"></el-option>
+              <el-option label="720p" value="720p"></el-option>
+              <el-option label="480p" value="480p"></el-option>
+            </el-select>
+          </div>
+          <div class="opt">
+            <span>编码</span>
+            <el-select v-model="codec" style="width:110px">
+              <el-option label="H.264" value="libx264"></el-option>
+              <el-option label="H.265" value="libx265"></el-option>
+            </el-select>
+          </div>
+          <div class="opt">
+            <span>预设</span>
+            <el-select v-model="preset" style="width:130px">
+              <el-option label="veryfast(快)" value="veryfast"></el-option>
+              <el-option label="faster" value="faster"></el-option>
+              <el-option label="fast" value="fast"></el-option>
+              <el-option label="medium(慢·高压缩)" value="medium"></el-option>
+            </el-select>
+          </div>
+          <div class="opt">
+            <span>质量CRF</span>
+            <el-select v-model="crf" style="width:100px">
+              <el-option label="18(高)" :value="18"></el-option>
+              <el-option label="20" :value="20"></el-option>
+              <el-option label="23" :value="23"></el-option>
+              <el-option label="26(低)" :value="26"></el-option>
+            </el-select>
+          </div>
+          <div class="opt">
+            <span>帧率</span>
+            <el-select v-model="fps" style="width:100px">
+              <el-option label="24" :value="24"></el-option>
+              <el-option label="30" :value="30"></el-option>
+              <el-option label="60" :value="60"></el-option>
+            </el-select>
+          </div>
+          <div class="opt">
+            <span>音频码率</span>
+            <el-select v-model="audioBitrate" style="width:110px">
+              <el-option label="128k" value="128k"></el-option>
+              <el-option label="192k" value="192k"></el-option>
+              <el-option label="320k" value="320k"></el-option>
+            </el-select>
+          </div>
+        </div>
+      </el-collapse-item>
+    </el-collapse>
     <div style="margin-top:16px">
       <el-button type="primary" @click="doGenerate" :loading="generating">生成视频</el-button>
       <el-progress v-if="progressText && phase==='download'" :percentage="downloadProgress" style="width:320px;margin-left:16px"></el-progress>
@@ -235,6 +290,12 @@ createApp({
       generating: false,
       isDark: false,
       segCount: 8,
+      resolution: '1080p',
+      codec: 'libx264',
+      preset: 'veryfast',
+      crf: 20,
+      fps: 24,
+      audioBitrate: '192k',
       downloadProgress: 0,
       phase: 'download',
     };
@@ -281,6 +342,12 @@ createApp({
         cover: this.cover,
         background: this.bgHex(),
         segCount: this.segCount,
+        resolution: this.resolution,
+        codec: this.codec,
+        preset: this.preset,
+        crf: this.crf,
+        fps: this.fps,
+        audioBitrate: this.audioBitrate,
       });
       if (!r.ok) { this.progressText = ''; return this.$message.error(r.error); }
       this.poll(r.taskId);
@@ -305,6 +372,12 @@ createApp({
           cover: this.cover,
           background: this.bgHex(),
           segCount: this.segCount,
+          resolution: this.resolution,
+          codec: this.codec,
+          preset: this.preset,
+          crf: this.crf,
+          fps: this.fps,
+          audioBitrate: this.audioBitrate,
         });
         done++;
         this.batchProgress = `(${done}/${total} 已入队)`;

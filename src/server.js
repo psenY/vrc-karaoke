@@ -163,7 +163,7 @@ app.post('/api/config', (req, res) => {
 
 // 生成（异步任务）
 app.post('/api/generate', (req, res) => {
-  const { input, highlight, bilingual, background, upload, cookie, cover, segCount } = req.body || {};
+  const { input, highlight, bilingual, background, upload, cookie, cover, segCount, resolution, codec, preset, crf, fps, audioBitrate } = req.body || {};
   if (!input) return res.json({ ok: false, error: '缺少输入' });
   const taskId = 't' + (++taskSeq);
   const cfg = readConfig();
@@ -180,6 +180,12 @@ app.post('/api/generate', (req, res) => {
       cover: !!cover,
       cookie: finalCookie,
       segCount: Number(segCount) || 8,
+      resolution: resolution || '1080p',
+      codec: codec || 'libx264',
+      preset: preset || 'veryfast',
+      crf: Number(crf) || 20,
+      fps: Number(fps) || 24,
+      audioBitrate: audioBitrate || '192k',
     },
   });
   res.json({ ok: true, taskId });
