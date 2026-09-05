@@ -184,6 +184,15 @@
             <el-color-picker v-model="progressColor"></el-color-picker>
           </div>
         </div>
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted)">参数预设</span>
+          <el-input v-model="presetName" placeholder="预设名称" size="small" style="width:130px"></el-input>
+          <el-button size="small" @click="savePreset">保存当前</el-button>
+          <el-select v-model="selectedPreset" placeholder="加载预设" size="small" style="width:130px" @change="loadPreset">
+            <el-option v-for="p in presets" :key="p.name" :label="p.name" :value="p.name"></el-option>
+          </el-select>
+          <el-button v-if="selectedPreset" size="small" type="danger" text @click="deletePreset">删除</el-button>
+        </div>
       </el-collapse-item>
     </el-collapse>
     <div style="margin-top:16px">
@@ -384,6 +393,9 @@ createApp({
       previewVisible: false,
       previewUrl: '',
       outputSize: 0,
+      presets: [],
+      presetName: '',
+      selectedPreset: '',
     };
   },
   computed: {
@@ -571,6 +583,51 @@ createApp({
       const mb = bytes / 1024 / 1024;
       return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(1) + ' MB';
     },
+    savePreset() {
+      const name = this.presetName.trim();
+      if (!name) return this.$message.warning('请输入预设名称');
+      const params = {
+        highlight: this.highlight, bilingual: this.bilingual, cover: this.cover,
+        background: this.background, segCount: this.segCount, resolution: this.resolution,
+        codec: this.codec, preset: this.preset, crf: this.crf, fps: this.fps,
+        audioBitrate: this.audioBitrate, currentColor: this.currentColor,
+        nextColor: this.nextColor, titleColor: this.titleColor, progressColor: this.progressColor,
+      };
+      const existing = this.presets.find(p => p.name === name);
+      if (existing) existing.params = params;
+      else this.presets.push({ name, params });
+      localStorage.setItem('vrc-presets', JSON.stringify(this.presets));
+      this.presetName = '';
+      this.$message.success('预设已保存: ' + name);
+    },
+    loadPreset(name) {
+      const p = this.presets.find(x => x.name === name);
+      if (!p) return;
+      const s = p.params;
+      this.highlight = s.highlight || '';
+      this.bilingual = !!s.bilingual;
+      this.cover = !!s.cover;
+      this.background = s.background || '#1a1a2e';
+      this.segCount = s.segCount || 8;
+      this.resolution = s.resolution || '1080p';
+      this.codec = s.codec || 'libx264';
+      this.preset = s.preset || 'veryfast';
+      this.crf = s.crf || 20;
+      this.fps = s.fps || 24;
+      this.audioBitrate = s.audioBitrate || '192k';
+      this.currentColor = s.currentColor || '#FFFFFF';
+      this.nextColor = s.nextColor || '#969696';
+      this.titleColor = s.titleColor || '#FFFFFF';
+      this.progressColor = s.progressColor || '#FFFFFF';
+      this.$message.success('预设已加载: ' + name);
+    },
+    deletePreset() {
+      const name = this.selectedPreset;
+      this.presets = this.presets.filter(p => p.name !== name);
+      localStorage.setItem('vrc-presets', JSON.stringify(this.presets));
+      this.selectedPreset = '';
+      this.$message.success('预设已删除');
+    },
     async saveCookie() {
       const r = await this.post('/api/config', { cookie: this.cookie.trim() });
       if (r.ok) this.$message.success(r.hasCookie ? 'cookie 已保存' : 'cookie 已清空');
@@ -628,16 +685,24 @@ createApp({
     async post(url, body) {
       const headers = { 'Content-Type': 'application/json' };
       if (this.token) headers['x-auth-token'] = this.token;
-      const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-      if (r.status === 401) { this.needAuth = true; this.loginVisible = true; return { ok: false, error: '未登录' }; }
-      return r.json();
+      try {
+        const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (r.status === 401) { this.needAuth = true; this.loginVisible = true; return { ok: false, error: '未登录' }; }
+        return r.json();
+      } catch (e) {
+        return { ok: false, error: '网络错误' };
+      }
     },
     async get(url) {
       const headers = {};
       if (this.token) headers['x-auth-token'] = this.token;
-      const r = await fetch(url, { headers });
-      if (r.status === 401) { this.needAuth = true; this.loginVisible = true; return { ok: false, error: '未登录' }; }
-      return r.json();
+      try {
+        const r = await fetch(url, { headers });
+        if (r.status === 401) { this.needAuth = true; this.loginVisible = true; return { ok: false, error: '未登录' }; }
+        return r.json();
+      } catch (e) {
+        return { ok: false, error: '网络错误' };
+      }
     },
     async doLogin() {
       const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: this.loginPassword }) }).then(r => r.json());
@@ -673,6 +738,7 @@ createApp({
     setInterval(() => this.loadQueue(), 3000);
     this.checkAuth();
     this.loadStats();
+    try { this.presets = JSON.parse(localStorage.getItem('vrc-presets') || '[]'); } catch (e) {}
   },
   updated() {
     this.applyCardBg();
