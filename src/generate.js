@@ -46,6 +46,7 @@ async function generateVideo(input, options = {}) {
     nextColor = '#969696',      // 下一句/翻译颜色
     titleColor = '#FFFFFF',     // 标题颜色
     progressColor = '#FFFFFF',  // 进度颜色
+    onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;
 
   const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480] };
@@ -103,6 +104,7 @@ async function generateVideo(input, options = {}) {
       coverPath,
       audioMs: result.audioMs,
       width, height, fps, crf, preset, audioBitrate, codec,
+      onSpawn,
     }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });
     });
@@ -120,7 +122,7 @@ async function generateVideo(input, options = {}) {
       if (typeof onProgress === 'function' && result.audioMs > 0) {
         onProgress({ phase: 'assemble', progress: Math.min(1, sec / (result.audioMs / 1000)) });
       }
-    });
+    }, onSpawn);
   }
 
   return { outPath, meta: result.meta, highlight: h };

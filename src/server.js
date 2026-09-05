@@ -44,13 +44,22 @@ function runNext() {
         }
       }
     };
+    options.onSpawn = (proc) => {
+      if (!t.procs) t.procs = [];
+      t.procs.push(proc);
+    };
     generateVideo(input, options)
       .then(result => {
+        if (t.status === 'cancelled') return;
         t.status = 'done';
         t.result = result;
+        t.title = result.meta.title;
         appendHistory({ input, title: result.meta.title, source: result.meta.source, outPath: result.outPath, url: result.url, time: Date.now() });
       })
-      .catch(err => { t.status = 'failed'; t.error = err.message; })
+      .catch(err => {
+        if (t.status === 'cancelled') return;
+        t.status = 'failed'; t.error = err.message;
+      })
       .finally(() => { running--; runNext(); });
   }
 }
@@ -168,7 +177,7 @@ app.post('/api/generate', (req, res) => {
   const taskId = 't' + (++taskSeq);
   const cfg = readConfig();
   const finalCookie = cookie || cfg.cookie || '';
-  tasks.set(taskId, { status: 'pending', result: null, error: null, phase: 'download', downloadProgress: 0 });
+  tasks.set(taskId, { id: taskId, status: 'pending', result: null, error: null, phase: 'download', downloadProgress: 0, procs: [], title: input });
   queue.push({
     id: taskId,
     input,
@@ -212,6 +221,40 @@ app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
   if (!t) return res.json({ ok: false, error: '任务不存在' });
   res.json({ ok: true, status: t.status, result: t.result, error: t.error, progress: t.progress, phase: t.phase, downloadProgress: t.downloadProgress });
+});
+
+// 队列状态（运行中 + 排队中）
+app.get('/api/queue', (req, res) => {
+  const runningList = [...tasks.values()].filter(t => t.status === 'running').map(t => ({ id: t.id, title: t.title, status: t.status }));
+  const pendingList = queue.map(q => ({ id: q.id, title: tasks.get(q.id)?.title || q.input, status: 'pending' }));
+  res.json({ ok: true, running: runningList, pending: pendingList });
+});
+
+// 取消任务（pending 移出队列 / running 中断 ffmpeg）
+app.post('/api/task/:id/cancel', (req, res) => {
+  const t = tasks.get(req.params.id);
+  if (!t) return res.json({ ok: false, error: '任务不存在' });
+  if (t.status === 'pending') {
+    const idx = queue.findIndex(q => q.id === t.id);
+    if (idx >= 0) queue.splice(idx, 1);
+    t.status = 'cancelled';
+  } else if (t.status === 'running') {
+    (t.procs || []).forEach(p => { try { p.kill('SIGKILL'); } catch (e) {} });
+    t.status = 'cancelled';
+  }
+  res.json({ ok: true });
+});
+
+// 插队（pending 任务移到队首）
+app.post('/api/task/:id/top', (req, res) => {
+  const t = tasks.get(req.params.id);
+  if (!t || t.status !== 'pending') return res.json({ ok: false, error: '仅排队中的任务可插队' });
+  const idx = queue.findIndex(q => q.id === t.id);
+  if (idx > 0) {
+    const [item] = queue.splice(idx, 1);
+    queue.unshift(item);
+  }
+  res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 3000;

@@ -78,9 +78,10 @@ function buildArgs(opts) {
   ];
 }
 
-function runFfmpeg(args, onProgress) {
+function runFfmpeg(args, onProgress, onSpawn) {
   return new Promise((resolve, reject) => {
     const proc = spawn('ffmpeg', args);
+    if (typeof onSpawn === 'function') onSpawn(proc);
     let stderr = '';
     proc.stderr.on('data', d => {
       stderr += d;
@@ -102,10 +103,10 @@ function runFfmpeg(args, onProgress) {
 }
 
 /** 合并分段视频（concat demuxer，无损） */
-function concatVideos(segPaths, outPath) {
+function concatVideos(segPaths, outPath, onSpawn) {
   const listFile = outPath + '.concat.txt';
   fs.writeFileSync(listFile, segPaths.map(p => `file '${p}'`).join('\n'));
-  return runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-movflags', '+faststart', outPath])
+  return runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-movflags', '+faststart', outPath], null, onSpawn)
     .finally(() => { try { fs.unlinkSync(listFile); } catch (e) {} });
 }
 
@@ -117,6 +118,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     audioPath, assText, fontDir, outPath, background, coverPath = null,
     audioMs, width = 1920, height = 1080, fps = 24,
     crf = 20, preset = 'veryfast', audioBitrate = '192k', codec = 'libx264',
+    onSpawn = null,
   } = opts;
   const tmpDir = path.dirname(outPath);
   const segMs = Math.ceil(audioMs / segCount);
@@ -139,7 +141,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
 
   // 1. 完整音频一次性转 AAC（音频完全连续，不参与分段，避免拼接处间隙）
   const aacPath = path.join(tmpDir, '_audio.aac');
-  await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ar', '44100', '-ac', '2', aacPath]);
+  await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ar', '44100', '-ac', '2', aacPath], null, onSpawn);
 
   // 2. 视频分段并行编码（无音频 -an）
   const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
@@ -172,15 +174,15 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
         const segDurSec = (seg.endMs - seg.startMs) / 1000;
         onProgress({ segIdx: seg.idx, progress: Math.min(1, sec / segDurSec) });
       }
-    });
+    }, onSpawn);
   }));
 
   // 3. 视频 concat 合并（无音频）
   const videoPath = path.join(tmpDir, '_video.mp4');
-  await concatVideos(segOuts, videoPath);
+  await concatVideos(segOuts, videoPath, onSpawn);
 
   // 4. 视频 + 完整音频 mux（无损，音频完全连续）
-  await runFfmpeg(['-y', '-i', videoPath, '-i', aacPath, '-c', 'copy', '-shortest', '-movflags', '+faststart', outPath]);
+  await runFfmpeg(['-y', '-i', videoPath, '-i', aacPath, '-c', 'copy', '-shortest', '-movflags', '+faststart', outPath], null, onSpawn);
 
   // 清理临时文件
   for (const p of [...segOuts, ...segAsses, videoPath, aacPath]) { try { fs.unlinkSync(p); } catch (e) {} }

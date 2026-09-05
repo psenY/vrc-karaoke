@@ -201,6 +201,17 @@
     <div class="result-box" v-html="result"></div>
   </el-card>
 
+  <el-card class="card" shadow="never" v-if="queue.length">
+    <template #header><b>任务队列</b></template>
+    <div v-for="q in queue" :key="q.id" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text)">{{ q.status === 'running' ? '生成中' : '排队中' }}：{{ q.title }}</span>
+      <span style="display:flex;gap:8px">
+        <el-button v-if="q.status === 'pending'" size="small" @click="queueTop(q.id)">插队</el-button>
+        <el-button size="small" type="danger" plain @click="queueCancel(q.id)">取消</el-button>
+      </span>
+    </div>
+  </el-card>
+
   <el-card class="card" shadow="never">
     <template #header><b>歌单批量生成</b>（网易云歌单链接）</template>
     <el-row :gutter="8">
@@ -331,6 +342,7 @@ createApp({
       progressColor: '#FFFFFF',
       downloadProgress: 0,
       phase: 'download',
+      queue: [],
     };
   },
   computed: {
@@ -493,6 +505,20 @@ createApp({
       const r = await this.post('/api/config', { cookie: '' });
       if (r.ok) { this.loginNickname = ''; this.cookie = ''; this.$message.success('已退出登录'); }
     },
+    async loadQueue() {
+      const r = await this.get('/api/queue');
+      if (r.ok) this.queue = [...(r.running || []), ...(r.pending || [])];
+    },
+    async queueCancel(id) {
+      const r = await this.post('/api/task/' + id + '/cancel', {});
+      if (r.ok) this.$message.success('已取消任务');
+      this.loadQueue();
+    },
+    async queueTop(id) {
+      const r = await this.post('/api/task/' + id + '/top', {});
+      if (r.ok) this.$message.success('已插队到队首');
+      this.loadQueue();
+    },
     async startQrLogin() {
       const r = await this.post('/api/login/qr', {});
       if (!r.ok) return this.$message.error(r.error);
@@ -537,6 +563,8 @@ createApp({
     });
     this.loadHistory();
     this.loadConfig();
+    this.loadQueue();
+    setInterval(() => this.loadQueue(), 3000);
   },
   updated() {
     this.applyCardBg();
