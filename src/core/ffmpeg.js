@@ -136,6 +136,11 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     return;
   }
 
+  // 1. 完整音频一次性转 AAC（音频完全连续，不参与分段，避免拼接处间隙）
+  const aacPath = path.join(tmpDir, '_audio.aac');
+  await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ar', '44100', '-ac', '2', aacPath]);
+
+  // 2. 视频分段并行编码（无音频 -an）
   const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
   const segOuts = segments.map(s => path.join(tmpDir, `seg_${s.idx}.mp4`));
   const segAsses = segments.map(s => path.join(tmpDir, `seg_${s.idx}.ass`));
@@ -147,12 +152,10 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     const segArgs = [
       '-y',
       '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
-      '-ss', String(seg.startMs / 1000), '-i', audioPath,
       '-vf', assFilter(segAssPath),
+      '-an',
       '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
-      '-c:a', 'aac', '-b:a', audioBitrate,
       '-t', String((seg.endMs - seg.startMs) / 1000),
-      '-shortest',
       segOut,
     ];
     await runFfmpeg(segArgs, (sec) => {
@@ -162,8 +165,15 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     });
   }));
 
-  await concatVideos(segOuts, outPath);
-  for (const p of [...segOuts, ...segAsses]) { try { fs.unlinkSync(p); } catch (e) {} }
+  // 3. 视频 concat 合并（无音频）
+  const videoPath = path.join(tmpDir, '_video.mp4');
+  await concatVideos(segOuts, videoPath);
+
+  // 4. 视频 + 完整音频 mux（无损，音频完全连续）
+  await runFfmpeg(['-y', '-i', videoPath, '-i', aacPath, '-c', 'copy', '-shortest', '-movflags', '+faststart', outPath]);
+
+  // 清理临时文件
+  for (const p of [...segOuts, ...segAsses, videoPath, aacPath]) { try { fs.unlinkSync(p); } catch (e) {} }
 }
 
 module.exports = { probeDuration, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };
