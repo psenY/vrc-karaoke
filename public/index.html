@@ -280,6 +280,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <b>历史记录</b>
         <div style="display:flex;gap:8px;align-items:center">
+          <span style="color:var(--muted);font-size:13px">占用 {{ formatSize(outputSize) }}</span>
           <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:160px"></el-input>
           <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
         </div>
@@ -290,14 +291,19 @@
       <el-table-column label="时间" width="170">
         <template #default="scope">{{ fmtTime(scope.row.time) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="150">
+      <el-table-column label="操作" width="180">
         <template #default="scope">
           <a :href="'/output/' + scope.row.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
+          <el-button size="small" type="primary" text @click="previewVideo(scope.row.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" type="danger" text @click="deleteHistory(scope.row.outPath.split('/').pop())">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
   </el-card>
+
+  <el-dialog v-model="previewVisible" title="预览" width="680px">
+    <video :src="previewUrl" controls autoplay style="width:100%;max-height:70vh;background:#000;border-radius:8px"></video>
+  </el-dialog>
 
   <el-dialog v-model="qrVisible" title="网易云扫码登录" width="320px" :close-on-click-modal="false">
     <div style="text-align:center">
@@ -375,6 +381,9 @@ createApp({
       historyFilter: '',
       lastGenerate: null,
       retryVisible: false,
+      previewVisible: false,
+      previewUrl: '',
+      outputSize: 0,
     };
   },
   computed: {
@@ -549,6 +558,19 @@ createApp({
       const r = await this.post('/api/history/delete', { filename });
       if (r.ok) { this.$message.success('已删除'); this.loadHistory(); }
     },
+    previewVideo(filename) {
+      this.previewUrl = '/output/' + filename;
+      this.previewVisible = true;
+    },
+    async loadStats() {
+      const r = await this.get('/api/stats');
+      if (r.ok) this.outputSize = r.outputSize;
+    },
+    formatSize(bytes) {
+      if (!bytes) return '0 MB';
+      const mb = bytes / 1024 / 1024;
+      return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(1) + ' MB';
+    },
     async saveCookie() {
       const r = await this.post('/api/config', { cookie: this.cookie.trim() });
       if (r.ok) this.$message.success(r.hasCookie ? 'cookie 已保存' : 'cookie 已清空');
@@ -650,6 +672,7 @@ createApp({
     this.loadQueue();
     setInterval(() => this.loadQueue(), 3000);
     this.checkAuth();
+    this.loadStats();
   },
   updated() {
     this.applyCardBg();

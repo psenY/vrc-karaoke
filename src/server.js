@@ -277,6 +277,22 @@ app.post('/api/history/delete', (req, res) => {
   res.json({ ok: true });
 });
 
+// 输出目录磁盘占用
+app.get('/api/stats', (req, res) => {
+  const outputDir = path.join(ROOT, 'output');
+  let total = 0;
+  let count = 0;
+  try {
+    for (const f of fs.readdirSync(outputDir)) {
+      try {
+        const st = fs.statSync(path.join(outputDir, f));
+        if (st.isFile()) { total += st.size; count++; }
+      } catch (e) {}
+    }
+  } catch (e) {}
+  res.json({ ok: true, outputSize: total, outputCount: count });
+});
+
 // 查询任务状态
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
