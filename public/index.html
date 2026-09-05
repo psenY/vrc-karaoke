@@ -213,8 +213,21 @@
       </el-col>
     </el-row>
     <div v-if="playlistName" style="margin-top:10px">
-      <span>歌单 <b>{{ playlistName }}</b> 共 {{ playlist.length }} 首</span>
-      <span v-if="batchProgress" style="color:#e6a23c;margin-left:12px">{{ batchProgress }}</span>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+        <span>歌单 <b>{{ playlistName }}</b> 共 {{ playlist.length }} 首</span>
+        <el-checkbox :model-value="allSelected" :indeterminate="someSelected" @change="toggleAll">全选</el-checkbox>
+        <span v-if="selectedCount" style="color:#67c23a">已选 {{ selectedCount }} 首</span>
+        <span v-if="batchProgress" style="color:#e6a23c">{{ batchProgress }}</span>
+      </div>
+      <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+        <div v-for="s in playlist" :key="s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
+          <el-checkbox v-model="s.selected"></el-checkbox>
+          <div>
+            <div style="font-weight:600;color:var(--text)">{{ s.name }}</div>
+            <div style="color:var(--muted);font-size:13px">{{ s.artists }}</div>
+          </div>
+        </div>
+      </div>
     </div>
   </el-card>
 
@@ -320,6 +333,11 @@ createApp({
       phase: 'download',
     };
   },
+  computed: {
+    selectedCount() { return this.playlist.filter(s => s.selected).length; },
+    allSelected() { return this.playlist.length > 0 && this.selectedCount === this.playlist.length; },
+    someSelected() { return this.selectedCount > 0 && this.selectedCount < this.playlist.length; },
+  },
   methods: {
     applyTheme() {
       const isDark = this.theme === 'dark' || (this.theme === 'system' && this.isSystemDark);
@@ -381,14 +399,19 @@ createApp({
       const r = await this.post('/api/playlist', { url: this.playlistUrl.trim() });
       if (!r.ok) return this.$message.error(r.error);
       this.playlistName = r.name;
-      this.playlist = r.songs;
+      this.playlist = r.songs.map(s => ({ ...s, selected: true }));
       this.$message.success(`歌单 ${r.name} 共 ${r.songs.length} 首`);
     },
+    toggleAll(val) {
+      this.playlist.forEach(s => { s.selected = val; });
+    },
     async batchGenerate() {
-      if (!this.playlist.length) return;
-      const total = this.playlist.length;
+      const selected = this.playlist.filter(s => s.selected);
+      if (!selected.length) return this.$message.warning('请先勾选要生成的歌曲');
+      const total = selected.length;
       let done = 0;
-      for (const s of this.playlist) {
+      this.batchProgress = `(0/${total} 已入队)`;
+      for (const s of selected) {
         await this.post('/api/generate', {
           input: `https://music.163.com/song?id=${s.id}`,
           highlight: this.highlight || undefined,
