@@ -14,32 +14,26 @@
     --bg: #f5f6f8;
     --text: #1f2329;
     --muted: #86909c;
-    --card: #ffffff;
-    --hover: #f0f2f5;
-    --border: #e5e6eb;
   }
   /* 深色 */
   html.dark {
     --bg: #141414;
     --text: #e5e6eb;
     --muted: #86909c;
-    --card: #1d1e1f;
-    --hover: #262728;
-    --border: #333435;
   }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
     font-family: system-ui, -apple-system, sans-serif;
-    transition: background .2s, color .2s;
   }
   #app { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
   .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   .hero { color: var(--text); margin: 0; }
-  .card { margin-bottom: 16px; background: var(--card) !important; border: 1px solid var(--border) !important; }
-  .song-item { padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: background .15s; border-bottom: 1px solid var(--border); }
-  .song-item:hover { background: var(--hover); }
+  .card { margin-bottom: 16px; }
+  html.dark .el-card { --el-card-bg-color: #1d1e1f; --el-card-border-color: #333; }
+  .song-item { padding: 10px 14px; border-radius: 8px; cursor: pointer; transition: background .15s; border-bottom: 1px solid var(--el-border-color-light); }
+  .song-item:hover { background: var(--el-fill-color-light); }
   .song-item .name { font-weight: 600; color: var(--text); }
   .song-item .artists { color: var(--muted); font-size: 13px; }
   .opts { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
@@ -221,6 +215,7 @@ createApp({
       qrStatus: 'wait',
       isSystemDark: mql.matches,
       generating: false,
+      isDark: false,
     };
   },
   methods: {
@@ -228,6 +223,13 @@ createApp({
       const isDark = this.theme === 'dark' || (this.theme === 'system' && this.isSystemDark);
       document.documentElement.classList.toggle('dark', isDark);
       localStorage.setItem('vrc-theme', this.theme);
+      this.isDark = isDark;
+      this.$nextTick(() => this.applyCardBg());
+    },
+    applyCardBg() {
+      document.querySelectorAll('.el-card').forEach(el => {
+        el.style.setProperty('background-color', this.isDark ? '#1d1e1f' : '#ffffff', 'important');
+      });
     },
     async doSearch() {
       if (!this.query.trim()) return this.$message.warning('请输入关键词');
@@ -374,6 +376,9 @@ createApp({
     });
     this.loadHistory();
     this.loadConfig();
+  },
+  updated() {
+    this.applyCardBg();
   },
 }).use(ElementPlus).mount('#app');
 </script>
