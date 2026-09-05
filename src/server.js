@@ -20,7 +20,7 @@ const tasks = new Map();
 let taskSeq = 0;
 const queue = [];
 let running = 0;
-const MAX_CONCURRENT = 6; // 并发数(充分利用多核, D1581 16核32线程)
+const MAX_CONCURRENT = 1; // 串行(用户要求一首一首来, 单首内部用分段并行吃多核)
 
 function runNext() {
   while (running < MAX_CONCURRENT && queue.length > 0) {

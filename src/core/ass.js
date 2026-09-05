@@ -54,6 +54,40 @@ function formatClock(sec) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// ASS 时间 H:MM:SS.cc -> 毫秒
+function parseAssTime(t) {
+  const m = String(t).match(/(\d+):(\d+):(\d+)[.:](\d+)/);
+  if (!m) return 0;
+  return (Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])) * 1000 + Number(m[4]) * 10;
+}
+
+// 从完整 ASS 提取 [startMs, endMs) 时间段，时间偏移到段内（用于分段并行编码）
+function segmentAss(assText, startMs, endMs) {
+  const lines = assText.split('\n');
+  const header = [];
+  const events = [];
+  let inEvents = false;
+  const segLen = endMs - startMs;
+  for (const line of lines) {
+    if (!inEvents) {
+      header.push(line);
+      if (line.startsWith('[Events]')) inEvents = true;
+      continue;
+    }
+    if (!line.startsWith('Dialogue:')) { events.push(line); continue; }
+    const m = line.match(/^Dialogue: (\d+),([^,]+),([^,]+),(.*)$/);
+    if (!m) { events.push(line); continue; }
+    const start = parseAssTime(m[2]);
+    const end = parseAssTime(m[3]);
+    const segStart = Math.max(start, startMs) - startMs;
+    const segEnd = Math.min(end, endMs) - startMs;
+    if (segEnd > 0 && segStart < segLen) {
+      events.push(`Dialogue: ${m[1]},${formatAssTime(segStart)},${formatAssTime(segEnd)},${m[4]}`);
+    }
+  }
+  return header.join('\n') + '\n' + events.join('\n') + '\n';
+}
+
 function escapeAssText(text) {
   return String(text)
     .replace(/\\/g, '\\\\')
@@ -208,4 +242,4 @@ function generateAss(lines, options = {}) {
   return buildHeader(playResX, playResY, fontName, fontSize) + events.join('\n') + '\n';
 }
 
-module.exports = { generateAss, formatAssTime, buildWordHighlight, buildEstimatedHighlight };
+module.exports = { generateAss, formatAssTime, segmentAss, buildWordHighlight, buildEstimatedHighlight };

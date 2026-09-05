@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { findPlatform } = require('./platforms');
 const { generateAss } = require('./core/ass');
-const { runFfmpeg, buildArgs } = require('./core/ffmpeg');
+const { runFfmpeg, buildArgs, runFfmpegSegmented } = require('./core/ffmpeg');
 const { download } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
@@ -54,29 +54,44 @@ async function generateVideo(input, options = {}) {
 
   // 3. 生成 ASS
   const assPath = path.join(workDir, `${result.meta.id}.ass`);
-  fs.writeFileSync(assPath, generateAss(result.lines, {
+  const assText = generateAss(result.lines, {
     highlight: h,
     bilingual,
     audioDurationMs: result.audioMs,
     title: result.meta.title || '',
     showProgress: true,
-  }), 'utf8');
+  });
+  fs.writeFileSync(assPath, assText, 'utf8');
 
-  // 4. 合成
+  // 4. 合成（纯色背景分段并行编码吃多核；封面背景单段）
   const outPath = path.join(outDir, out || `${result.meta.id}_${h}.mp4`);
-  const ffargs = buildArgs({
-    audioPath: result.audioPath,
-    assPath,
-    fontDir,
-    outPath,
-    background,
-    coverPath,
-  });
-  await runFfmpeg(ffargs, (sec) => {
-    if (typeof onProgress === 'function' && result.audioMs > 0) {
-      onProgress(Math.min(1, sec / (result.audioMs / 1000)));
-    }
-  });
+  const SEG_COUNT = 8; // 分段数(D1581 16核, 8段并行)
+  if (!coverPath && result.audioMs > 60000) {
+    await runFfmpegSegmented({
+      audioPath: result.audioPath,
+      assText,
+      fontDir,
+      outPath,
+      background,
+      audioMs: result.audioMs,
+    }, SEG_COUNT, (p) => {
+      if (typeof onProgress === 'function') onProgress(p);
+    });
+  } else {
+    const ffargs = buildArgs({
+      audioPath: result.audioPath,
+      assPath,
+      fontDir,
+      outPath,
+      background,
+      coverPath,
+    });
+    await runFfmpeg(ffargs, (sec) => {
+      if (typeof onProgress === 'function' && result.audioMs > 0) {
+        onProgress(Math.min(1, sec / (result.audioMs / 1000)));
+      }
+    });
+  }
 
   return { outPath, meta: result.meta, highlight: h };
 }

@@ -1,6 +1,9 @@
 'use strict';
 
 const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const { segmentAss } = require('./ass');
 
 /** 用 ffprobe 读取音频时长（毫秒） */
 function probeDuration(filePath) {
@@ -97,4 +100,70 @@ function runFfmpeg(args, onProgress) {
   });
 }
 
-module.exports = { probeDuration, buildArgs, runFfmpeg };
+/** 合并分段视频（concat demuxer，无损） */
+function concatVideos(segPaths, outPath) {
+  const listFile = outPath + '.concat.txt';
+  fs.writeFileSync(listFile, segPaths.map(p => `file '${p}'`).join('\n'));
+  return runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-movflags', '+faststart', outPath])
+    .finally(() => { try { fs.unlinkSync(listFile); } catch (e) {} });
+}
+
+/**
+ * 分段并行编码：把一首歌切成 segCount 段，并行编码各段（单首吃多核），最后合并。
+ */
+async function runFfmpegSegmented(opts, segCount, onProgress) {
+  const {
+    audioPath, assText, fontDir, outPath, background,
+    audioMs, width = 1920, height = 1080, fps = 24,
+    crf = 20, preset = 'veryfast', audioBitrate = '192k',
+  } = opts;
+  const tmpDir = path.dirname(outPath);
+  const segMs = Math.ceil(audioMs / segCount);
+
+  const segments = [];
+  for (let i = 0; i < segCount; i++) {
+    const startMs = i * segMs;
+    const endMs = Math.min((i + 1) * segMs, audioMs);
+    if (startMs >= audioMs) break;
+    segments.push({ idx: i, startMs, endMs });
+  }
+  if (segments.length <= 1) {
+    // 太短不分段
+    const fullAss = path.join(tmpDir, '_full.ass');
+    fs.writeFileSync(fullAss, assText);
+    const single = buildArgs({ audioPath, assPath: fullAss, fontDir, outPath, background, width, height, fps, crf, preset, audioBitrate });
+    await runFfmpeg(single, onProgress);
+    return;
+  }
+
+  const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
+  const segOuts = segments.map(s => path.join(tmpDir, `seg_${s.idx}.mp4`));
+  const segAsses = segments.map(s => path.join(tmpDir, `seg_${s.idx}.ass`));
+
+  await Promise.all(segments.map(async (seg) => {
+    const segAssPath = segAsses[seg.idx];
+    const segOut = segOuts[seg.idx];
+    fs.writeFileSync(segAssPath, segmentAss(assText, seg.startMs, seg.endMs));
+    const segArgs = [
+      '-y',
+      '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
+      '-ss', String(seg.startMs / 1000), '-i', audioPath,
+      '-vf', assFilter(segAssPath),
+      '-c:v', 'libx264', '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
+      '-c:a', 'aac', '-b:a', audioBitrate,
+      '-t', String((seg.endMs - seg.startMs) / 1000),
+      '-shortest',
+      segOut,
+    ];
+    await runFfmpeg(segArgs, (sec) => {
+      if (typeof onProgress === 'function' && audioMs > 0) {
+        onProgress(Math.min(1, (seg.startMs / 1000 + sec) / (audioMs / 1000)));
+      }
+    });
+  }));
+
+  await concatVideos(segOuts, outPath);
+  for (const p of [...segOuts, ...segAsses]) { try { fs.unlinkSync(p); } catch (e) {} }
+}
+
+module.exports = { probeDuration, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };
