@@ -110,12 +110,15 @@ app.get('/api/auth-status', (req, res) => {
   res.json({ ok: true, needAuth: !!readConfig().adminPassword });
 });
 
-// 鉴权中间件（未启用密码时放行；启用后需 token）
+// 鉴权中间件（未启用密码时放行；启用后需 token，token 24 小时过期）
+const TOKEN_TTL = 24 * 60 * 60 * 1000;
 function requireAuth(req, res, next) {
   const cfg = readConfig();
   if (!cfg.adminPassword) return next();
   const token = req.headers['x-auth-token'] || req.query.token || '';
-  if (token && tokens.has(token)) return next();
+  const ts = tokens.get(token);
+  if (ts && Date.now() - ts < TOKEN_TTL) return next();
+  if (ts) tokens.delete(token);  // 清理过期 token，避免内存累积
   return res.status(401).json({ ok: false, error: '未登录或登录已过期', needAuth: true });
 }
 app.use('/api', requireAuth);
