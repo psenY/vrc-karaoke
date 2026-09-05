@@ -29,6 +29,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Current,${fontName},${fontSize},&H00FFFFFF,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,2,100,100,200,1
 Style: Next,${fontName},${fontSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
 Style: Trans,${fontName},${transSize},&H00969696,&H00969696,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
+Style: Title,${fontName},54,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,8,100,100,60,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -118,6 +119,7 @@ function generateAss(lines, options = {}) {
     topMarginV = 420,
     bottomMarginV = 200,
     bilingual = false,        // 双语（原文 + 翻译）
+    title = '',               // 顶部歌曲信息（歌名-歌手）
   } = options;
 
   const events = [];
@@ -173,6 +175,14 @@ function generateAss(lines, options = {}) {
         );
       }
     }
+  }
+
+  // 顶部歌曲信息（贯穿整个视频）
+  if (title) {
+    const titleEnd = audioDurationMs ?? (lines.length ? (lines[lines.length - 1].startMs ?? 0) + 5000 : 300000);
+    events.unshift(
+      `Dialogue: 0,0:00:00.00,${formatAssTime(titleEnd)},Title,,0,0,0,,${escapeAssText(title)}`
+    );
   }
 
   return buildHeader(playResX, playResY, fontName, fontSize) + events.join('\n') + '\n';
