@@ -118,18 +118,33 @@ function sha256(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex');
 }
 
-// 登录（启用密码后需登录）
+// 登录暴力破解防护：每 IP 连续 5 次失败锁定 5 分钟（公网暴露安全）
+const loginFails = new Map(); // ip -> { count, lockUntil }
 app.post('/api/login', (req, res) => {
   const cfg = readConfig();
   if (!cfg.adminPassword) return res.json({ ok: true, needAuth: false, token: null });
+  const ip = req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const rec = loginFails.get(ip);
+  if (rec && rec.lockUntil > now) {
+    const waitMin = Math.ceil((rec.lockUntil - now) / 60000);
+    return res.json({ ok: false, error: `尝试过于频繁，请 ${waitMin} 分钟后再试` });
+  }
   const { password } = req.body || {};
   if (sha256(password) === cfg.adminPassword) {
+    loginFails.delete(ip);
     const token = crypto.randomBytes(32).toString('hex');
-    tokens.set(token, Date.now());
+    tokens.set(token, now);
     // 种 cookie，供 GET / 判断已登录（登录后直接进主应用）
     res.setHeader('Set-Cookie', `vrc_auth=${token}; Path=/; Max-Age=86400; SameSite=Lax`);
     return res.json({ ok: true, needAuth: true, token });
   }
+  const count = (rec && rec.count || 0) + 1;
+  if (count >= 5) {
+    loginFails.set(ip, { count: 0, lockUntil: now + 5 * 60 * 1000 });  // 锁定 5 分钟
+    return res.json({ ok: false, error: '密码错误次数过多，已锁定 5 分钟' });
+  }
+  loginFails.set(ip, { count, lockUntil: 0 });
   res.json({ ok: false, error: '密码错误' });
 });
 

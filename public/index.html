@@ -702,15 +702,15 @@ createApp({
         const filename = res.outPath.split('/').pop();
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
           '<p style="color:#67c23a;font-weight:600;margin:0 0 12px">生成完成</p>' +
-          '<video src="/output/' + filename + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
-          '<a href="/output/' + filename + '" download style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
+          '<video src="/output/' + this.escHtml(filename) + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
+          '<a href="/output/' + this.escHtml(filename) + '" download style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
           '</div>';
         this.loadHistory();
       } else if (r.status === 'failed') {
         this.generating = false;
         this.retryVisible = true;
         this.progressText = '';
-        this.result = '<p style="color:#f56c6c">失败: ' + r.error + '</p>';
+        this.result = '<p style="color:#f56c6c">失败: ' + this.escHtml(r.error || '未知错误') + '</p>';
       } else {
         if (r.status === 'pending') {
           this.progressText = '排队中... ';
@@ -880,6 +880,9 @@ createApp({
         this.qrStatus = 'scanned';
       }
       setTimeout(() => this.qrPoll(), 2000);
+    },
+    escHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
     fmtTime(ts) {
       return new Date(ts).toLocaleString('zh-CN');
