@@ -171,8 +171,8 @@ async function generateVideo(input, options = {}) {
       // 标签用全角空格(U+3000)补齐等宽，冒号与值对齐；整块左对齐起点=标题第一行左边
       { style: 'IntroInfo', y: 552, text: esc('开发者：VRChat@psenY7') },
       { style: 'IntroInfo', y: 614, text: esc('歌\u3000曲：' + (result.meta.title || '')) },
-      { style: 'IntroInfo', y: 676, text: esc('音\u3000质：' + levelLabel + ' · ' + brLabel) },
-      { style: 'IntroInfo', y: 738, text: esc('参\u3000数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf) },
+      { style: 'IntroInfo', y: 676, text: esc('音\u3000质：' + levelLabel + ' - ' + brLabel) },
+      { style: 'IntroInfo', y: 738, text: esc('参\u3000数：' + resolution + ' - ' + fps + 'fps - ' + preset + ' - CRF' + crf) },
     ];
     fs.writeFileSync(introAssPath, buildIntroAss(introLines, width, height));
     const introPath = path.join(workDir, '_intro.mp4');
