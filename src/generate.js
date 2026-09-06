@@ -59,6 +59,7 @@ async function generateVideo(input, options = {}) {
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
 
+  try {
   // 1. 识别平台 + 抓取
   const platform = findPlatform(input, { explicitId: !!songId });
   const result = await platform.fetch(input, {
@@ -216,7 +217,14 @@ async function generateVideo(input, options = {}) {
     for (const p of [bodyOut, introPath, introAssPath, introList]) { try { fs.unlinkSync(p); } catch (e) {} }
   }
 
-  // 6. 清理非音频缓存的中间文件（.ass/.jpg/.png/.txt），保留音频缓存(mp3/flac/m4a)供下次复用
+  return { outPath, meta: result.meta, highlight: h };
+  } finally {
+    cleanupWorkDir(workDir);  // 任何结束方式(成功/失败/取消)都清理中间文件
+  }
+}
+
+// 清理工作目录中非音频缓存的中间文件（.ass/.jpg/.png/.txt），保留音频缓存(mp3/flac/m4a)供下次复用
+function cleanupWorkDir(workDir) {
   try {
     for (const f of fs.readdirSync(workDir)) {
       if (/\.(ass|jpg|png|txt)$/i.test(f)) {
@@ -224,8 +232,6 @@ async function generateVideo(input, options = {}) {
       }
     }
   } catch (e) {}
-
-  return { outPath, meta: result.meta, highlight: h };
 }
 
 // 片头信息卡 ASS：纯黑背景上的白字/灰字信息，\pos 精确排版
