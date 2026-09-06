@@ -386,7 +386,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <b>历史记录</b>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="color:var(--muted);font-size:13px">成品 {{ formatSize(outputSize) }} / 缓存 {{ formatSize(tmpSize) }}</span>
+          <span style="color:var(--muted);font-size:13px">成品 {{ formatSize(outputSize) }} / 缓存 {{ formatSize(tmpSize) }} / 磁盘剩余 {{ formatSize(diskFree) }}</span>
           <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:150px"></el-input>
           <el-button size="small" plain @click="cleanCache">清理缓存</el-button>
           <el-button size="small" plain @click="cleanOrphan">清理孤儿</el-button>
@@ -511,6 +511,7 @@ createApp({
       previewUrl: '',
       outputSize: 0,
       tmpSize: 0,
+      diskFree: 0,
       presets: [],
       presetName: '',
       selectedPreset: '',
@@ -612,6 +613,10 @@ createApp({
     async doGenerate() {
       const input = this.selected ? this.selected.url : this.query.trim();
       if (!input) return this.$message.warning('请先搜索选歌，或直接粘贴链接');
+      // 磁盘空间预警：剩余不足 300MB 时提示（无损视频单首可达 100-200MB）
+      if (this.diskFree > 0 && this.diskFree < 300 * 1024 * 1024) {
+        this.$message.warning(`磁盘剩余空间不足（${this.formatSize(this.diskFree)}），生成大体积视频可能失败，建议先清理缓存或孤儿文件`);
+      }
       this.lastGenerate = this.buildGenerateBody(input);
       this.retryVisible = false;
       this.generating = true;
@@ -750,7 +755,7 @@ createApp({
     },
     async loadStats() {
       const r = await this.get('/api/stats');
-      if (r.ok) { this.outputSize = r.outputSize; this.tmpSize = r.tmpSize; }
+      if (r.ok) { this.outputSize = r.outputSize; this.tmpSize = r.tmpSize; this.diskFree = r.diskFree || 0; }
     },
     async cleanCache() {
       const r = await this.post('/api/cache/clean', {});

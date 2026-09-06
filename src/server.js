@@ -2,6 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { execFileSync } = require('child_process');
 const express = require('express');
 const { platforms } = require('./platforms');
 const { generateVideo } = require('./generate');
@@ -373,7 +374,15 @@ function dirSize(dir) {
 app.get('/api/stats', (req, res) => {
   const out = dirSize(path.join(ROOT, 'output'));
   const tmp = dirSize(path.join(ROOT, 'tmp'));
-  res.json({ ok: true, outputSize: out.total, outputCount: out.count, tmpSize: tmp.total, tmpCount: tmp.count });
+  // 磁盘剩余空间（df 解析，字节）
+  let diskFree = 0;
+  try {
+    const dfOut = execFileSync('df', ['-k', path.join(ROOT, 'output')], { encoding: 'utf8' });
+    const line = dfOut.trim().split('\n').pop();
+    const parts = line.split(/\s+/);
+    diskFree = (parseInt(parts[3], 10) || 0) * 1024;  // 可用 KB → 字节
+  } catch (e) {}
+  res.json({ ok: true, outputSize: out.total, outputCount: out.count, tmpSize: tmp.total, tmpCount: tmp.count, diskFree });
 });
 
 // 清理 tmp 缓存（释放磁盘，下次生成重新下载）
