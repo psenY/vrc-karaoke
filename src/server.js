@@ -385,7 +385,17 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 },  // 200MB 上限（无损音频够用）
 });
 // 上传：字段 audio（音频）+ 可选 lrc（歌词），返回服务端路径
+// 顺带清理 24h 前的旧上传文件（上传是一次性的，用完即弃，防目录膨胀）
 app.post('/api/upload', upload.fields([{ name: 'audio', maxCount: 1 }, { name: 'lrc', maxCount: 1 }]), (req, res) => {
+  try {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    for (const f of fs.readdirSync(uploadDir)) {
+      try {
+        const st = fs.statSync(path.join(uploadDir, f));
+        if (st.isFile() && st.mtimeMs < cutoff) fs.unlinkSync(path.join(uploadDir, f));
+      } catch (e) {}
+    }
+  } catch (e) {}
   const files = req.files || {};
   const audio = files.audio && files.audio[0];
   if (!audio) return res.json({ ok: false, error: '缺少音频文件' });
