@@ -18,6 +18,14 @@ const tokens = new Map(); // token -> 登录时间戳
 const app = express();
 app.use(express.json());
 
+// 基础安全响应头（防点击劫持 / MIME 嗅探 / 降低 XSS 影响面）
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
+
 // 访问保护：启用密码且未登录时，/ 返回轻量登录页（避免未登录加载整套应用）
 app.get('/', (req, res, next) => {
   const cfg = readConfig();
@@ -136,7 +144,7 @@ app.post('/api/login', (req, res) => {
     const token = crypto.randomBytes(32).toString('hex');
     tokens.set(token, now);
     // 种 cookie，供 GET / 判断已登录（登录后直接进主应用）
-    res.setHeader('Set-Cookie', `vrc_auth=${token}; Path=/; Max-Age=86400; SameSite=Lax`);
+    res.setHeader('Set-Cookie', `vrc_auth=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Lax`);
     return res.json({ ok: true, needAuth: true, token });
   }
   const count = (rec && rec.count || 0) + 1;
