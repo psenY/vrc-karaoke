@@ -5,6 +5,7 @@ const fs = require('fs');
 const { execFileSync } = require('child_process');
 const express = require('express');
 const { platforms } = require('./platforms');
+const { getSongUrl } = require('./core/netease-api');
 const { generateVideo } = require('./generate');
 const { getPlaylist, getQrKey, getQrImg, checkQrLogin, getUserInfo, getLyric } = require('./core/netease-api');
 
@@ -232,6 +233,21 @@ app.post('/api/search', async (req, res) => {
         url: urlFor(platform.id, s),
       })),
     });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// 网易云试听（30s 预览确认选歌）
+app.post('/api/trial', async (req, res) => {
+  try {
+    const { input, cookie } = req.body || {};
+    const m = String(input || '').match(/[?&]id=(\d+)/);
+    if (!m) return res.json({ ok: false, error: '无法识别歌曲链接' });
+    const cfg = readConfig();
+    const { url } = await getSongUrl(Number(m[1]), cookie || cfg.cookie || '', 'standard');
+    if (!url) return res.json({ ok: false, error: '试听不可用（可能无版权）' });
+    res.json({ ok: true, url });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }

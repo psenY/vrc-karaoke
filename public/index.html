@@ -111,10 +111,15 @@
   </el-card>
 
   <el-card class="card" shadow="never" v-if="songs.length">
-    <template #header><b>搜索结果</b>（点选一首）</template>
+    <template #header><b>搜索结果</b>（点选一首，▶试听确认）</template>
     <div class="song-item" v-for="(s, i) in songs" :key="s.id" @click="selectSong(i)">
-      <div class="name">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span></div>
-      <div class="artists">{{ s.artists }}<span v-if="s.duration"> · {{ fmtDuration(s.duration) }}</span></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <el-button size="small" :type="trialId === s.id ? 'primary' : ''" circle :icon="trialId === s.id ? '' : ''" @click.stop="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
+        <div style="min-width:0">
+          <div class="name">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span></div>
+          <div class="artists">{{ s.artists }}<span v-if="s.duration"> · {{ fmtDuration(s.duration) }}</span></div>
+        </div>
+      </div>
     </div>
     <div style="text-align:center;margin-top:10px">
       <el-button size="small" @click="loadMore">加载更多</el-button>
@@ -502,6 +507,8 @@ createApp({
       playlistName: '',
       playlist: [],
       searchOffset: 0,
+      trialId: '',
+      trialAudio: null,
       batchProgress: '',
       localAudio: '',
       localLrc: '',
@@ -623,6 +630,18 @@ createApp({
       if (!r.songs.length) { this.$message.info('没有更多了'); return; }
       this.songs = this.songs.concat(r.songs);
       this.searchOffset += r.songs.length;
+    },
+    // 网易云 30s 试听（确认选对版本）
+    async trialSong(s) {
+      if (this.trialAudio) { this.trialAudio.pause(); this.trialAudio = null; }
+      if (this.trialId === s.id) { this.trialId = ''; return; }
+      const url = `https://music.163.com/song?id=${s.id}`;
+      const r = await this.post('/api/trial', { input: url });
+      if (!r.ok) return this.$message.error(r.error || '试听不可用');
+      this.trialId = s.id;
+      const a = new Audio(r.url);
+      this.trialAudio = a;
+      a.play().catch(() => { this.trialId = ''; this.$message.warning('试听播放失败'); });
     },
     selectSong(i) {
       this.selected = this.songs[i];
