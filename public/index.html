@@ -124,6 +124,11 @@
       </div>
       <el-checkbox v-model="bilingual">双语</el-checkbox>
       <el-checkbox v-model="cover">封面背景</el-checkbox>
+      <div class="opt" v-if="cover">
+        <el-checkbox v-model="coverMask">遮罩</el-checkbox>
+        <el-slider v-model="coverMaskLevel" :min="0" :max="80" :disabled="!coverMask" style="width:110px"></el-slider>
+        <span style="font-size:12px;color:var(--muted)">{{ coverMaskLevel }}%</span>
+      </div>
       <div class="opt">
         <span>背景色</span>
         <el-color-picker v-model="background"></el-color-picker>
@@ -435,7 +440,9 @@ createApp({
       selected: null,
       highlight: '',
       bilingual: false,
-      cover: false,
+      cover: true,
+      coverMask: true,
+      coverMaskLevel: 30,
       background: '#1a1a2e',
       progress: 0,
       progressText: '',
@@ -568,6 +575,8 @@ createApp({
         highlight: this.highlight || undefined,
         bilingual: this.bilingual,
         cover: this.cover,
+        coverMask: this.coverMask,
+        coverMaskLevel: this.coverMaskLevel,
         background: this.bgHex(),
         segCount: this.segCount,
         resolution: this.resolution,
@@ -743,6 +752,7 @@ createApp({
       if (!name) return this.$message.warning('请输入预设名称');
       const params = {
         highlight: this.highlight, bilingual: this.bilingual, cover: this.cover,
+        coverMask: this.coverMask, coverMaskLevel: this.coverMaskLevel,
         background: this.background, segCount: this.segCount, resolution: this.resolution,
         codec: this.codec, preset: this.preset, crf: this.crf, fps: this.fps,
         audioBitrate: this.audioBitrate, audioLevel: this.audioLevel,
@@ -764,7 +774,9 @@ createApp({
       const s = p.params;
       this.highlight = s.highlight || '';
       this.bilingual = !!s.bilingual;
-      this.cover = !!s.cover;
+      this.cover = s.cover !== undefined ? !!s.cover : true;
+      this.coverMask = s.coverMask !== undefined ? !!s.coverMask : true;
+      this.coverMaskLevel = s.coverMaskLevel !== undefined ? s.coverMaskLevel : 30;
       this.background = s.background || '#1a1a2e';
       this.segCount = s.segCount || 8;
       this.resolution = s.resolution || '1080p';

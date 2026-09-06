@@ -33,6 +33,8 @@ async function generateVideo(input, options = {}) {
     cookie = '',
     songId,                     // 网易云 --id
     cover = false,              // 封面背景
+    coverMask = true,          // 封面遮罩（全屏半透明黑叠加在封面图上）
+    coverMaskLevel = 30,       // 遮罩强度 0-90(%)
     out = null,                 // 输出文件名
     onProgress = null,          // 进度回调 (0~1 数字, 或 {segIdx,progress} 对象)
     segCount = 8,               // 分段并行数(线程数)
@@ -69,13 +71,17 @@ async function generateVideo(input, options = {}) {
   if (h === undefined) h = result.meta.source === 'youtube' ? 'word' : 'line';
 
   // 2.5 下载封面（可选，失败退回纯色）+ 预生成模糊背景图（blur 只做一次，分段/单段共用）
+  // 封面遮罩：可选全屏半透明黑叠加在封面图上（默认 30%）
   let coverPath = null;
   if (cover && result.meta.coverUrl) {
     try {
       coverPath = path.join(workDir, `${result.meta.id}_cover.jpg`);
       await download(result.meta.coverUrl, coverPath);
       const blurredPath = path.join(workDir, `${result.meta.id}_bg.jpg`);
-      await runFfmpeg(['-y', '-loop', '1', '-i', coverPath, '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2`, '-frames:v', '1', blurredPath], null, onSpawn);
+      const maskFilter = coverMask && coverMaskLevel > 0
+        ? `,drawbox=w=iw:h=ih:t=fill:color=black@${(Math.min(90, coverMaskLevel) / 100).toFixed(2)}`
+        : '';
+      await runFfmpeg(['-y', '-loop', '1', '-i', coverPath, '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2${maskFilter}`, '-frames:v', '1', blurredPath], null, onSpawn);
       coverPath = blurredPath;  // 后续用已模糊的背景图
     } catch (e) {
       console.log('[提示] 封面处理失败，退回纯色背景:', e.message.split('\n')[0]);
