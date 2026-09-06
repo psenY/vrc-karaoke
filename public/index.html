@@ -266,12 +266,25 @@
 
   <el-card class="card" shadow="never" v-if="queue.length">
     <template #header><b>任务队列</b></template>
-    <div v-for="q in queue" :key="q.id" :style="'display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--el-border-color-light);' + (isMobile ? 'flex-direction:column;align-items:flex-start' : 'align-items:center;justify-content:space-between')">
-      <span style="color:var(--text);word-break:break-all">{{ q.status === 'running' ? '生成中' : '排队中' }}：{{ q.title }}</span>
-      <span style="display:flex;gap:8px">
-        <el-button v-if="q.status === 'pending'" size="small" @click="queueTop(q.id)">插队</el-button>
-        <el-button size="small" type="danger" plain @click="queueCancel(q.id)">取消</el-button>
-      </span>
+    <div v-for="q in queue" :key="q.id" :style="'padding:8px 0;border-bottom:1px solid var(--el-border-color-light);'">
+      <div :style="'display:flex;gap:8px;' + (isMobile ? 'flex-direction:column;align-items:flex-start' : 'align-items:center;justify-content:space-between')">
+        <span style="color:var(--text);word-break:break-all">{{ q.status === 'running' ? '生成中' : '排队中' }}：{{ q.title }}</span>
+        <span style="display:flex;gap:8px">
+          <el-button v-if="q.status === 'pending'" size="small" @click="queueTop(q.id)">插队</el-button>
+          <el-button size="small" type="danger" plain @click="queueCancel(q.id)">取消</el-button>
+        </span>
+      </div>
+      <!-- 进行中任务进度条（轮询刷新，刷新页面也能恢复显示） -->
+      <div v-if="q.status === 'running'" style="margin-top:6px">
+        <el-progress v-if="q.phase === 'download'" :percentage="Math.round(q.downloadProgress || 0)" :stroke-width="5"></el-progress>
+        <el-progress v-else-if="q.phase === 'assemble' && !Array.isArray(q.progress)" :percentage="Math.round((q.progress || 0) * 100)" :stroke-width="5"></el-progress>
+        <div v-else-if="Array.isArray(q.progress)" :style="'display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(' + (isMobile ? '80' : '120') + 'px,1fr))'">
+          <div v-for="(p, i) in q.progress" :key="i">
+            <div style="font-size:11px;color:var(--muted)">线程 {{ i + 1 }}</div>
+            <el-progress :percentage="Math.round((p || 0) * 100)" :stroke-width="4"></el-progress>
+          </div>
+        </div>
+      </div>
     </div>
   </el-card>
 

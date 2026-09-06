@@ -402,7 +402,10 @@ app.get('/api/task/:id', (req, res) => {
 
 // 队列状态（运行中 + 排队中）
 app.get('/api/queue', (req, res) => {
-  const runningList = [...tasks.values()].filter(t => t.status === 'running').map(t => ({ id: t.id, title: t.title, status: t.status }));
+  const runningList = [...tasks.values()].filter(t => t.status === 'running').map(t => ({
+    id: t.id, title: t.title, status: t.status,
+    phase: t.phase, downloadProgress: t.downloadProgress, progress: t.progress,
+  }));
   const pendingList = queue.map(q => ({ id: q.id, title: tasks.get(q.id)?.title || q.input, status: 'pending' }));
   res.json({ ok: true, running: runningList, pending: pendingList });
 });
