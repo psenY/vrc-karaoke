@@ -76,7 +76,8 @@ function buildArgs(opts) {
     flacAudio = false,   // 无损封装：音频保持 FLAC
   } = opts;
 
-  const assFilter = `ass=${assPath}` + (fontDir ? `:fontsdir=${fontDir}` : '');
+  // fps filter 强制每帧精确 1/fps PTS，避免帧时间戳抖动导致音画漂移
+  const assFilter = `fps=${fps},ass=${assPath}` + (fontDir ? `:fontsdir=${fontDir}` : '');
 
   // 封面背景：coverPath 已是预生成的模糊背景图，歌词叠加
   if (coverPath) {
@@ -185,7 +186,8 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   await runFfmpeg(audioArgs, null, onSpawn);
 
   // 2. 视频分段并行编码（无音频 -an；coverPath 已是预生成的模糊背景图）
-  const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
+  // fps filter 强制每帧精确 1/fps PTS（lavfi 源默认帧 PTS 有周期性抖动，累积成音画漂移）
+  const assFilter = (f) => `fps=${fps},ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
   const segOuts = segments.map(s => path.join(tmpDir, `seg_${s.idx}.mp4`));
   const segAsses = segments.map(s => path.join(tmpDir, `seg_${s.idx}.ass`));
 
@@ -193,13 +195,16 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     const segAssPath = segAsses[seg.idx];
     const segOut = segOuts[seg.idx];
     fs.writeFileSync(segAssPath, segmentAss(assText, seg.startMs, seg.endMs));
+    // 每段精确帧数 + 恒定帧率(CFR)，避免帧时长微调导致 VFR 使歌词随播放漂移
+    const segFrames = Math.max(1, Math.round((seg.endMs - seg.startMs) / 1000 * fps));
     const segArgs = coverPath ? [
       '-y',
       '-loop', '1', '-i', coverPath,
       '-vf', assFilter(segAssPath),
       '-an',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
-      '-t', String((seg.endMs - seg.startMs) / 1000),
+      '-fps_mode', 'cfr',
+      '-frames:v', String(segFrames),
       segOut,
     ] : [
       '-y',
@@ -207,7 +212,8 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
       '-vf', assFilter(segAssPath),
       '-an',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
-      '-t', String((seg.endMs - seg.startMs) / 1000),
+      '-fps_mode', 'cfr',
+      '-frames:v', String(segFrames),
       segOut,
     ];
     await runFfmpeg(segArgs, (sec) => {
@@ -218,9 +224,12 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     }, onSpawn);
   }));
 
-  // 3. 视频 concat 合并（无音频）
+  // 3. 视频 concat + 重编码（filter concat 拼接所有段 + setpts 强制帧时间戳均匀）
+  //    concat demuxer 拼接时段边界帧 PTS 会跳变(0.167s/边界)，播放器累积漂移导致歌词越来越慢
   const videoPath = path.join(tmpDir, '_video.mp4');
-  await concatVideos(segOuts, videoPath, onSpawn);
+  const segInputs = segOuts.map(p => ['-i', p]).flat();
+  const concatFilter = segOuts.map((_, i) => `[${i}:v]`).join('') + `concat=n=${segOuts.length}:v=1:a=0,setpts=N/${fps}/TB[v]`;
+  await runFfmpeg(['-y', ...segInputs, '-filter_complex', concatFilter, '-map', '[v]', '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0', videoPath], null, onSpawn);
 
   // 4. 视频 + 完整音频 mux（无损，音频完全连续；FLAC 封装需 -strict -2）
   const muxArgs = ['-y', '-i', videoPath, '-i', audioOutPath, '-c', 'copy', '-shortest', '-movflags', '+faststart'];
