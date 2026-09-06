@@ -44,7 +44,7 @@ module.exports = {
     }
     const parsed = parseLrc(readLrcFile(lrcPath)).lines;
     if (!parsed.length) throw new Error('歌词解析为空');
-    const lines = parsed.map(l => ({ startMs: l.time, text: l.text }));
+    const lines = parsed.map(l => ({ startMs: l.time, text: l.text, endMs: l.endMs }));
 
     return {
       meta: { id: path.basename(input, path.extname(input)), title: path.basename(input, path.extname(input)), source: 'local' },

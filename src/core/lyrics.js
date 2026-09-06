@@ -49,7 +49,14 @@ function parseLrc(lrcText) {
     if (tags.length === 0) continue;
 
     const text = line.replace(/\[[^\]]*\]/g, '').trim();
-    if (!text) continue;  // 跳过空歌词行（空拍/间隔标记），避免打断相邻句的下一句预览
+    if (!text) {
+      // 空歌词行 = 上一句的结束标记（不作为句子显示，仅提供 endMs）
+      if (lines.length > 0) {
+        const t = parseTimeTag(tags[0][0].slice(1, -1));
+        if (t !== null) lines[lines.length - 1].endMs = t + offset;
+      }
+      continue;
+    }
     for (const tag of tags) {
       const timeMs = parseTimeTag(tag[0].slice(1, -1));
       if (timeMs === null) continue;

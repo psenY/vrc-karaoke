@@ -71,6 +71,7 @@ module.exports = {
     const lines = parsed.map(l => ({
       startMs: l.time,
       text: l.text,
+      endMs: l.endMs,          // 空行标记的结束时间（有则当前句在该时刻隐藏）
       translation: transMap[l.time] || '',
     }));
 
