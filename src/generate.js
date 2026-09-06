@@ -3,7 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const { findPlatform } = require('./platforms');
-const { generateAss } = require('./core/ass');
+const { generateAss, escapeAssText } = require('./core/ass');
 const { runFfmpeg, buildArgs, runFfmpegSegmented, probeBitrate, resolveAudioBitrate } = require('./core/ffmpeg');
 const { download } = require('./core/netease-api');
 
@@ -46,8 +46,7 @@ async function generateVideo(input, options = {}) {
     nextColor = '#969696',      // 下一句/翻译颜色
     titleColor = '#FFFFFF',     // 标题颜色
     progressColor = '#FFFFFF',  // 进度颜色
-    watermarkText = '',       // 右下角水印文字（空=不加）
-    introText = '',           // 片头提示文字（空=不加）
+    introText = 'AUTO',       // 片头信息卡（'AUTO'=自动生成项目/开发者/歌曲/音质/参数；''=不加）
     audioLevel = 'standard',  // 音质 standard/exhigh/lossless
     flacAudio = false,        // 无损封装：音频保持 FLAC（部分播放器不支持）
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
@@ -84,7 +83,21 @@ async function generateVideo(input, options = {}) {
     }
   }
 
-  // 3. 生成 ASS
+  // 3. 音频码率：auto 时按音源实际码率对齐（无损/高音质不再被压到 128k）
+  const srcBitrate = audioBitrate === 'auto' ? await probeBitrate(result.audioPath) : 0;
+  const finalAudioBitrate = resolveAudioBitrate(audioBitrate, srcBitrate);
+
+  // 3.2 片头信息卡（introText === 'AUTO' 时自动生成：项目/开发者/歌曲/音质/参数）
+  let finalIntro = introText;
+  if (introText === 'AUTO') {
+    const esc = escapeAssText;
+    const labels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
+    const levelLabel = labels[audioLevel] || audioLevel;
+    const brLabel = flacAudio ? 'FLAC 无损' : finalAudioBitrate;
+    finalIntro = `{\\fad(300,500)}{\\fs92}${esc('psenY/vrc-karaoke')}{\\fs42}\\N\\N${esc('开发者：VRChat@psenY7')}\\N${esc('歌曲：' + (result.meta.title || ''))}\\N${esc('音质：' + levelLabel + ' · ' + brLabel)}\\N${esc('参数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf)}`;
+  }
+
+  // 4. 生成 ASS
   const assPath = path.join(workDir, `${result.meta.id}.ass`);
   const assText = generateAss(result.lines, {
     highlight: h,
@@ -96,16 +109,11 @@ async function generateVideo(input, options = {}) {
     nextColor: hexToAssBgr(nextColor) || '&H00969696',
     titleColor: hexToAssBgr(titleColor) || '&H00FFFFFF',
     progressColor: hexToAssBgr(progressColor) || '&H00FFFFFF',
-    watermarkText,
-    introText,
+    introText: finalIntro,
   });
   fs.writeFileSync(assPath, assText, 'utf8');
 
-  // 3.5 音频码率：auto 时按音源实际码率对齐（无损/高音质不再被压到 128k）
-  const srcBitrate = audioBitrate === 'auto' ? await probeBitrate(result.audioPath) : 0;
-  const finalAudioBitrate = resolveAudioBitrate(audioBitrate, srcBitrate);
-
-  // 4. 合成（纯色背景分段并行编码吃多核；封面背景单段）
+  // 5. 合成（纯色背景分段并行编码吃多核；封面背景单段）
   const outPath = path.join(outDir, out || `${result.meta.id}_${h}.mp4`);
   if (segCount > 1 && result.audioMs > 60000) {
     await runFfmpegSegmented({
