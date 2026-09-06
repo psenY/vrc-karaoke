@@ -73,6 +73,7 @@ function buildArgs(opts) {
     audioBitrate = '192k',
     codec = 'libx264',
     coverPath = null,
+    flacAudio = false,   // 无损封装：音频保持 FLAC
   } = opts;
 
   const assFilter = `ass=${assPath}` + (fontDir ? `:fontsdir=${fontDir}` : '');
@@ -87,7 +88,8 @@ function buildArgs(opts) {
       '-filter_complex', filterComplex,
       '-map', '[v]', '-map', '1:a',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
-      '-c:a', 'aac', '-b:a', audioBitrate,
+      '-c:a', flacAudio ? 'flac' : 'aac',
+      ...(flacAudio ? ['-strict', '-2'] : ['-b:a', audioBitrate]),
       '-shortest', '-movflags', '+faststart',
       outPath,
     ];
@@ -100,7 +102,8 @@ function buildArgs(opts) {
     '-i', audioPath,
     '-vf', assFilter,
     '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
-    '-c:a', 'aac', '-b:a', audioBitrate,
+    '-c:a', flacAudio ? 'flac' : 'aac',
+    ...(flacAudio ? ['-strict', '-2'] : ['-b:a', audioBitrate]),
     '-shortest',
     '-movflags', '+faststart',
     outPath,
@@ -147,6 +150,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     audioPath, assText, fontDir, outPath, background, coverPath = null,
     audioMs, width = 1920, height = 1080, fps = 24,
     crf = 20, preset = 'veryfast', audioBitrate = '192k', codec = 'libx264',
+    flacAudio = false,   // 无损封装：音频保持 FLAC（部分播放器不支持）
     onSpawn = null,
   } = opts;
   const tmpDir = path.dirname(outPath);
@@ -163,15 +167,21 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     // 太短不分段
     const fullAss = path.join(tmpDir, '_full.ass');
     fs.writeFileSync(fullAss, assText);
-    const single = buildArgs({ audioPath, assPath: fullAss, fontDir, outPath, background, width, height, fps, crf, preset, audioBitrate });
+    const single = buildArgs({ audioPath, assPath: fullAss, fontDir, outPath, background, width, height, fps, crf, preset, audioBitrate, flacAudio });
     await runFfmpeg(single, onProgress);
     return;
   }
 
   // 1. 完整音频一次性转 AAC（音频完全连续，不参与分段，避免拼接处间隙）
-  const aacPath = path.join(tmpDir, '_audio.aac');
-  // 采样率跟随音源（不升采样），码率按 auto 映射；native AAC 在音源采样率下的实际输出即为其极限
-  await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ac', '2', aacPath], null, onSpawn);
+  // 1. 完整音频一次性转码（音频完全连续，不参与分段，避免拼接处间隙）
+  //    无损封装用 FLAC（保留音源码率），否则 AAC（按码率参数）
+  const audioExt = flacAudio ? 'flac' : 'aac';
+  const audioOutPath = path.join(tmpDir, '_audio.' + audioExt);
+  const audioArgs = ['-y', '-i', audioPath, '-vn', '-c:a', audioExt, '-ac', '2'];
+  if (flacAudio) audioArgs.push('-strict', '-2');
+  else audioArgs.push('-b:a', audioBitrate);
+  audioArgs.push(audioOutPath);
+  await runFfmpeg(audioArgs, null, onSpawn);
 
   // 2. 视频分段并行编码（无音频 -an；coverPath 已是预生成的模糊背景图）
   const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
@@ -211,11 +221,14 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   const videoPath = path.join(tmpDir, '_video.mp4');
   await concatVideos(segOuts, videoPath, onSpawn);
 
-  // 4. 视频 + 完整音频 mux（无损，音频完全连续）
-  await runFfmpeg(['-y', '-i', videoPath, '-i', aacPath, '-c', 'copy', '-shortest', '-movflags', '+faststart', outPath], null, onSpawn);
+  // 4. 视频 + 完整音频 mux（无损，音频完全连续；FLAC 封装需 -strict -2）
+  const muxArgs = ['-y', '-i', videoPath, '-i', audioOutPath, '-c', 'copy', '-shortest', '-movflags', '+faststart'];
+  if (flacAudio) muxArgs.push('-strict', '-2');
+  muxArgs.push(outPath);
+  await runFfmpeg(muxArgs, null, onSpawn);
 
   // 清理临时文件
-  for (const p of [...segOuts, ...segAsses, videoPath, aacPath]) { try { fs.unlinkSync(p); } catch (e) {} }
+  for (const p of [...segOuts, ...segAsses, videoPath, audioOutPath]) { try { fs.unlinkSync(p); } catch (e) {} }
 }
 
 module.exports = { probeDuration, probeBitrate, resolveAudioBitrate, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };

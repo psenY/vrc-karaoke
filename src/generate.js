@@ -49,6 +49,7 @@ async function generateVideo(input, options = {}) {
     watermarkText = '',       // 右下角水印文字（空=不加）
     introText = '',           // 片头提示文字（空=不加）
     audioLevel = 'standard',  // 音质 standard/exhigh/lossless
+    flacAudio = false,        // 无损封装：音频保持 FLAC（部分播放器不支持）
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;
 
@@ -115,7 +116,7 @@ async function generateVideo(input, options = {}) {
       background,
       coverPath,
       audioMs: result.audioMs,
-      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec,
+      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio,
       onSpawn,
     }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });
@@ -128,7 +129,7 @@ async function generateVideo(input, options = {}) {
       outPath,
       background,
       coverPath,
-      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec,
+      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio,
     });
     await runFfmpeg(ffargs, (sec) => {
       if (typeof onProgress === 'function' && result.audioMs > 0) {

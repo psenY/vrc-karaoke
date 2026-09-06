@@ -209,6 +209,9 @@
             </el-select>
           </div>
           <div class="opt">
+            <el-checkbox v-model="flacAudio" :disabled="!canFlac">无损封装(FLAC,部分KTV房不兼容)</el-checkbox>
+          </div>
+          <div class="opt">
             <span>当前句色</span>
             <el-color-picker v-model="currentColor"></el-color-picker>
           </div>
@@ -472,6 +475,7 @@ createApp({
       fps: 24,
       audioBitrate: 'auto',
       audioLevel: 'standard',
+      flacAudio: false,
       currentColor: '#FFFFFF',
       nextColor: '#969696',
       titleColor: '#FFFFFF',
@@ -512,6 +516,10 @@ createApp({
       return map[this.vipType] || '普通用户';
     },
     canVip() { return this.vipType === 11 || this.vipType === 110; },      // VIP及以上：极高/无损/高解析度/高清甄音
+    canFlac() {
+      // 无损封装仅对无损级音源开放（无损/高解析度/高清甄音/甄音全景声/沉浸环绕声/超清母带）
+      return this.isSVIP && ['lossless', 'hires', 'jyeffect', 'dolby', 'sky', 'jymaster'].includes(this.audioLevel);
+    },
     isSVIP() { return this.vipType === 110; },                             // SVIP：甄音全景声/沉浸环绕声/超清母带
     filteredHistory() {
       const f = this.historyFilter.trim().toLowerCase();
@@ -572,6 +580,7 @@ createApp({
         fps: this.fps,
         audioBitrate: this.audioBitrate,
         audioLevel: this.audioLevel,
+        flacAudio: this.flacAudio,
         currentColor: this.currentColor,
         nextColor: this.nextColor,
         titleColor: this.titleColor,
@@ -741,6 +750,7 @@ createApp({
         background: this.background, segCount: this.segCount, resolution: this.resolution,
         codec: this.codec, preset: this.preset, crf: this.crf, fps: this.fps,
         audioBitrate: this.audioBitrate, audioLevel: this.audioLevel,
+        flacAudio: this.flacAudio,
         currentColor: this.currentColor,
         nextColor: this.nextColor, titleColor: this.titleColor, progressColor: this.progressColor,
         addWatermark: this.addWatermark, watermarkText: this.watermarkText,
@@ -769,6 +779,7 @@ createApp({
       this.fps = s.fps || 24;
       this.audioBitrate = s.audioBitrate || 'auto';
       this.audioLevel = s.audioLevel || 'standard';
+      this.flacAudio = !!s.flacAudio;
       this.currentColor = s.currentColor || '#FFFFFF';
       this.nextColor = s.nextColor || '#969696';
       this.titleColor = s.titleColor || '#FFFFFF';
