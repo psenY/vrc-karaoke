@@ -140,6 +140,49 @@ function buildEstimatedHighlight(text, startMs, endMs, mode) {
   return out;
 }
 
+// 估算文本显示宽度（全角≈1字宽、半角≈0.55字宽），单位 px
+function estTextWidth(text, fontSize) {
+  let units = 0;
+  for (const ch of String(text)) {
+    units += ch.charCodeAt(0) > 255 ? 1 : 0.55;
+  }
+  return units * fontSize;
+}
+
+// 长句断行 + 字号自适应：单行放不下则拆两行（中文按字符对半、英文优先空格），
+// 两行时字号压到 ≤110（保证两行不跨槽位重叠），仍超则继续缩到 80
+function fitLyricLine(text, fontSize, maxWidth) {
+  const str = String(text);
+  if (estTextWidth(str, fontSize) <= maxWidth) return { cut: 0, fontSize };
+  let cut = Math.floor(str.length / 2);
+  const spaceIdx = str.lastIndexOf(' ', cut);
+  if (spaceIdx > str.length * 0.25) cut = spaceIdx + 1;  // 英文优先在空格处断
+  let fs = Math.min(fontSize, 110);                       // 两行高度约束
+  while (fs >= 80) {
+    if (estTextWidth(str.slice(0, cut), fs) <= maxWidth && estTextWidth(str.slice(cut), fs) <= maxWidth) break;
+    fs -= 10;
+  }
+  return { cut, fontSize: fs };
+}
+
+// 在含 {\k...} 标签的文本第 cut 个实际字符后插入 \N（断行）
+function insertBreakAtTagged(tagged, cut) {
+  let count = 0, out = '', i = 0;
+  while (i < tagged.length) {
+    if (tagged[i] === '{') {
+      const end = tagged.indexOf('}', i);
+      out += tagged.slice(i, end + 1);
+      i = end + 1;
+      continue;
+    }
+    out += tagged[i];
+    count++;
+    if (count === cut) out += '\\N';
+    i++;
+  }
+  return out;
+}
+
 /**
  * 精确逐字：用词级时间戳（YouTube json3）生成 \k 标签。
  * @param {Array<{text:string,startMs:number}>} words
@@ -202,8 +245,12 @@ function generateAss(lines, options = {}) {
       highlightText = buildEstimatedHighlight(curText, startMs, endMs, highlight);
     }
 
+    // 长句处理：断行 + 字号自适应（槽位可用宽留边距）
+    const maxWidth = playResX - 200;
+    const fitted = fitLyricLine(curText, fontSize, maxWidth);
+    let curFull = fitted.cut > 0 ? insertBreakAtTagged(highlightText, fitted.cut) : highlightText;
+    if (fitted.fontSize !== fontSize) curFull = `{\\fs${fitted.fontSize}}` + curFull;
     // 双语：当前句附加翻译
-    let curFull = highlightText;
     if (bilingual && cur.translation) {
       curFull += `\\N{\\rTrans}${escapeAssText(cur.translation)}`;
     }
@@ -220,7 +267,9 @@ function generateAss(lines, options = {}) {
       const next = lines[i + 1];
       const nextText = getLineText(next);
       if (nextText) {
-        let nextFull = escapeAssText(nextText);
+        const nfitted = fitLyricLine(nextText, fontSize, maxWidth);
+        let nextFull = nfitted.cut > 0 ? insertBreakAtTagged(escapeAssText(nextText), nfitted.cut) : escapeAssText(nextText);
+        if (nfitted.fontSize !== fontSize) nextFull = `{\\fs${nfitted.fontSize}}` + nextFull;
         if (bilingual && next.translation) {
           nextFull += `\\N{\\rTrans}${escapeAssText(next.translation)}`;
         }
