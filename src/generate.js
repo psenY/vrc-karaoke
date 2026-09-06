@@ -46,6 +46,8 @@ async function generateVideo(input, options = {}) {
     nextColor = '#969696',      // 下一句/翻译颜色
     titleColor = '#FFFFFF',     // 标题颜色
     progressColor = '#FFFFFF',  // 进度颜色
+    watermarkText = '',       // 右下角水印文字（空=不加）
+    introText = '',           // 片头提示文字（空=不加）
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;
 
@@ -92,6 +94,8 @@ async function generateVideo(input, options = {}) {
     nextColor: hexToAssBgr(nextColor) || '&H00969696',
     titleColor: hexToAssBgr(titleColor) || '&H00FFFFFF',
     progressColor: hexToAssBgr(progressColor) || '&H00FFFFFF',
+    watermarkText,
+    introText,
   });
   fs.writeFileSync(assPath, assText, 'utf8');
 

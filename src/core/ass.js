@@ -37,6 +37,8 @@ Style: Next,${fontName},${fontSize},${nextColor},${nextColor},&H00000000,&H96000
 Style: Trans,${fontName},${transSize},${nextColor},${nextColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,2,100,100,200,1
 Style: Title,${fontName},54,${titleColor},${titleColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,8,100,100,60,1
 Style: Progress,${fontName},48,${progressColor},${progressColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,9,100,100,60,1
+Style: Watermark,${fontName},34,&H40FFFFFF,&H40FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,2,9,100,100,24,1
+Style: Intro,${fontName},76,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,5,100,100,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -173,6 +175,8 @@ function generateAss(lines, options = {}) {
     nextColor = '&H00969696',      // 下一句/翻译颜色
     titleColor = '&H00FFFFFF',     // 标题颜色
     progressColor = '&H00FFFFFF',  // 进度颜色
+    watermarkText = '',       // 右下角水印文字（空=不加）
+    introText = '',           // 片头提示文字（空=不加）
   } = options;
 
   const events = [];
@@ -247,6 +251,21 @@ function generateAss(lines, options = {}) {
         `Dialogue: 0,${formatAssTime(sec * 1000)},${formatAssTime((sec + 1) * 1000)},Progress,,0,0,0,,[${formatClock(sec)} / ${totalStr}]`
       );
     }
+  }
+
+  // 右下角水印（贯穿整个视频）
+  if (watermarkText) {
+    const wmEnd = audioDurationMs ?? (lines.length ? (lines[lines.length - 1].startMs ?? 0) + 5000 : 300000);
+    events.push(
+      `Dialogue: 0,0:00:00.00,${formatAssTime(wmEnd)},Watermark,,0,0,0,,${escapeAssText(watermarkText)}`
+    );
+  }
+
+  // 片头提示（前 2.5 秒，中央，淡入淡出）
+  if (introText) {
+    events.push(
+      `Dialogue: 0,0:00:00.00,0:00:02.50,Intro,,0,0,0,,{\\fad(400,600)}${escapeAssText(introText)}`
+    );
   }
 
   return buildHeader(playResX, playResY, fontName, fontSize, { currentColor, nextColor, titleColor, progressColor }) + events.join('\n') + '\n';

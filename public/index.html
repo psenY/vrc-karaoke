@@ -209,6 +209,17 @@
             <el-color-picker v-model="progressColor"></el-color-picker>
           </div>
         </div>
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted)">视频标识</span>
+          <div class="opt">
+            <el-checkbox v-model="addWatermark">水印</el-checkbox>
+            <el-input v-model="watermarkText" placeholder="右下角水印文字" size="small" style="width:150px"></el-input>
+          </div>
+          <div class="opt">
+            <el-checkbox v-model="addIntro">片头</el-checkbox>
+            <el-input v-model="introText" placeholder="片头提示文字" size="small" style="width:180px"></el-input>
+          </div>
+        </div>
         <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--muted)">参数预设</span>
           <el-input v-model="presetName" placeholder="预设名称" size="small" style="width:130px"></el-input>
@@ -429,6 +440,11 @@ createApp({
       downloadProgress: 0,
       phase: 'download',
       queue: [],
+      progressColor: '#FFFFFF',
+      addWatermark: true,
+      watermarkText: 'vrc-karaoke 生成',
+      addIntro: true,
+      introText: '本视频由 vrc-karaoke 生成',
       needAuth: false,
       token: localStorage.getItem('vrc-token') || '',
       loginVisible: false,
@@ -514,6 +530,8 @@ createApp({
         nextColor: this.nextColor,
         titleColor: this.titleColor,
         progressColor: this.progressColor,
+        watermarkText: this.addWatermark ? this.watermarkText : '',
+        introText: this.addIntro ? this.introText : '',
       };
     },
     async doGenerate() {
@@ -678,6 +696,8 @@ createApp({
         codec: this.codec, preset: this.preset, crf: this.crf, fps: this.fps,
         audioBitrate: this.audioBitrate, currentColor: this.currentColor,
         nextColor: this.nextColor, titleColor: this.titleColor, progressColor: this.progressColor,
+        addWatermark: this.addWatermark, watermarkText: this.watermarkText,
+        addIntro: this.addIntro, introText: this.introText,
       };
       const existing = this.presets.find(p => p.name === name);
       if (existing) existing.params = params;
@@ -705,6 +725,10 @@ createApp({
       this.nextColor = s.nextColor || '#969696';
       this.titleColor = s.titleColor || '#FFFFFF';
       this.progressColor = s.progressColor || '#FFFFFF';
+      this.addWatermark = s.addWatermark !== undefined ? !!s.addWatermark : true;
+      this.watermarkText = s.watermarkText || 'vrc-karaoke 生成';
+      this.addIntro = s.addIntro !== undefined ? !!s.addIntro : true;
+      this.introText = s.introText || '本视频由 vrc-karaoke 生成';
       this.$message.success('预设已加载: ' + name);
     },
     deletePreset() {
