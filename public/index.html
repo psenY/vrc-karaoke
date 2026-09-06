@@ -294,11 +294,24 @@
     <template #header>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <b>网易云登录</b>
-        <span v-if="loginNickname" style="color:#67c23a">已登录：{{ loginNickname }}</span>
+        <span v-if="loginNickname" style="color:#67c23a">已登录</span>
         <span v-else style="color:var(--muted)">未登录</span>
       </div>
     </template>
-    <el-row :gutter="8">
+    <!-- 已登录：显示账户详情 + 退出登录 -->
+    <div v-if="loginNickname" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <img v-if="loginAvatar" :src="loginAvatar" style="width:52px;height:52px;border-radius:50%;object-fit:cover" :style="isMobile ? 'width:44px;height:44px' : ''">
+      <div style="flex:1;min-width:120px">
+        <div style="font-weight:600;color:var(--text)">{{ loginNickname }}</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:2px">
+          <span :style="vipType === 0 ? '' : 'color:#e6a23c'">{{ vipLabel }}</span>
+          <span v-if="loginLevel"> · Lv.{{ loginLevel }}</span>
+        </div>
+      </div>
+      <el-button type="danger" plain @click="logout">退出登录</el-button>
+    </div>
+    <!-- 未登录：cookie 输入 + 扫码登录 -->
+    <el-row v-else :gutter="8">
       <el-col :xs="24" :sm="16" :md="16">
         <el-input v-model="cookie" placeholder="粘贴 cookie" clearable></el-input>
       </el-col>
@@ -306,20 +319,32 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <el-button @click="saveCookie" style="flex:1;min-width:70px">保存</el-button>
           <el-button type="success" @click="startQrLogin" style="flex:1;min-width:90px">扫码登录</el-button>
-          <el-button v-if="loginNickname" type="danger" plain @click="logout" style="flex:1;min-width:90px">退出登录</el-button>
         </div>
       </el-col>
     </el-row>
   </el-card>
 
   <el-card class="card" shadow="never">
-    <template #header><b>访问控制</b>（公开部署时设置访问密码）</template>
-    <el-row :gutter="8">
+    <template #header><b>访问控制</b></template>
+    <!-- 未设置密码：设置密码 -->
+    <el-row v-if="!needAuth" :gutter="8">
       <el-col :xs="24" :sm="16" :md="16">
-        <el-input v-model="adminPassword" type="password" placeholder="设置访问密码（留空不启用）" show-password clearable></el-input>
+        <el-input v-model="adminPassword" type="password" placeholder="设置访问密码" show-password clearable></el-input>
       </el-col>
       <el-col :xs="24" :sm="8" :md="8">
-        <el-button @click="setPassword" style="width:100%">保存密码</el-button>
+        <el-button @click="setPassword" style="width:100%">设置密码</el-button>
+      </el-col>
+    </el-row>
+    <!-- 已设置密码：更改密码（需验证原密码） -->
+    <el-row v-else :gutter="8">
+      <el-col :xs="12" :sm="8" :md="8">
+        <el-input v-model="adminOldPassword" type="password" placeholder="原密码" show-password></el-input>
+      </el-col>
+      <el-col :xs="12" :sm="8" :md="8">
+        <el-input v-model="adminPassword" type="password" placeholder="新密码" show-password></el-input>
+      </el-col>
+      <el-col :xs="24" :sm="8" :md="8">
+        <el-button @click="setPassword" style="width:100%">更改密码</el-button>
       </el-col>
     </el-row>
   </el-card>
@@ -410,6 +435,9 @@ createApp({
       batchProgress: '',
       cookie: '',
       loginNickname: '',
+      loginAvatar: '',
+      loginLevel: 0,
+      vipType: 0,
       history: [],
       qrVisible: false,
       qrImg: '',
@@ -442,6 +470,7 @@ createApp({
       needAuth: false,
       token: localStorage.getItem('vrc-token') || '',
       adminPassword: '',
+      adminOldPassword: '',
       historyFilter: '',
       lastGenerate: null,
       retryVisible: false,
@@ -460,6 +489,10 @@ createApp({
     selectedCount() { return this.playlist.filter(s => s.selected).length; },
     allSelected() { return this.playlist.length > 0 && this.selectedCount === this.playlist.length; },
     someSelected() { return this.selectedCount > 0 && this.selectedCount < this.playlist.length; },
+    vipLabel() {
+      const map = { 0: '普通用户', 10: '音乐包', 11: '黑胶VIP', 15: '黑胶SVIP', 20: '黑胶SVIP' };
+      return map[this.vipType] || '普通用户';
+    },
     filteredHistory() {
       const f = this.historyFilter.trim().toLowerCase();
       return f ? this.history.filter(h => (h.title || h.input || '').toLowerCase().includes(f)) : this.history;
@@ -737,11 +770,16 @@ createApp({
     },
     async loadConfig() {
       const r = await this.get('/api/config');
-      if (r.ok) this.loginNickname = r.nickname || '';
+      if (r.ok) {
+        this.loginNickname = r.nickname || '';
+        this.loginAvatar = r.avatarUrl || '';
+        this.loginLevel = r.level || 0;
+        this.vipType = r.vipType || 0;
+      }
     },
     async logout() {
       const r = await this.post('/api/config', { cookie: '' });
-      if (r.ok) { this.loginNickname = ''; this.cookie = ''; this.$message.success('已退出登录'); }
+      if (r.ok) { this.loginNickname = ''; this.loginAvatar = ''; this.loginLevel = 0; this.vipType = 0; this.cookie = ''; this.$message.success('已退出登录'); }
     },
     async loadQueue() {
       const r = await this.get('/api/queue');
@@ -836,9 +874,16 @@ createApp({
       this.queueTimer = setInterval(() => this.loadQueue(), 3000);
     },
     async setPassword() {
-      if (!this.adminPassword) return this.$message.warning('请输入访问密码');
-      const r = await this.post('/api/set-password', { password: this.adminPassword });
-      if (r.ok) { this.$message.success('访问密码已设置'); this.adminPassword = ''; }
+      if (!this.adminPassword) return this.$message.warning(this.needAuth ? '请输入新密码' : '请输入访问密码');
+      // 已设置密码时，改密码需传原密码验证
+      const body = { password: this.adminPassword };
+      if (this.needAuth) body.oldPassword = this.adminOldPassword;
+      const r = await this.post('/api/set-password', body);
+      if (!r.ok) return this.$message.error(r.error);
+      this.$message.success(this.needAuth ? '密码已更改' : '访问密码已设置');
+      this.adminPassword = '';
+      this.adminOldPassword = '';
+      this.needAuth = !!this.adminPassword || r.ok ? true : this.needAuth;
     },
   },
   mounted() {

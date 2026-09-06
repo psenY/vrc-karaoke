@@ -105,14 +105,19 @@ async function checkQrLogin(key) {
   return { code: body.code, cookie: body.cookie || '' };
 }
 
-/** 用 cookie 获取账号信息（昵称） */
+/** 用 cookie 获取账号信息（昵称/头像/VIP/等级） */
 async function getUserInfo(cookie) {
   try {
     const res = await api.login_status({ cookie });
     const profile = res.body?.data?.profile || res.body?.profile || {};
-    return { nickname: profile.nickname || '' };
+    return {
+      nickname: profile.nickname || '',
+      avatarUrl: profile.avatarUrl || '',
+      vipType: profile.vipType || 0,
+      level: profile.level || 0,
+    };
   } catch (e) {
-    return { nickname: '' };
+    return { nickname: '', avatarUrl: '', vipType: 0, level: 0 };
   }
 }
 

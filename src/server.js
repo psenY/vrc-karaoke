@@ -151,10 +151,14 @@ function requireAuth(req, res, next) {
 }
 app.use('/api', requireAuth);
 
-// 设置/修改访问密码（需已登录；空密码=取消密码保护）
+// 设置/修改访问密码（需已登录；改密码需验证原密码；空密码=取消保护）
 app.post('/api/set-password', (req, res) => {
-  const { password } = req.body || {};
+  const { password, oldPassword } = req.body || {};
   const cfg = readConfig();
+  // 已设置密码时，改密码必须验证原密码
+  if (cfg.adminPassword && sha256(oldPassword || '') !== cfg.adminPassword) {
+    return res.json({ ok: false, error: '原密码错误' });
+  }
   if (password) {
     writeConfig({ ...cfg, adminPassword: sha256(password) });
   } else {
@@ -247,15 +251,14 @@ app.get('/api/login/check', async (req, res) => {
   }
 });
 
-// 配置：读 cookie 状态
+// 配置：读 cookie 状态 + 账户详情
 app.get('/api/config', async (req, res) => {
   const cfg = readConfig();
-  let nickname = '';
+  let info = {};
   if (cfg.cookie) {
-    const info = await getUserInfo(cfg.cookie);
-    nickname = info.nickname;
+    info = await getUserInfo(cfg.cookie);
   }
-  res.json({ ok: true, hasCookie: !!cfg.cookie, nickname });
+  res.json({ ok: true, hasCookie: !!cfg.cookie, nickname: info.nickname || '', avatarUrl: info.avatarUrl || '', vipType: info.vipType || 0, level: info.level || 0 });
 });
 
 // 配置：保存 cookie
