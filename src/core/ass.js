@@ -247,12 +247,17 @@ function generateAss(lines, options = {}) {
 
     // 长句处理：断行 + 字号自适应（槽位可用宽留边距）
     const maxWidth = playResX - 200;
+    const transSize = Math.round(fontSize * 0.6);
     const fitted = fitLyricLine(curText, fontSize, maxWidth);
     let curFull = fitted.cut > 0 ? insertBreakAtTagged(highlightText, fitted.cut) : highlightText;
     if (fitted.fontSize !== fontSize) curFull = `{\\fs${fitted.fontSize}}` + curFull;
-    // 双语：当前句附加翻译
+    // 双语：当前句附加翻译（长翻译同样断行）
     if (bilingual && cur.translation) {
-      curFull += `\\N{\\rTrans}${escapeAssText(cur.translation)}`;
+      const tf = fitLyricLine(cur.translation, transSize, maxWidth);
+      const transFull = tf.cut > 0
+        ? escapeAssText(cur.translation.slice(0, tf.cut)) + '\\N' + escapeAssText(cur.translation.slice(tf.cut))
+        : escapeAssText(cur.translation);
+      curFull += `\\N{\\rTrans}${transFull}`;
     }
 
     // 交替槽位：句 i 在槽位 i%2
@@ -271,7 +276,11 @@ function generateAss(lines, options = {}) {
         let nextFull = nfitted.cut > 0 ? insertBreakAtTagged(escapeAssText(nextText), nfitted.cut) : escapeAssText(nextText);
         if (nfitted.fontSize !== fontSize) nextFull = `{\\fs${nfitted.fontSize}}` + nextFull;
         if (bilingual && next.translation) {
-          nextFull += `\\N{\\rTrans}${escapeAssText(next.translation)}`;
+          const tf = fitLyricLine(next.translation, transSize, maxWidth);
+          const transFull = tf.cut > 0
+            ? escapeAssText(next.translation.slice(0, tf.cut)) + '\\N' + escapeAssText(next.translation.slice(tf.cut))
+            : escapeAssText(next.translation);
+          nextFull += `\\N{\\rTrans}${transFull}`;
         }
         const nextSlot = (i + 1) % 2;
         const nextMarginV = nextSlot === 0 ? topMarginV : bottomMarginV;
