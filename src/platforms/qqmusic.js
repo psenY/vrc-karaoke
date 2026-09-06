@@ -71,7 +71,7 @@ module.exports = {
   id: 'qqmusic',
   name: 'QQ音乐',
 
-  search: searchSong,
+  search: (kw, offset = 0) => searchSong(kw, 5),
 
   matches(input) {
     return /y\.qq\.com/.test(input || '');

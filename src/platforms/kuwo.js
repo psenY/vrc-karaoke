@@ -82,7 +82,7 @@ module.exports = {
   id: 'kuwo',
   name: '酷我音乐',
 
-  search: searchSong,
+  search: (kw, offset = 0) => searchSong(kw, 5),
 
   matches(input) {
     return /kuwo\.cn/.test(input || '');
