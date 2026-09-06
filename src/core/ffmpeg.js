@@ -88,7 +88,6 @@ function buildArgs(opts) {
       '-map', '[v]', '-map', '1:a',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
       '-c:a', 'aac', '-b:a', audioBitrate,
-      ...(audioBitrate === '512k' ? ['-ar', '96000'] : []),
       '-shortest', '-movflags', '+faststart',
       outPath,
     ];
@@ -102,7 +101,6 @@ function buildArgs(opts) {
     '-vf', assFilter,
     '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
     '-c:a', 'aac', '-b:a', audioBitrate,
-    ...(audioBitrate === '512k' ? ['-ar', '96000'] : []),
     '-shortest',
     '-movflags', '+faststart',
     outPath,
@@ -172,11 +170,8 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
 
   // 1. 完整音频一次性转 AAC（音频完全连续，不参与分段，避免拼接处间隙）
   const aacPath = path.join(tmpDir, '_audio.aac');
-  // 512k 目标（无损源）升采样到 96k，native AAC 才能实际输出 ~500k（48k 下 encoder 上限 ~402k）
-  const aacArgs = ['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ac', '2'];
-  if (audioBitrate === '512k') aacArgs.push('-ar', '96000');
-  aacArgs.push(aacPath);
-  await runFfmpeg(aacArgs, null, onSpawn);
+  // 采样率跟随音源（不升采样），码率按 auto 映射；native AAC 在音源采样率下的实际输出即为其极限
+  await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ac', '2', aacPath], null, onSpawn);
 
   // 2. 视频分段并行编码（无音频 -an；coverPath 已是预生成的模糊背景图）
   const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
