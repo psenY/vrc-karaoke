@@ -110,11 +110,17 @@ async function getUserInfo(cookie) {
   try {
     const res = await api.login_status({ cookie });
     const profile = res.body?.data?.profile || res.body?.profile || {};
+    // 等级单独从 /user/level 接口拿（login_status 不返回）
+    let level = 0;
+    try {
+      const lv = await api.user_level({ cookie });
+      level = lv.body?.data?.level || 0;
+    } catch (e) {}
     return {
       nickname: profile.nickname || '',
       avatarUrl: profile.avatarUrl || '',
       vipType: profile.vipType || 0,
-      level: profile.level || 0,
+      level,
     };
   } catch (e) {
     return { nickname: '', avatarUrl: '', vipType: 0, level: 0 };
