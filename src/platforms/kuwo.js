@@ -3,6 +3,7 @@
 const http = require('http');
 const https = require('https');
 const path = require('path');
+const fs = require('fs');
 const { probeDuration } = require('../core/ffmpeg');
 const { download } = require('../core/netease-api');
 
@@ -103,7 +104,7 @@ module.exports = {
 
     // 2. 歌词
     const { lines } = await getLyric(musicId);
-    if (!lines.length) throw new Error('未获取到歌词');
+    if (!lines.length) throw new Error('酷我歌词接口暂不可用（可能被风控），请改用网易云/YouTube');
 
     // 3. 歌曲 URL + 下载 + 时长验证（拦截试听片段）
     const { url } = await getSongUrl(musicId);
@@ -112,7 +113,9 @@ module.exports = {
     await download(url, audioPath);
     const audioMs = await probeDuration(audioPath);
     const lyricEndMs = lines[lines.length - 1]?.startMs || 0;
-    if (lyricEndMs > 60000 && audioMs < lyricEndMs * 0.5) {
+    // 试听片段判定：绝对阈值(<45s) + 歌词长但音频明显短（纯音乐无歌词也能拦截）
+    if (audioMs < 45000 || (lyricEndMs > 60000 && audioMs < lyricEndMs * 0.5)) {
+      try { fs.unlinkSync(audioPath); } catch (e) {}  // 试听不进缓存，避免下次复用
       throw new Error('音频是试听片段（酷我免费接口限制），需会员获取完整歌曲');
     }
 
