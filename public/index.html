@@ -186,10 +186,15 @@
           </div>
           <div class="opt">
             <span>音质</span>
-            <el-select v-model="audioLevel" style="width:150px">
-              <el-option label="标准(128k)" value="standard"></el-option>
-              <el-option label="高品(320k VIP)" value="exhigh" :disabled="!canHigh"></el-option>
-              <el-option label="无损(SVIP)" value="lossless" :disabled="!canLossless"></el-option>
+            <el-select v-model="audioLevel" style="width:170px">
+              <el-option label="标准 128k" value="standard"></el-option>
+              <el-option label="较高 192k" value="higher"></el-option>
+              <el-option label="极高 320k (VIP)" value="exhigh" :disabled="!canExhigh"></el-option>
+              <el-option label="无损 (SVIP)" value="lossless" :disabled="!isSVIP"></el-option>
+              <el-option label="高解析度无损 (SVIP)" value="hires" :disabled="!isSVIP"></el-option>
+              <el-option label="高清甄音 (SVIP)" value="jyeffect" :disabled="!isSVIP"></el-option>
+              <el-option label="沉浸环绕声 (SVIP)" value="sky" :disabled="!isSVIP"></el-option>
+              <el-option label="超清母带 (SVIP)" value="jymaster" :disabled="!isSVIP"></el-option>
             </el-select>
           </div>
           <div class="opt">
@@ -503,8 +508,8 @@ createApp({
       const map = { 0: '普通用户', 10: '音乐包', 11: '黑胶VIP', 110: '黑胶SVIP' };
       return map[this.vipType] || '普通用户';
     },
-    canHigh() { return this.vipType === 11 || this.vipType === 110; },       // 高品 320k：VIP/SVIP
-    canLossless() { return this.vipType === 110; },                          // 无损 FLAC：仅SVIP
+    canExhigh() { return this.vipType === 11 || this.vipType === 110; },      // 极高 320k：VIP/SVIP
+    isSVIP() { return this.vipType === 110; },                                // 无损/高解析度/母带等：仅SVIP
     filteredHistory() {
       const f = this.historyFilter.trim().toLowerCase();
       return f ? this.history.filter(h => (h.title || h.input || '').toLowerCase().includes(f)) : this.history;
