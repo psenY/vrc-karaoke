@@ -177,14 +177,13 @@ async function generateVideo(input, options = {}) {
       introPath,
     ], null, onSpawn);
     // 拼接片头 + 主体：视频用 concat demuxer（-c:v copy，快）；
-    // 音频用 filter concat（3 秒静音 + 原始歌曲音频重编码），避免 concat demuxer 对 AAC 音频流时长的 bug
+    // 音频用 adelay（原始歌曲音频延迟 3 秒，前 3 秒静音，然后歌曲开始）
+    // 不依赖采样率匹配（filter concat 在 anullsrc 与音源采样率不一致时会输出静音）
     const introList = path.join(workDir, '_intro.list.txt');
     fs.writeFileSync(introList, [`file '${introPath}'`, `file '${bodyOut}'`].join('\n'));
-    const outSampleRate = flacAudio ? 48000 : 44100;
     const muxAudio = [
       '-i', result.audioPath,  // 原始歌曲音频（1:a）
-      '-f', 'lavfi', '-i', `anullsrc=channel_layout=stereo:sample_rate=${outSampleRate}`,  // 3 秒静音（2:a）
-      '-filter_complex', '[2:a][1:a]concat=n=2:v=0:a=1[a]',
+      '-filter_complex', '[1:a]adelay=3000:all=1[a]',
       '-map', '0:v', '-map', '[a]',
       '-c:v', 'copy',
       '-c:a', flacAudio ? 'flac' : 'aac',
