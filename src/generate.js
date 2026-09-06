@@ -52,6 +52,7 @@ async function generateVideo(input, options = {}) {
     introText = 'AUTO',       // 片头信息卡（'AUTO'=自动生成项目/开发者/歌曲/音质/参数；''=不加）
     audioLevel = 'higher',    // 音质档位(默认较高192k)
     flacAudio = false,        // 无损封装：音频保持 FLAC（部分播放器不支持）
+    subtitleLang = 'auto',    // YouTube 字幕语言(zh/en/ja/ko)
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;
 
@@ -64,7 +65,7 @@ async function generateVideo(input, options = {}) {
   // 1. 识别平台 + 抓取
   const platform = findPlatform(input, { explicitId: !!songId });
   const result = await platform.fetch(input, {
-    workDir, cookie, songId, audioLevel,
+    workDir, cookie, songId, audioLevel, subtitleLang,
     onProgress: (p) => { if (typeof onProgress === 'function') onProgress({ phase: 'download', progress: p }); },
   });
 

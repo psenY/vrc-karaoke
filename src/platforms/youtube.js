@@ -65,9 +65,17 @@ module.exports = {
       await runYtdlp(['-x', '--audio-format', 'mp3', '-o', base + '.%(ext)s', '--no-warnings', input]);
     }
 
-    // 3. json3 自动字幕（按语言优先级逐个尝试）
+    // 3. json3 自动字幕（按语言优先级逐个尝试；用户可选字幕语言）
     let lines = [];
-    const subLangs = ['zh-Hans,zh-CN,zh', 'en', 'ja', 'ko'];
+    const userLang = options.subtitleLang || 'auto';
+    const langOrders = {
+      auto: ['zh-Hans,zh-CN,zh', 'en', 'ja', 'ko'],
+      zh: ['zh-Hans,zh-CN,zh', 'en', 'ja', 'ko'],
+      en: ['en', 'zh-Hans,zh-CN,zh', 'ja', 'ko'],
+      ja: ['ja', 'zh-Hans,zh-CN,zh', 'en', 'ko'],
+      ko: ['ko', 'zh-Hans,zh-CN,zh', 'en', 'ja'],
+    };
+    const subLangs = langOrders[userLang] || langOrders.auto;
     for (const lang of subLangs) {
       try {
         await runYtdlp([

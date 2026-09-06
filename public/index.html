@@ -240,6 +240,16 @@
             <el-checkbox v-model="flacAudio" :disabled="!canFlac">无损封装(FLAC,部分KTV房不兼容)</el-checkbox>
           </div>
           <div class="opt">
+            <span>YT字幕</span>
+            <el-select v-model="subtitleLang" style="width:100px">
+              <el-option label="自动" value="auto"></el-option>
+              <el-option label="中文" value="zh"></el-option>
+              <el-option label="英文" value="en"></el-option>
+              <el-option label="日文" value="ja"></el-option>
+              <el-option label="韩文" value="ko"></el-option>
+            </el-select>
+          </div>
+          <div class="opt">
             <span>当前句色</span>
             <el-color-picker v-model="currentColor"></el-color-picker>
           </div>
@@ -522,6 +532,7 @@ createApp({
       audioBitrate: 'auto',
       audioLevel: 'higher',
       flacAudio: false,
+      subtitleLang: 'auto',
       currentColor: '#FFFFFF',
       nextColor: '#969696',
       titleColor: '#FFFFFF',
@@ -644,6 +655,7 @@ createApp({
         audioBitrate: this.audioBitrate,
         audioLevel: this.audioLevel,
         flacAudio: this.flacAudio,
+        subtitleLang: this.subtitleLang,
         currentColor: this.currentColor,
         nextColor: this.nextColor,
         titleColor: this.titleColor,
@@ -862,6 +874,7 @@ createApp({
         codec: this.codec, preset: this.preset, crf: this.crf, fps: this.fps,
         audioBitrate: this.audioBitrate, audioLevel: this.audioLevel,
         flacAudio: this.flacAudio,
+        subtitleLang: this.subtitleLang,
         currentColor: this.currentColor,
         nextColor: this.nextColor, titleColor: this.titleColor, progressColor: this.progressColor,
         addIntro: this.addIntro,
@@ -894,6 +907,7 @@ createApp({
       this.audioBitrate = s.audioBitrate || 'auto';
       this.audioLevel = s.audioLevel || 'higher';
       this.flacAudio = !!s.flacAudio;
+      this.subtitleLang = s.subtitleLang || 'auto';
       this.currentColor = s.currentColor || '#FFFFFF';
       this.nextColor = s.nextColor || '#969696';
       this.titleColor = s.titleColor || '#FFFFFF';
