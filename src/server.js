@@ -292,7 +292,7 @@ app.post('/api/generate', (req, res) => {
       preset: preset || 'veryfast',
       crf: Number(crf) || 20,
       fps: Number(fps) || 24,
-      audioBitrate: audioBitrate || '192k',
+      audioBitrate: audioBitrate || 'auto',
       currentColor: currentColor || '#FFFFFF',
       nextColor: nextColor || '#969696',
       titleColor: titleColor || '#FFFFFF',

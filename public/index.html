@@ -200,7 +200,8 @@
           </div>
           <div class="opt">
             <span>音频码率</span>
-            <el-select v-model="audioBitrate" style="width:110px">
+            <el-select v-model="audioBitrate" style="width:130px">
+              <el-option label="自动(跟随音源)" value="auto"></el-option>
               <el-option label="128k" value="128k"></el-option>
               <el-option label="192k" value="192k"></el-option>
               <el-option label="320k" value="320k"></el-option>
@@ -468,7 +469,7 @@ createApp({
       preset: 'veryfast',
       crf: 20,
       fps: 24,
-      audioBitrate: '192k',
+      audioBitrate: 'auto',
       audioLevel: 'standard',
       currentColor: '#FFFFFF',
       nextColor: '#969696',
@@ -765,7 +766,7 @@ createApp({
       this.preset = s.preset || 'veryfast';
       this.crf = s.crf || 20;
       this.fps = s.fps || 24;
-      this.audioBitrate = s.audioBitrate || '192k';
+      this.audioBitrate = s.audioBitrate || 'auto';
       this.audioLevel = s.audioLevel || 'standard';
       this.currentColor = s.currentColor || '#FFFFFF';
       this.nextColor = s.nextColor || '#969696';

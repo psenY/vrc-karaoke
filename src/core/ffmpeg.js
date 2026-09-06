@@ -25,6 +25,34 @@ function probeDuration(filePath) {
   });
 }
 
+/** 用 ffprobe 读取音频码率（bps，读取失败返回 0）。FLAC 等 VBR 无损流 bit_rate 是 N/A，回退容器 format.bit_rate */
+function probeBitrate(filePath) {
+  return new Promise((resolve) => {
+    const proc = spawn('ffprobe', [
+      '-v', 'error',
+      '-show_entries', 'stream=bit_rate:format=bit_rate',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      filePath,
+    ]);
+    let out = '';
+    proc.stdout.on('data', d => { out += d; });
+    proc.stderr.on('data', () => {});
+    proc.on('error', () => resolve(0));
+    proc.on('close', () => {
+      const vals = out.trim().split('\n').map(s => parseInt(s, 10)).filter(v => v > 0);
+      resolve(vals.length ? Math.max(...vals) : 0);
+    });
+  });
+}
+
+/** 按音源实际码率对齐最终 AAC 码率（auto 逻辑）：无损级→320k、320k 级→320k、192k→192k、128k→128k */
+function resolveAudioBitrate(audioBitrate, srcBitrate) {
+  if (audioBitrate !== 'auto') return audioBitrate;
+  if (!srcBitrate || srcBitrate < 140000) return '128k';
+  if (srcBitrate < 220000) return '192k';
+  return '320k';  // 320k 及以上（含无损/母带）→ AAC 320k（播放器兼容上限）
+}
+
 /**
  * 构建 ffmpeg 合成参数。
  * coverPath 存在时用封面图（模糊铺满）作背景，否则纯色背景。
@@ -188,4 +216,4 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   for (const p of [...segOuts, ...segAsses, videoPath, aacPath]) { try { fs.unlinkSync(p); } catch (e) {} }
 }
 
-module.exports = { probeDuration, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };
+module.exports = { probeDuration, probeBitrate, resolveAudioBitrate, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };

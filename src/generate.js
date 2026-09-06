@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { findPlatform } = require('./platforms');
 const { generateAss } = require('./core/ass');
-const { runFfmpeg, buildArgs, runFfmpegSegmented } = require('./core/ffmpeg');
+const { runFfmpeg, buildArgs, runFfmpegSegmented, probeBitrate, resolveAudioBitrate } = require('./core/ffmpeg');
 const { download } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
@@ -41,7 +41,7 @@ async function generateVideo(input, options = {}) {
     preset = 'veryfast',        // 编码预设(速度↔压缩)
     crf = 20,                   // 质量(越小越高)
     fps = 24,                   // 帧率
-    audioBitrate = '192k',      // 音频码率
+    audioBitrate = 'auto',      // 音频码率（auto=跟随音源质量对齐）
     currentColor = '#FFFFFF',   // 当前句颜色
     nextColor = '#969696',      // 下一句/翻译颜色
     titleColor = '#FFFFFF',     // 标题颜色
@@ -100,6 +100,10 @@ async function generateVideo(input, options = {}) {
   });
   fs.writeFileSync(assPath, assText, 'utf8');
 
+  // 3.5 音频码率：auto 时按音源实际码率对齐（无损/高音质不再被压到 128k）
+  const srcBitrate = audioBitrate === 'auto' ? await probeBitrate(result.audioPath) : 0;
+  const finalAudioBitrate = resolveAudioBitrate(audioBitrate, srcBitrate);
+
   // 4. 合成（纯色背景分段并行编码吃多核；封面背景单段）
   const outPath = path.join(outDir, out || `${result.meta.id}_${h}.mp4`);
   if (segCount > 1 && result.audioMs > 60000) {
@@ -111,7 +115,7 @@ async function generateVideo(input, options = {}) {
       background,
       coverPath,
       audioMs: result.audioMs,
-      width, height, fps, crf, preset, audioBitrate, codec,
+      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec,
       onSpawn,
     }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });
@@ -124,7 +128,7 @@ async function generateVideo(input, options = {}) {
       outPath,
       background,
       coverPath,
-      width, height, fps, crf, preset, audioBitrate, codec,
+      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec,
     });
     await runFfmpeg(ffargs, (sec) => {
       if (typeof onProgress === 'function' && result.audioMs > 0) {
