@@ -426,12 +426,14 @@
           <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:150px"></el-input>
           <el-button size="small" plain @click="cleanCache">清理缓存</el-button>
           <el-button size="small" plain @click="cleanOrphan">清理孤儿</el-button>
+          <el-button v-if="historySelected.length" size="small" type="danger" plain @click="batchDeleteHistory">删除选中({{ historySelected.length }})</el-button>
           <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
         </div>
       </div>
     </template>
     <!-- 桌面端：表格 -->
-    <el-table v-if="!isMobile" :data="filteredHistory" stripe size="small" empty-text="暂无记录">
+    <el-table v-if="!isMobile" :data="filteredHistory" stripe size="small" empty-text="暂无记录" @selection-change="h => this.historySelected = h">
+      <el-table-column type="selection" width="40"></el-table-column>
       <el-table-column prop="title" label="歌曲" min-width="200"></el-table-column>
       <el-table-column label="时间" width="170">
         <template #default="scope">{{ fmtTime(scope.row.time) }}</template>
@@ -509,6 +511,7 @@ createApp({
       searchOffset: 0,
       trialId: '',
       trialAudio: null,
+      historySelected: [],
       batchProgress: '',
       localAudio: '',
       localLrc: '',
@@ -856,6 +859,19 @@ createApp({
     async deleteHistory(filename) {
       const r = await this.post('/api/history/delete', { filename });
       if (r.ok) { this.$message.success('已删除'); this.loadHistory(); }
+    },
+    // 批量删除选中的历史记录（勾选后一次删除）
+    async batchDeleteHistory() {
+      const files = this.historySelected.map(h => h.outPath.split('/').pop());
+      if (!files.length) return;
+      let ok = 0;
+      for (const f of files) {
+        const r = await this.post('/api/history/delete', { filename: f });
+        if (r.ok) ok++;
+      }
+      this.historySelected = [];
+      this.$message.success(`已删除 ${ok}/${files.length} 个`);
+      this.loadHistory();
     },
     previewVideo(filename) {
       this.previewUrl = '/output/' + filename;
