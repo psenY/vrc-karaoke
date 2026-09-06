@@ -66,9 +66,16 @@ function resolveAudioBitrate(audioBitrate, srcBitrate) {
   return '512k';  // 无损/高音质源(≥800k) → AAC 512k（接近无损，兼容播放器；MP4 封装 FLAC 播放器不认）
 }
 
+/** 背景源 input 参数：封面图(已模糊) > 渐变图 > 纯色。三处复用（buildArgs / 分段 / 单段） */
+function bgSourceArgs({ coverPath, bgGradPath, background, width, height, fps }) {
+  if (coverPath) return ['-loop', '1', '-i', coverPath];
+  if (bgGradPath) return ['-loop', '1', '-i', bgGradPath];
+  return ['-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`];
+}
+
 /**
  * 构建 ffmpeg 合成参数。
- * coverPath 存在时用封面图（模糊铺满）作背景，否则纯色背景。
+ * coverPath 存在时用封面图（模糊铺满）作背景，否则纯色/渐变背景。
  */
 function buildArgs(opts) {
   const {
@@ -92,12 +99,12 @@ function buildArgs(opts) {
   // fps filter 强制每帧精确 1/fps PTS，避免帧时间戳抖动导致音画漂移
   const assFilter = `fps=${fps},ass=${assPath}` + (fontDir ? `:fontsdir=${fontDir}` : '');
 
-  // 封面背景：coverPath 已是预生成的模糊背景图，歌词叠加
+  // 封面背景：coverPath 已是预生成的模糊背景图，歌词叠加（filter_complex 映射 [0:v]）
   if (coverPath) {
     const filterComplex = `[0:v]${assFilter}[v]`;
     return [
       '-y',
-      '-loop', '1', '-i', coverPath,
+      ...bgSourceArgs({ coverPath, bgGradPath, background, width, height, fps }),
       '-i', audioPath,
       '-filter_complex', filterComplex,
       '-map', '[v]', '-map', '1:a',
@@ -109,10 +116,10 @@ function buildArgs(opts) {
     ];
   }
 
-  // 纯色背景（或渐变背景图 loop）
+  // 纯色/渐变背景
   return [
     '-y',
-    ...(bgGradPath ? ['-loop', '1', '-i', bgGradPath] : ['-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`]),
+    ...bgSourceArgs({ coverPath, bgGradPath, background, width, height, fps }),
     '-i', audioPath,
     '-vf', assFilter,
     '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
@@ -210,18 +217,9 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     fs.writeFileSync(segAssPath, segmentAss(assText, seg.startMs, seg.endMs));
     // 每段精确帧数 + 恒定帧率(CFR)，避免帧时长微调导致 VFR 使歌词随播放漂移
     const segFrames = Math.max(1, Math.round((seg.endMs - seg.startMs) / 1000 * fps));
-    const segArgs = coverPath ? [
+    const segArgs = [
       '-y',
-      '-loop', '1', '-i', coverPath,
-      '-vf', assFilter(segAssPath),
-      '-an',
-      '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
-      '-fps_mode', 'cfr',
-      '-frames:v', String(segFrames),
-      segOut,
-    ] : [
-      '-y',
-      ...(bgGradPath ? ['-loop', '1', '-i', bgGradPath] : ['-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`]),
+      ...bgSourceArgs({ coverPath, bgGradPath, background, width, height, fps }),
       '-vf', assFilter(segAssPath),
       '-an',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
