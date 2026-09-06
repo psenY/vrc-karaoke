@@ -168,10 +168,11 @@ async function generateVideo(input, options = {}) {
     const introAssPath = path.join(workDir, '_intro.ass');
     const introLines = [
       { style: 'IntroMain', y: 400, text: esc('本视频由 psenY/vrc-karaoke 生成') },
-      { style: 'IntroInfo', y: 560, text: esc('开发者：VRChat@psenY7') },
-      { style: 'IntroInfo', y: 620, text: esc('歌曲：' + (result.meta.title || '')) },
-      { style: 'IntroInfo', y: 680, text: esc('音质：' + levelLabel + ' · ' + brLabel) },
-      { style: 'IntroInfo', y: 740, text: esc('参数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf) },
+      // 标签用全角空格(U+3000)补齐等宽，冒号与值对齐；整块左对齐起点=标题第一行左边
+      { style: 'IntroInfo', y: 552, text: esc('开发者：VRChat@psenY7') },
+      { style: 'IntroInfo', y: 614, text: esc('歌\u3000曲：' + (result.meta.title || '')) },
+      { style: 'IntroInfo', y: 676, text: esc('音\u3000质：' + levelLabel + ' · ' + brLabel) },
+      { style: 'IntroInfo', y: 738, text: esc('参\u3000数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf) },
     ];
     fs.writeFileSync(introAssPath, buildIntroAss(introLines, width, height));
     const introPath = path.join(workDir, '_intro.mp4');
@@ -229,7 +230,9 @@ Style: IntroInfo,Noto Sans CJK SC,44,&H00D0D0D0,&H00D0D0D0,&H00000000,&H96000000
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
-  const events = lines.map(l => `Dialogue: 0,0:00:00.00,0:00:03.00,${l.style},,0,0,0,,{\\pos(${Math.round(playResX / 2)},${l.y})}${l.text}`);
+  // 左对齐：\an4(左中) + 统一 X（标题第一行左边第一个字位置），四行从同一起点左对齐
+  const leftX = Math.round(playResX * 0.14);
+  const events = lines.map(l => `Dialogue: 0,0:00:00.00,0:00:03.00,${l.style},,0,0,0,,{\\pos(${leftX},${l.y})\\an4}${l.text}`);
   return header + events.join('\n') + '\n';
 }
 
