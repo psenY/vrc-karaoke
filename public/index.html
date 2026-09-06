@@ -743,8 +743,16 @@ createApp({
       const r = await this.post('/api/playlist', { url: this.playlistUrl.trim() });
       if (!r.ok) return this.$message.error(r.error);
       this.playlistName = r.name;
-      this.playlist = r.songs.map(s => ({ ...s, selected: true }));
-      this.$message.success(`歌单 ${r.name} 共 ${r.songs.length} 首`);
+      // 去重（歌单里重复歌曲只保留一个）
+      const seen = new Set();
+      this.playlist = r.songs.filter(s => {
+        const k = String(s.id);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      }).map(s => ({ ...s, selected: true }));
+      const dup = r.songs.length - this.playlist.length;
+      this.$message.success(`歌单 ${r.name} 共 ${r.songs.length} 首${dup ? `（去重 ${dup} 首重复）` : ''}`);
     },
     toggleAll(val) {
       this.playlist.forEach(s => { s.selected = val; });
