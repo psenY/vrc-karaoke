@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { findPlatform } = require('./platforms');
 const { generateAss, escapeAssText } = require('./core/ass');
-const { runFfmpeg, buildArgs, runFfmpegSegmented, concatVideos, probeBitrate, resolveAudioBitrate } = require('./core/ffmpeg');
+const { runFfmpeg, buildArgs, runFfmpegSegmented, concatVideos, probeBitrate, probeCodec, resolveAudioBitrate } = require('./core/ffmpeg');
 const { download } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
@@ -88,6 +88,16 @@ async function generateVideo(input, options = {}) {
   const srcBitrate = needProbe ? await probeBitrate(result.audioPath) : 0;
   const finalAudioBitrate = resolveAudioBitrate(audioBitrate, srcBitrate);
 
+  // 3.1 无损封装仅对 FLAC 音源有效（mp3/aac 源转 FLAC 是"无损容器装有损内容"，码率虚高、解码压力大、片头码率误导）
+  let finalFlac = flacAudio;
+  if (flacAudio) {
+    const srcCodec = await probeCodec(result.audioPath);
+    if (srcCodec !== 'flac') {
+      finalFlac = false;
+      console.log(`[提示] 音源非 FLAC(实际 ${srcCodec || '未知'})，无损封装不适用，已改用 AAC`);
+    }
+  }
+
   // 3.2 片头信息卡（introText === 'AUTO' 时自动生成：生成方/开发者/歌曲/音质码率/参数）
   // levelLabel/brLabel 供 5.5 前置片头片段复用
   let finalIntro = introText;
@@ -97,8 +107,8 @@ async function generateVideo(input, options = {}) {
     const esc = escapeAssText;
     const labels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
     levelLabel = labels[audioLevel] || audioLevel;
-    // 音频码率：无损封装显示 FLAC 音源码率；否则显示 AAC 目标码率
-    brLabel = flacAudio ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
+    // 音频码率：无损封装(FLAC音源)显示 FLAC 音源码率；否则显示 AAC 目标码率
+    brLabel = finalFlac ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
     finalIntro = 'on';  // 标记：需要前置片头片段
   }
 
@@ -130,7 +140,7 @@ async function generateVideo(input, options = {}) {
       background,
       coverPath,
       audioMs: result.audioMs,
-      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio,
+      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio: finalFlac,
       onSpawn,
     }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });
@@ -143,7 +153,7 @@ async function generateVideo(input, options = {}) {
       outPath: bodyOut,
       background,
       coverPath,
-      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio,
+      width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio: finalFlac,
     });
     await runFfmpeg(ffargs, (sec) => {
       if (typeof onProgress === 'function' && result.audioMs > 0) {
@@ -186,8 +196,8 @@ async function generateVideo(input, options = {}) {
       '-filter_complex', '[1:a]adelay=3000:all=1[a]',
       '-map', '0:v', '-map', '[a]',
       '-c:v', 'copy',
-      '-c:a', flacAudio ? 'flac' : 'aac',
-      ...(flacAudio ? ['-strict', '-2'] : ['-b:a', finalAudioBitrate]),
+      '-c:a', finalFlac ? 'flac' : 'aac',
+      ...(finalFlac ? ['-strict', '-2'] : ['-b:a', finalAudioBitrate]),
       '-shortest', '-movflags', '+faststart',
     ];
     await runFfmpeg([

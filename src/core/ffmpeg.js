@@ -45,6 +45,18 @@ function probeBitrate(filePath) {
   });
 }
 
+/** 用 ffprobe 读取音频编码器名（如 flac/aac/mp3），失败返回 '' */
+function probeCodec(filePath) {
+  return new Promise((resolve) => {
+    const proc = spawn('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name', '-of', 'default=noprint_wrappers=1:nokey=1', filePath]);
+    let out = '';
+    proc.stdout.on('data', d => { out += d; });
+    proc.stderr.on('data', () => {});
+    proc.on('error', () => resolve(''));
+    proc.on('close', () => resolve(out.trim()));
+  });
+}
+
 /** 按音源实际码率对齐最终 AAC 码率（auto 逻辑）：无损级→512k、320k 级→320k、192k→192k、128k→128k */
 function resolveAudioBitrate(audioBitrate, srcBitrate) {
   if (audioBitrate !== 'auto') return audioBitrate;
@@ -241,4 +253,4 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   for (const p of [...segOuts, ...segAsses, videoPath, audioOutPath]) { try { fs.unlinkSync(p); } catch (e) {} }
 }
 
-module.exports = { probeDuration, probeBitrate, resolveAudioBitrate, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };
+module.exports = { probeDuration, probeBitrate, probeCodec, resolveAudioBitrate, buildArgs, runFfmpeg, runFfmpegSegmented, concatVideos };

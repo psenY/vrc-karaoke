@@ -496,6 +496,13 @@ createApp({
       selectedLyric: '',
     };
   },
+  watch: {
+    // 音质切到非无损档时自动取消无损封装（FLAC 封装只对无损音源有意义）
+    audioLevel(v) {
+      const flacLevels = ['lossless', 'hires', 'jyeffect', 'dolby', 'sky', 'jymaster'];
+      if (!flacLevels.includes(v)) this.flacAudio = false;
+    },
+  },
   computed: {
     selectedCount() { return this.playlist.filter(s => s.selected).length; },
     allSelected() { return this.playlist.length > 0 && this.selectedCount === this.playlist.length; },
