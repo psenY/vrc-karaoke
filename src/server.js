@@ -370,6 +370,43 @@ function dirSize(dir) {
   return { total, count };
 }
 
+// 本地文件上传（浏览器直传 mp3 + 可选同名 .lrc，生成用）——存 tmp/uploads/
+const multer = require('multer');
+const uploadDir = path.join(ROOT, 'tmp', 'uploads');
+fs.mkdirSync(uploadDir, { recursive: true });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, cb) => {
+      const safe = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + (file.originalname || '').replace(/[^\w.\-]/g, '_');
+      cb(null, safe);
+    },
+  }),
+  limits: { fileSize: 200 * 1024 * 1024 },  // 200MB 上限（无损音频够用）
+});
+// 上传：字段 audio（音频）+ 可选 lrc（歌词），返回服务端路径
+app.post('/api/upload', upload.fields([{ name: 'audio', maxCount: 1 }, { name: 'lrc', maxCount: 1 }]), (req, res) => {
+  const files = req.files || {};
+  const audio = files.audio && files.audio[0];
+  if (!audio) return res.json({ ok: false, error: '缺少音频文件' });
+  const audioPath = path.join(uploadDir, audio.filename);
+  const audioBase = audio.filename.replace(/\.[^.]+$/, '');
+  // 歌词：上传了 lrc 则用（统一 base 名，让本地平台的"同名 .lrc"规则能找到）
+  let lrcPath = null;
+  if (files.lrc && files.lrc[0]) {
+    lrcPath = path.join(uploadDir, files.lrc[0].filename);
+    if (files.lrc[0].filename.replace(/\.[^.]+$/, '') !== audioBase) {
+      const newLrc = path.join(uploadDir, audioBase + '.lrc');
+      fs.renameSync(lrcPath, newLrc);
+      lrcPath = newLrc;
+    }
+  } else {
+    const lrcCand = path.join(uploadDir, audioBase + '.lrc');
+    if (fs.existsSync(lrcCand)) lrcPath = lrcCand;
+  }
+  res.json({ ok: true, path: audioPath, lrcPath });
+});
+
 // 磁盘占用（output 成品 + tmp 缓存）
 app.get('/api/stats', (req, res) => {
   const out = dirSize(path.join(ROOT, 'output'));

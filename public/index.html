@@ -94,6 +94,20 @@
         <el-button type="primary" @click="doGenerate" :loading="generating" style="width:100%">直接生成</el-button>
       </el-col>
     </el-row>
+    <!-- 本地文件：浏览器直传 mp3 + 歌词 lrc 生成 -->
+    <div style="margin-top:12px;border-top:1px solid var(--el-border-color-light);padding-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--muted)">本地文件</span>
+      <el-upload :auto-upload="false" :show-file-list="false" accept=".mp3,.flac,.m4a,.wav,.aac,.ogg" :on-change="onPickAudio" style="display:inline-block">
+        <el-button size="small">选择音频</el-button>
+      </el-upload>
+      <span v-if="localAudio" style="color:var(--text);font-size:13px;word-break:break-all">{{ localAudio }}</span>
+      <el-upload :auto-upload="false" :show-file-list="false" accept=".lrc,.txt" :on-change="onPickLrc" style="display:inline-block">
+        <el-button size="small" plain>选择歌词 .lrc</el-button>
+      </el-upload>
+      <span v-if="localLrc" style="color:var(--muted);font-size:12px">{{ localLrc }}</span>
+      <el-button size="small" type="primary" @click="doUploadGenerate" :loading="uploading">上传并生成</el-button>
+      <span v-if="localAudio" style="color:var(--muted);font-size:12px">歌词可选（不选则用音频同名 .lrc）</span>
+    </div>
   </el-card>
 
   <el-card class="card" shadow="never" v-if="songs.length">
@@ -467,6 +481,11 @@ createApp({
       playlistName: '',
       playlist: [],
       batchProgress: '',
+      localAudio: '',
+      localLrc: '',
+      localAudioFile: null,
+      localLrcFile: null,
+      uploading: false,
       cookie: '',
       loginNickname: '',
       loginAvatar: '',
@@ -609,6 +628,34 @@ createApp({
         progressColor: this.progressColor,
         introText: this.addIntro ? 'AUTO' : '',
       };
+    },
+    onPickAudio(file) {
+      this.localAudioFile = file.raw;
+      this.localAudio = file.name;
+      this.localLrc = ''; this.localLrcFile = null;
+    },
+    onPickLrc(file) {
+      this.localLrcFile = file.raw;
+      this.localLrc = file.name;
+    },
+    async doUploadGenerate() {
+      if (!this.localAudioFile) return this.$message.warning('请先选择音频文件');
+      this.uploading = true;
+      try {
+        const fd = new FormData();
+        fd.append('audio', this.localAudioFile);
+        if (this.localLrcFile) fd.append('lrc', this.localLrcFile);
+        const r = await fetch('/api/upload', { method: 'POST', headers: { 'x-auth-token': this.token }, body: fd }).then(x => x.json());
+        if (!r.ok) return this.$message.error(r.error || '上传失败');
+        // 上传成功后用本地路径直接生成
+        await this.post('/api/generate', this.buildGenerateBody(r.path));
+        this.localAudio = ''; this.localAudioFile = null; this.localLrc = ''; this.localLrcFile = null;
+        this.$message.success('已上传，开始生成');
+      } catch (e) {
+        this.$message.error('上传失败：' + (e.message || ''));
+      } finally {
+        this.uploading = false;
+      }
     },
     async doGenerate() {
       const input = this.selected ? this.selected.url : this.query.trim();
