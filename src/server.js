@@ -50,6 +50,21 @@ const queue = [];
 let running = 0;
 const MAX_CONCURRENT = 1; // 串行(用户要求一首一首来, 单首内部用分段并行吃多核)
 
+// 失败错误信息友好化：把技术错误映射成可操作的提示
+function friendlyError(msg) {
+  const m = String(msg || '未知错误');
+  if (m.includes('ffmpeg exit')) return '视频合成失败（编码异常），可尝试降低音质、分辨率或分段数后重试';
+  if (m.includes('未获取到音频地址')) return '未能获取音频（可能是会员/无版权歌曲，或所选音质无权限）';
+  if (m.includes('多次下载仍不完整')) return '音频多次下载不完整（可能是试听片段/会员歌），请检查登录状态';
+  if (m.includes('未获取到歌词')) return '未能获取歌词（该歌曲可能没有歌词数据）';
+  if (m.includes('未获取到 YouTube 字幕')) return 'YouTube 视频无可用字幕（自动字幕可能未生成）';
+  if (m.includes('歌词解析为空')) return '歌词文件为空或格式无法解析';
+  if (m.includes('未找到歌词文件')) return '未找到歌词文件（需与音频同目录同名的 .lrc）';
+  if (m.includes('ENOTFOUND') || m.includes('ECONNRESET') || m.includes('ETIMEDOUT')) return '网络错误，请稍后重试';
+  if (m.includes('封面') && m.includes('下载')) return '封面下载失败（不影响生成，已用纯色背景）';
+  return m;
+}
+
 // 清理完成的旧任务（限制 tasks Map 大小，避免长期运行内存累积）
 function cleanupTasks() {
   while (tasks.size > 100) {
@@ -94,7 +109,7 @@ function runNext() {
       })
       .catch(err => {
         if (t.status === 'cancelled') return;
-        t.status = 'failed'; t.error = err.message;
+        t.status = 'failed'; t.error = friendlyError(err.message);
       })
       .finally(() => { running--; cleanupTasks(); runNext(); });
   }
