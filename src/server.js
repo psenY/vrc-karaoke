@@ -309,7 +309,7 @@ app.post('/api/config', (req, res) => {
 
 // 生成（异步任务）
 app.post('/api/generate', (req, res) => {
-  const { input, highlight, bilingual, background, upload, cookie, cover, coverMask, coverMaskLevel, segCount, resolution, codec, preset, crf, fps, audioBitrate, currentColor, nextColor, titleColor, progressColor, introText, audioLevel, flacAudio } = req.body || {};
+  const { input, highlight, bilingual, background, backgroundBottom, upload, cookie, cover, coverMask, coverMaskLevel, segCount, resolution, codec, preset, crf, fps, audioBitrate, currentColor, nextColor, titleColor, progressColor, introText, audioLevel, flacAudio } = req.body || {};
   if (!input) return res.json({ ok: false, error: '缺少输入' });
   const taskId = 't' + (++taskSeq);
   const cfg = readConfig();
@@ -322,6 +322,7 @@ app.post('/api/generate', (req, res) => {
       highlight: highlight || undefined,
       bilingual: !!bilingual,
       background: background || '0x1a1a2e',
+      backgroundBottom: backgroundBottom || '',
       upload: !!upload,
       cover: !!cover,
       coverMask: coverMask !== false,

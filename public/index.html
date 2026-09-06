@@ -151,6 +151,10 @@
         <el-color-picker v-model="background"></el-color-picker>
       </div>
       <div class="opt">
+        <el-checkbox v-model="backgroundGradient">渐变</el-checkbox>
+        <el-color-picker v-model="backgroundBottom" :disabled="!backgroundGradient"></el-color-picker>
+      </div>
+      <div class="opt">
         <span>并行分段</span>
         <el-select v-model="segCount" style="width:90px">
           <el-option label="1" :value="1"></el-option>
@@ -476,6 +480,8 @@ createApp({
       coverMask: true,
       coverMaskLevel: 30,
       background: '#1a1a2e',
+      backgroundGradient: false,
+      backgroundBottom: '#0a0a15',
       progress: 0,
       progressText: '',
       progressStatus: '',
@@ -626,6 +632,7 @@ createApp({
         coverMask: this.coverMask,
         coverMaskLevel: this.coverMaskLevel,
         background: this.bgHex(),
+        backgroundBottom: this.backgroundGradient ? this.backgroundBottom : '',
         segCount: this.segCount,
         resolution: this.resolution,
         codec: this.codec,
@@ -842,7 +849,7 @@ createApp({
       const params = {
         highlight: this.highlight, bilingual: this.bilingual, cover: this.cover,
         coverMask: this.coverMask, coverMaskLevel: this.coverMaskLevel,
-        background: this.background, segCount: this.segCount, resolution: this.resolution,
+        background: this.background, backgroundGradient: this.backgroundGradient, backgroundBottom: this.backgroundBottom, segCount: this.segCount, resolution: this.resolution,
         codec: this.codec, preset: this.preset, crf: this.crf, fps: this.fps,
         audioBitrate: this.audioBitrate, audioLevel: this.audioLevel,
         flacAudio: this.flacAudio,
@@ -867,6 +874,8 @@ createApp({
       this.coverMask = s.coverMask !== undefined ? !!s.coverMask : true;
       this.coverMaskLevel = s.coverMaskLevel !== undefined ? s.coverMaskLevel : 30;
       this.background = s.background || '#1a1a2e';
+      this.backgroundGradient = !!s.backgroundGradient;
+      this.backgroundBottom = s.backgroundBottom || '#0a0a15';
       this.segCount = s.segCount || 8;
       this.resolution = s.resolution || '1080p';
       this.codec = s.codec || 'libx264';

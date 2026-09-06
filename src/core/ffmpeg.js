@@ -80,6 +80,7 @@ function buildArgs(opts) {
     height = 1080,
     fps = 24,
     background = '0x1a1a2e',
+    bgGradPath = null,
     crf = 20,
     preset = 'veryfast',
     audioBitrate = '192k',
@@ -108,10 +109,10 @@ function buildArgs(opts) {
     ];
   }
 
-  // 纯色背景
+  // 纯色背景（或渐变背景图 loop）
   return [
     '-y',
-    '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
+    ...(bgGradPath ? ['-loop', '1', '-i', bgGradPath] : ['-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`]),
     '-i', audioPath,
     '-vf', assFilter,
     '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
@@ -161,7 +162,7 @@ function concatVideos(segPaths, outPath, onSpawn) {
  */
 async function runFfmpegSegmented(opts, segCount, onProgress) {
   const {
-    audioPath, assText, fontDir, outPath, background, coverPath = null,
+    audioPath, assText, fontDir, outPath, background, coverPath = null, bgGradPath = null,
     audioMs, width = 1920, height = 1080, fps = 24,
     crf = 20, preset = 'veryfast', audioBitrate = '192k', codec = 'libx264',
     flacAudio = false,   // 无损封装：音频保持 FLAC（部分播放器不支持）
@@ -220,7 +221,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
       segOut,
     ] : [
       '-y',
-      '-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`,
+      ...(bgGradPath ? ['-loop', '1', '-i', bgGradPath] : ['-f', 'lavfi', '-i', `color=c=${background}:s=${width}x${height}:r=${fps}`]),
       '-vf', assFilter(segAssPath),
       '-an',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',

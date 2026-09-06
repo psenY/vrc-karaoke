@@ -30,6 +30,7 @@ async function generateVideo(input, options = {}) {
     highlight,                  // 未指定时 YouTube 默认 word，其余 line
     bilingual = false,
     background = '0x1a1a2e',
+    backgroundBottom = '',   // 渐变底部色（空=纯色背景）
     cookie = '',
     songId,                     // 网易云 --id
     cover = false,              // 封面背景
@@ -90,6 +91,22 @@ async function generateVideo(input, options = {}) {
     }
   }
 
+  // 2.6 渐变背景（backgroundBottom 非空时）：预生成垂直渐变图一次（geq 单帧），分段/单段 loop 复用
+  let bgGradPath = null;
+  if (backgroundBottom && !coverPath) {
+    try {
+      bgGradPath = path.join(workDir, '_bg_grad.png');
+      const p = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+      const [r0, g0, b0] = p(String(background).replace(/^0x/, '#').padStart(7, '#000000'));
+      const [r1, g1, b1] = p(backgroundBottom);
+      const geq = `geq=r='${r0}+(${r1}-${r0})*Y/${height}':g='${g0}+(${g1}-${g0})*Y/${height}':b='${b0}+(${b1}-${b0})*Y/${height}'`;
+      await runFfmpeg(['-y', '-f', 'lavfi', '-i', `color=c=black:s=${width}x${height}:r=1`, '-vf', geq, '-frames:v', '1', bgGradPath], null, onSpawn);
+    } catch (e) {
+      console.log('[提示] 渐变背景生成失败，退回纯色:', e.message.split('\n')[0]);
+      bgGradPath = null;
+    }
+  }
+
   // 3. 音频码率：auto 时按音源实际码率对齐（无损/高音质不再被压到 128k）；无损封装也需探测音源码率用于信息卡
   const needProbe = audioBitrate === 'auto' || flacAudio;
   const srcBitrate = needProbe ? await probeBitrate(result.audioPath) : 0;
@@ -146,6 +163,7 @@ async function generateVideo(input, options = {}) {
       outPath: bodyOut,
       background,
       coverPath,
+      bgGradPath,
       audioMs: result.audioMs,
       width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio: finalFlac,
       onSpawn,
@@ -160,6 +178,7 @@ async function generateVideo(input, options = {}) {
       outPath: bodyOut,
       background,
       coverPath,
+      bgGradPath,
       width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio: finalFlac,
     });
     await runFfmpeg(ffargs, (sec) => {
