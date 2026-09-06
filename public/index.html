@@ -85,6 +85,7 @@
         <el-select v-model="platform" placeholder="搜索平台" style="width:100%">
           <el-option label="网易云" value="netease"></el-option>
           <el-option label="QQ音乐" value="qqmusic"></el-option>
+          <el-option label="酷我" value="kuwo"></el-option>
         </el-select>
       </el-col>
       <el-col :xs="12" :sm="3" :md="3">
@@ -114,7 +115,7 @@
     <template #header><b>搜索结果</b>（点选一首，▶试听确认）</template>
     <div class="song-item" v-for="(s, i) in songs" :key="s.id" @click="selectSong(i)">
       <div style="display:flex;align-items:center;gap:10px">
-        <el-button size="small" :type="trialId === s.id ? 'primary' : ''" circle :icon="trialId === s.id ? '' : ''" @click.stop="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
+        <el-button v-if="platform === 'netease'" size="small" :type="trialId === s.id ? 'primary' : ''" circle @click.stop="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
         <div style="min-width:0">
           <div class="name">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span></div>
           <div class="artists">{{ s.artists }}<span v-if="s.duration"> · {{ fmtDuration(s.duration) }}</span></div>
