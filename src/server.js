@@ -195,11 +195,11 @@ app.post('/api/set-password', (req, res) => {
 // 搜索（网易云 / QQ音乐 / 酷我）
 app.post('/api/search', async (req, res) => {
   try {
-    const { query, platform: platformId } = req.body || {};
+    const { query, platform: platformId, offset = 0 } = req.body || {};
     if (!query) return res.json({ ok: false, error: '缺少关键词' });
     const platform = platforms.find(p => p.id === platformId) || platforms[0];
     if (!platform.search) return res.json({ ok: false, error: `${platform.name} 不支持关键词搜索` });
-    const songs = await platform.search(query);
+    const songs = await platform.search(query, offset);
     const urlFor = (p, s) => {
       if (p === 'netease') return `https://music.163.com/song?id=${s.id}`;
       if (p === 'qqmusic') return `https://y.qq.com/n/ryqq/songDetail/${s.id}`;

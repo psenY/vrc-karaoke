@@ -32,7 +32,7 @@ module.exports = {
   id: 'netease',
   name: '网易云音乐',
 
-  search: (kw) => searchSong(kw, 10),
+  search: (kw, offset = 0) => searchSong(kw, 10, offset),
 
   // 匹配网易云链接；关键词等无明确平台时由 findPlatform 回退到本平台
   matches(input) {

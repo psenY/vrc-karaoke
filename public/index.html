@@ -116,6 +116,9 @@
       <div class="name">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span></div>
       <div class="artists">{{ s.artists }}<span v-if="s.duration"> · {{ fmtDuration(s.duration) }}</span></div>
     </div>
+    <div style="text-align:center;margin-top:10px">
+      <el-button size="small" @click="loadMore">加载更多</el-button>
+    </div>
   </el-card>
 
   <el-card class="card" shadow="never" v-if="selected">
@@ -480,6 +483,7 @@ createApp({
       playlistUrl: '',
       playlistName: '',
       playlist: [],
+      searchOffset: 0,
       batchProgress: '',
       localAudio: '',
       localLrc: '',
@@ -587,10 +591,19 @@ createApp({
     },
     async doSearch() {
       if (!this.query.trim()) return this.$message.warning('请输入关键词');
-      const r = await this.post('/api/search', { query: this.query.trim(), platform: this.platform });
+      this.searchOffset = 0;
+      const r = await this.post('/api/search', { query: this.query.trim(), platform: this.platform, offset: 0 });
       if (!r.ok) return this.$message.error(r.error);
       this.songs = r.songs;
+      this.searchOffset = 10;
       if (!r.songs.length) this.$message.info('无结果');
+    },
+    async loadMore() {
+      const r = await this.post('/api/search', { query: this.query.trim(), platform: this.platform, offset: this.searchOffset });
+      if (!r.ok) return this.$message.error(r.error);
+      if (!r.songs.length) { this.$message.info('没有更多了'); return; }
+      this.songs = this.songs.concat(r.songs);
+      this.searchOffset += r.songs.length;
     },
     selectSong(i) {
       this.selected = this.songs[i];

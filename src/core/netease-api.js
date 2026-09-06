@@ -6,8 +6,8 @@ const fs = require('fs');
 const api = require('NeteaseCloudMusicApi');
 
 /** 搜索单曲（type=1），返回精简结果列表 */
-async function searchSong(keywords, limit = 5) {
-  const res = await api.search({ keywords, limit, type: 1 });
+async function searchSong(keywords, limit = 5, offset = 0) {
+  const res = await api.search({ keywords, limit, offset, type: 1 });
   const songs = res.body?.result?.songs || [];
   return songs.map(s => ({
     id: s.id,
