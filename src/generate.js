@@ -41,7 +41,7 @@ async function generateVideo(input, options = {}) {
     resolution = '1080p',       // 分辨率
     codec = 'libx264',          // 编码器
     preset = 'veryfast',        // 编码预设(速度↔压缩)
-    crf = 20,                   // 质量(越小越高)
+    crf = 23,                   // 质量(越小越高)
     fps = 24,                   // 帧率
     audioBitrate = 'auto',      // 音频码率（auto=跟随音源质量对齐）
     currentColor = '#FFFFFF',   // 当前句颜色
@@ -49,7 +49,7 @@ async function generateVideo(input, options = {}) {
     titleColor = '#FFFFFF',     // 标题颜色
     progressColor = '#FFFFFF',  // 进度颜色
     introText = 'AUTO',       // 片头信息卡（'AUTO'=自动生成项目/开发者/歌曲/音质/参数；''=不加）
-    audioLevel = 'standard',  // 音质 standard/exhigh/lossless
+    audioLevel = 'higher',    // 音质档位(默认较高192k)
     flacAudio = false,        // 无损封装：音频保持 FLAC（部分播放器不支持）
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;

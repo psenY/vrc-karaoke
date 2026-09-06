@@ -184,6 +184,8 @@
           <div class="opt">
             <span>帧率</span>
             <el-select v-model="fps" style="width:100px">
+              <el-option label="15" :value="15"></el-option>
+              <el-option label="20" :value="20"></el-option>
               <el-option label="24" :value="24"></el-option>
               <el-option label="30" :value="30"></el-option>
               <el-option label="60" :value="60"></el-option>
@@ -484,10 +486,10 @@ createApp({
       resolution: '1080p',
       codec: 'libx264',
       preset: 'veryfast',
-      crf: 20,
+      crf: 23,
       fps: 24,
       audioBitrate: 'auto',
-      audioLevel: 'standard',
+      audioLevel: 'higher',
       flacAudio: false,
       currentColor: '#FFFFFF',
       nextColor: '#969696',
@@ -795,10 +797,10 @@ createApp({
       this.resolution = s.resolution || '1080p';
       this.codec = s.codec || 'libx264';
       this.preset = s.preset || 'veryfast';
-      this.crf = s.crf || 20;
+      this.crf = s.crf || 23;
       this.fps = s.fps || 24;
       this.audioBitrate = s.audioBitrate || 'auto';
-      this.audioLevel = s.audioLevel || 'standard';
+      this.audioLevel = s.audioLevel || 'higher';
       this.flacAudio = !!s.flacAudio;
       this.currentColor = s.currentColor || '#FFFFFF';
       this.nextColor = s.nextColor || '#969696';

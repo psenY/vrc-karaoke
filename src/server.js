@@ -292,7 +292,7 @@ app.post('/api/generate', (req, res) => {
       resolution: resolution || '1080p',
       codec: codec || 'libx264',
       preset: preset || 'veryfast',
-      crf: Number(crf) || 20,
+      crf: Number(crf) || 23,
       fps: Number(fps) || 24,
       audioBitrate: audioBitrate || 'auto',
       currentColor: currentColor || '#FFFFFF',
@@ -300,7 +300,7 @@ app.post('/api/generate', (req, res) => {
       titleColor: titleColor || '#FFFFFF',
       progressColor: progressColor || '#FFFFFF',
       introText: introText || '',
-      audioLevel: audioLevel || 'standard',
+      audioLevel: audioLevel || 'higher',
       flacAudio: !!flacAudio,
     },
   });
