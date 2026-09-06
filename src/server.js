@@ -397,7 +397,7 @@ app.post('/api/output/clean', (req, res) => {
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
   if (!t) return res.json({ ok: false, error: '任务不存在' });
-  res.json({ ok: true, status: t.status, result: t.result, error: t.error, progress: t.progress, phase: t.phase, downloadProgress: t.downloadProgress });
+  res.json({ ok: true, status: t.status, title: t.title, result: t.result, error: t.error, progress: t.progress, phase: t.phase, downloadProgress: t.downloadProgress });
 });
 
 // 队列状态（运行中 + 排队中）

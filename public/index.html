@@ -663,6 +663,7 @@ createApp({
       for (const s of todo) {
         const r = await this.post('/api/generate', this.buildGenerateBody(`https://music.163.com/song?id=${s.id}`));
         if (r.ok && r.taskId) this.batchTaskIds.push(r.taskId);
+        else this.$message.warning(`入队失败：${s.name}${r.error ? ' (' + r.error + ')' : ''}`);
         done++;
         this.batchProgress = `(${done}/${total} 已入队)`;
       }
@@ -671,16 +672,24 @@ createApp({
     async pollBatch() {
       const ids = this.batchTaskIds;
       if (!ids.length) return;
-      let completed = 0;
+      let completed = 0, success = 0;
+      const failed = [];
       for (const id of ids) {
         const r = await this.get('/api/task/' + id);
-        if (r.status === 'done' || r.status === 'failed' || r.status === 'cancelled') completed++;
+        if (r.status === 'done') { completed++; success++; }
+        else if (r.status === 'failed') { completed++; failed.push(r.title || id); }
+        else if (r.status === 'cancelled') completed++;
       }
-      this.batchProgress = `(${completed}/${ids.length} 已完成)`;
+      this.batchProgress = `(${completed}/${ids.length} 已完成 · 成功 ${success} · 失败 ${failed.length})`;
       if (completed < ids.length) {
         setTimeout(() => this.pollBatch(), 3000);
       } else {
-        this.batchProgress = `(全部完成 ${ids.length} 首)`;
+        this.batchProgress = `(全部完成 ${ids.length} 首 · 成功 ${success} · 失败 ${failed.length})`;
+        if (failed.length) {
+          this.$message.error(`批量完成，失败 ${failed.length} 首：` + failed.join('、'));
+        } else {
+          this.$message.success(`批量完成 ${success} 首`);
+        }
         this.loadHistory();
       }
     },
