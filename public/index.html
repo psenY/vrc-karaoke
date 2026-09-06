@@ -490,7 +490,8 @@ createApp({
     allSelected() { return this.playlist.length > 0 && this.selectedCount === this.playlist.length; },
     someSelected() { return this.selectedCount > 0 && this.selectedCount < this.playlist.length; },
     vipLabel() {
-      const map = { 0: '普通用户', 10: '音乐包', 11: '黑胶VIP', 15: '黑胶SVIP', 20: '黑胶SVIP' };
+      // 网易云 vipType: 0=普通 10=音乐包 11=黑胶VIP 110=黑胶SVIP
+      const map = { 0: '普通用户', 10: '音乐包', 11: '黑胶VIP', 110: '黑胶SVIP' };
       return map[this.vipType] || '普通用户';
     },
     filteredHistory() {
