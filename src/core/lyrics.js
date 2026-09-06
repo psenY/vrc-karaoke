@@ -49,6 +49,7 @@ function parseLrc(lrcText) {
     if (tags.length === 0) continue;
 
     const text = line.replace(/\[[^\]]*\]/g, '').trim();
+    if (!text) continue;  // 跳过空歌词行（空拍/间隔标记），避免打断相邻句的下一句预览
     for (const tag of tags) {
       const timeMs = parseTimeTag(tag[0].slice(1, -1));
       if (timeMs === null) continue;
