@@ -38,6 +38,7 @@ Style: Trans,${fontName},${transSize},${nextColor},${nextColor},&H00000000,&H960
 Style: Title,${fontName},54,${titleColor},${titleColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,8,100,100,60,1
 Style: Progress,${fontName},48,${progressColor},${progressColor},&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,9,100,100,60,1
 Style: Intro,${fontName},42,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,6,2,5,100,100,0,1
+Style: Mask,${fontName},1,&H00000000,&H00000000,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -251,9 +252,13 @@ function generateAss(lines, options = {}) {
     }
   }
 
-  // 片头信息卡（前 3 秒，中央多行：项目/开发者/歌曲/音质/参数，淡入淡出）
+  // 片头信息卡（前 3 秒：50% 黑遮罩 + 中央多行信息，无淡入淡出）
   // introText 由调用方生成完整 ASS 文本（含 \fs/\N 标签，文字已转义），这里直接插入
   if (introText) {
+    // 全屏 50% 黑遮罩（\c 黑色 + \alpha&H80& = 50% 不透明；大字号方块铺满）
+    events.push(
+      `Dialogue: 0,0:00:00.00,0:00:03.00,Mask,,0,0,0,,{\\pos(960,540)\\fs1080\\fscx(178)\\c&H000000&\\alpha&H80&}█`
+    );
     events.push(
       `Dialogue: 0,0:00:00.00,0:00:03.00,Intro,,0,0,0,,${introText}`
     );

@@ -83,18 +83,20 @@ async function generateVideo(input, options = {}) {
     }
   }
 
-  // 3. 音频码率：auto 时按音源实际码率对齐（无损/高音质不再被压到 128k）
-  const srcBitrate = audioBitrate === 'auto' ? await probeBitrate(result.audioPath) : 0;
+  // 3. 音频码率：auto 时按音源实际码率对齐（无损/高音质不再被压到 128k）；无损封装也需探测音源码率用于信息卡
+  const needProbe = audioBitrate === 'auto' || flacAudio;
+  const srcBitrate = needProbe ? await probeBitrate(result.audioPath) : 0;
   const finalAudioBitrate = resolveAudioBitrate(audioBitrate, srcBitrate);
 
-  // 3.2 片头信息卡（introText === 'AUTO' 时自动生成：项目/开发者/歌曲/音质/参数）
+  // 3.2 片头信息卡（introText === 'AUTO' 时自动生成：生成方/开发者/歌曲/音质码率/参数）
   let finalIntro = introText;
   if (introText === 'AUTO') {
     const esc = escapeAssText;
     const labels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
     const levelLabel = labels[audioLevel] || audioLevel;
-    const brLabel = flacAudio ? 'FLAC 无损' : finalAudioBitrate;
-    finalIntro = `{\\fad(300,500)}{\\fs92}${esc('psenY/vrc-karaoke')}{\\fs42}\\N\\N${esc('开发者：VRChat@psenY7')}\\N${esc('歌曲：' + (result.meta.title || ''))}\\N${esc('音质：' + levelLabel + ' · ' + brLabel)}\\N${esc('参数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf)}`;
+    // 音频码率：无损封装显示 FLAC 音源码率；否则显示 AAC 目标码率
+    const brLabel = flacAudio ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
+    finalIntro = `{\\fs92}${esc('本视频由 psenY/vrc-karaoke 生成')}{\\fs44}\\N${esc('开发者：VRChat@psenY7')}\\N${esc('歌曲：' + (result.meta.title || ''))}\\N${esc('音质：' + levelLabel + ' · ' + brLabel)}\\N${esc('参数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf)}`;
   }
 
   // 4. 生成 ASS
