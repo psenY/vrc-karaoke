@@ -138,7 +138,8 @@ function runFfmpeg(args, onProgress, onSpawn) {
 function concatVideos(segPaths, outPath, onSpawn) {
   const listFile = outPath + '.concat.txt';
   fs.writeFileSync(listFile, segPaths.map(p => `file '${p}'`).join('\n'));
-  return runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-movflags', '+faststart', outPath], null, onSpawn)
+  // -shortest：以最短流（视频）为准，避免音频流时长异常拉长总时长
+  return runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-shortest', '-movflags', '+faststart', outPath], null, onSpawn)
     .finally(() => { try { fs.unlinkSync(listFile); } catch (e) {} });
 }
 
@@ -174,10 +175,10 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
 
   // 1. 完整音频一次性转 AAC（音频完全连续，不参与分段，避免拼接处间隙）
   // 1. 完整音频一次性转码（音频完全连续，不参与分段，避免拼接处间隙）
-  //    无损封装用 FLAC（保留音源码率），否则 AAC（按码率参数）
-  const audioExt = flacAudio ? 'flac' : 'aac';
+  //    无损封装用 FLAC（保留音源码率），否则 AAC 输出到 .m4a 容器（裸流 .aac 的 duration 计算有 bug，会异常拉长）
+  const audioExt = flacAudio ? 'flac' : 'm4a';
   const audioOutPath = path.join(tmpDir, '_audio.' + audioExt);
-  const audioArgs = ['-y', '-i', audioPath, '-vn', '-c:a', audioExt, '-ac', '2'];
+  const audioArgs = ['-y', '-i', audioPath, '-vn', '-c:a', flacAudio ? 'flac' : 'aac', '-ac', '2'];
   if (flacAudio) audioArgs.push('-strict', '-2');
   else audioArgs.push('-b:a', audioBitrate);
   audioArgs.push(audioOutPath);

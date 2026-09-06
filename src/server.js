@@ -373,12 +373,19 @@ app.post('/api/output/clean', (req, res) => {
   const outputDir = path.join(ROOT, 'output');
   const h = readHistory();
   const known = new Set(h.map(item => item.outPath.split('/').pop()));
+  // 跳过最近 30 分钟内生成的文件（可能是正在生成的任务输出，避免误删导致生成报错）
+  const recentMs = 30 * 60 * 1000;
+  const now = Date.now();
   let removed = 0;
   try {
     for (const f of fs.readdirSync(outputDir)) {
-      if (f.endsWith('.mp4') && !known.has(f)) {
-        try { fs.unlinkSync(path.join(outputDir, f)); removed++; } catch (e) {}
-      }
+      if (!f.endsWith('.mp4') || known.has(f)) continue;
+      try {
+        const st = fs.statSync(path.join(outputDir, f));
+        if (now - st.mtimeMs < recentMs) continue;
+        fs.unlinkSync(path.join(outputDir, f));
+        removed++;
+      } catch (e) {}
     }
   } catch (e) {}
   res.json({ ok: true, removed });

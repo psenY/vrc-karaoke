@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { findPlatform } = require('./platforms');
 const { generateAss, escapeAssText } = require('./core/ass');
-const { runFfmpeg, buildArgs, runFfmpegSegmented, probeBitrate, resolveAudioBitrate } = require('./core/ffmpeg');
+const { runFfmpeg, buildArgs, runFfmpegSegmented, concatVideos, probeBitrate, resolveAudioBitrate } = require('./core/ffmpeg');
 const { download } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
@@ -89,14 +89,17 @@ async function generateVideo(input, options = {}) {
   const finalAudioBitrate = resolveAudioBitrate(audioBitrate, srcBitrate);
 
   // 3.2 片头信息卡（introText === 'AUTO' 时自动生成：生成方/开发者/歌曲/音质码率/参数）
+  // levelLabel/brLabel 供 5.5 前置片头片段复用
   let finalIntro = introText;
+  let levelLabel = '';
+  let brLabel = '';
   if (introText === 'AUTO') {
     const esc = escapeAssText;
     const labels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
-    const levelLabel = labels[audioLevel] || audioLevel;
+    levelLabel = labels[audioLevel] || audioLevel;
     // 音频码率：无损封装显示 FLAC 音源码率；否则显示 AAC 目标码率
-    const brLabel = flacAudio ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
-    finalIntro = `{\\fs92}${esc('本视频由 psenY/vrc-karaoke 生成')}{\\fs44}\\N${esc('开发者：VRChat@psenY7')}\\N${esc('歌曲：' + (result.meta.title || ''))}\\N${esc('音质：' + levelLabel + ' · ' + brLabel)}\\N${esc('参数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf)}`;
+    brLabel = flacAudio ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
+    finalIntro = 'on';  // 标记：需要前置片头片段
   }
 
   // 4. 生成 ASS
@@ -111,18 +114,19 @@ async function generateVideo(input, options = {}) {
     nextColor: hexToAssBgr(nextColor) || '&H00969696',
     titleColor: hexToAssBgr(titleColor) || '&H00FFFFFF',
     progressColor: hexToAssBgr(progressColor) || '&H00FFFFFF',
-    introText: finalIntro,
+    introText: '',   // 片头改为前置独立片段，主体 ASS 不含片头
   });
   fs.writeFileSync(assPath, assText, 'utf8');
 
   // 5. 合成（纯色背景分段并行编码吃多核；封面背景单段）
   const outPath = path.join(outDir, out || `${result.meta.id}_${h}.mp4`);
+  const bodyOut = finalIntro ? outPath + '.body.mp4' : outPath;  // 有片头时主体先输出到临时路径
   if (segCount > 1 && result.audioMs > 60000) {
     await runFfmpegSegmented({
       audioPath: result.audioPath,
       assText,
       fontDir,
-      outPath,
+      outPath: bodyOut,
       background,
       coverPath,
       audioMs: result.audioMs,
@@ -136,7 +140,7 @@ async function generateVideo(input, options = {}) {
       audioPath: result.audioPath,
       assPath,
       fontDir,
-      outPath,
+      outPath: bodyOut,
       background,
       coverPath,
       width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio,
@@ -148,7 +152,76 @@ async function generateVideo(input, options = {}) {
     }, onSpawn);
   }
 
+  // 5.5 前置片头：3 秒纯黑 + 信息卡文字 + 静音音频（前 3 秒不播放歌曲音频）
+  if (finalIntro) {
+    const esc = escapeAssText;
+    const introAssPath = path.join(workDir, '_intro.ass');
+    const introLines = [
+      { style: 'IntroMain', y: 400, text: esc('本视频由 psenY/vrc-karaoke 生成') },
+      { style: 'IntroInfo', y: 560, text: esc('开发者：VRChat@psenY7') },
+      { style: 'IntroInfo', y: 620, text: esc('歌曲：' + (result.meta.title || '')) },
+      { style: 'IntroInfo', y: 680, text: esc('音质：' + levelLabel + ' · ' + brLabel) },
+      { style: 'IntroInfo', y: 740, text: esc('参数：' + resolution + ' · ' + fps + 'fps · ' + preset + ' · CRF' + crf) },
+    ];
+    fs.writeFileSync(introAssPath, buildIntroAss(introLines, width, height));
+    const introPath = path.join(workDir, '_intro.mp4');
+    await runFfmpeg([
+      '-y',
+      '-f', 'lavfi', '-i', `color=c=black:s=${width}x${height}:r=${fps}:d=3`,
+      '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+      '-t', '3',
+      '-vf', `ass=${introAssPath}:fontsdir=${fontDir}`,
+      '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-shortest',
+      introPath,
+    ], null, onSpawn);
+    // 拼接片头 + 主体：视频用 concat demuxer（-c:v copy，快）；
+    // 音频用 filter concat（3 秒静音 + 原始歌曲音频重编码），避免 concat demuxer 对 AAC 音频流时长的 bug
+    const introList = path.join(workDir, '_intro.list.txt');
+    fs.writeFileSync(introList, [`file '${introPath}'`, `file '${bodyOut}'`].join('\n'));
+    const outSampleRate = flacAudio ? 48000 : 44100;
+    const muxAudio = [
+      '-i', result.audioPath,  // 原始歌曲音频（1:a）
+      '-f', 'lavfi', '-i', `anullsrc=channel_layout=stereo:sample_rate=${outSampleRate}`,  // 3 秒静音（2:a）
+      '-filter_complex', '[2:a][1:a]concat=n=2:v=0:a=1[a]',
+      '-map', '0:v', '-map', '[a]',
+      '-c:v', 'copy',
+      '-c:a', flacAudio ? 'flac' : 'aac',
+      ...(flacAudio ? ['-strict', '-2'] : ['-b:a', finalAudioBitrate]),
+      '-shortest', '-movflags', '+faststart',
+    ];
+    await runFfmpeg([
+      '-y',
+      '-f', 'concat', '-safe', '0', '-i', introList,
+      ...muxAudio,
+      outPath,
+    ], null, onSpawn);
+    for (const p of [bodyOut, introPath, introAssPath, introList]) { try { fs.unlinkSync(p); } catch (e) {} }
+  }
+
   return { outPath, meta: result.meta, highlight: h };
+}
+
+// 片头信息卡 ASS：纯黑背景上的白字/灰字信息，\pos 精确排版
+function buildIntroAss(lines, playResX, playResY) {
+  const header = `[Script Info]
+ScriptType: v4.00+
+PlayResX: ${playResX}
+PlayResY: ${playResY}
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: IntroMain,Noto Sans CJK SC,92,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,5,100,100,0,1
+Style: IntroInfo,Noto Sans CJK SC,44,&H00D0D0D0,&H00D0D0D0,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,5,100,100,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+  const events = lines.map(l => `Dialogue: 0,0:00:00.00,0:00:03.00,${l.style},,0,0,0,,{\\pos(${Math.round(playResX / 2)},${l.y})}${l.text}`);
+  return header + events.join('\n') + '\n';
 }
 
 module.exports = { generateVideo };
