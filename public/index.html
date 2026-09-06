@@ -185,6 +185,14 @@
             </el-select>
           </div>
           <div class="opt">
+            <span>音质</span>
+            <el-select v-model="audioLevel" style="width:150px">
+              <el-option label="标准(128k)" value="standard"></el-option>
+              <el-option label="高品(320k VIP)" value="exhigh" :disabled="!canHigh"></el-option>
+              <el-option label="无损(SVIP)" value="lossless" :disabled="!canLossless"></el-option>
+            </el-select>
+          </div>
+          <div class="opt">
             <span>音频码率</span>
             <el-select v-model="audioBitrate" style="width:110px">
               <el-option label="128k" value="128k"></el-option>
@@ -455,6 +463,7 @@ createApp({
       crf: 20,
       fps: 24,
       audioBitrate: '192k',
+      audioLevel: 'standard',
       currentColor: '#FFFFFF',
       nextColor: '#969696',
       titleColor: '#FFFFFF',
@@ -494,6 +503,8 @@ createApp({
       const map = { 0: '普通用户', 10: '音乐包', 11: '黑胶VIP', 110: '黑胶SVIP' };
       return map[this.vipType] || '普通用户';
     },
+    canHigh() { return this.vipType === 11 || this.vipType === 110; },       // 高品 320k：VIP/SVIP
+    canLossless() { return this.vipType === 110; },                          // 无损 FLAC：仅SVIP
     filteredHistory() {
       const f = this.historyFilter.trim().toLowerCase();
       return f ? this.history.filter(h => (h.title || h.input || '').toLowerCase().includes(f)) : this.history;
@@ -552,6 +563,7 @@ createApp({
         crf: this.crf,
         fps: this.fps,
         audioBitrate: this.audioBitrate,
+        audioLevel: this.audioLevel,
         currentColor: this.currentColor,
         nextColor: this.nextColor,
         titleColor: this.titleColor,
@@ -720,7 +732,8 @@ createApp({
         highlight: this.highlight, bilingual: this.bilingual, cover: this.cover,
         background: this.background, segCount: this.segCount, resolution: this.resolution,
         codec: this.codec, preset: this.preset, crf: this.crf, fps: this.fps,
-        audioBitrate: this.audioBitrate, currentColor: this.currentColor,
+        audioBitrate: this.audioBitrate, audioLevel: this.audioLevel,
+        currentColor: this.currentColor,
         nextColor: this.nextColor, titleColor: this.titleColor, progressColor: this.progressColor,
         addWatermark: this.addWatermark, watermarkText: this.watermarkText,
         addIntro: this.addIntro, introText: this.introText,
@@ -747,6 +760,7 @@ createApp({
       this.crf = s.crf || 20;
       this.fps = s.fps || 24;
       this.audioBitrate = s.audioBitrate || '192k';
+      this.audioLevel = s.audioLevel || 'standard';
       this.currentColor = s.currentColor || '#FFFFFF';
       this.nextColor = s.nextColor || '#969696';
       this.titleColor = s.titleColor || '#FFFFFF';

@@ -30,9 +30,9 @@ async function getLyric(songId) {
 }
 
 /** 获取歌曲播放地址（高音质需 cookie） */
-async function getSongUrl(songId, cookie = '') {
+async function getSongUrl(songId, cookie = '', level = 'standard') {
   const fn = api.song_url_v1 || api.song_url;
-  const res = await fn({ id: songId, level: 'standard', cookie });
+  const res = await fn({ id: songId, level, cookie });
   const data = res.body?.data || [];
   const item = data.find(d => d.id === songId) || data[0] || {};
   return {

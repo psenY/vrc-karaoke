@@ -48,6 +48,7 @@ async function generateVideo(input, options = {}) {
     progressColor = '#FFFFFF',  // 进度颜色
     watermarkText = '',       // 右下角水印文字（空=不加）
     introText = '',           // 片头提示文字（空=不加）
+    audioLevel = 'standard',  // 音质 standard/exhigh/lossless
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;
 
@@ -59,7 +60,7 @@ async function generateVideo(input, options = {}) {
   // 1. 识别平台 + 抓取
   const platform = findPlatform(input, { explicitId: !!songId });
   const result = await platform.fetch(input, {
-    workDir, cookie, songId,
+    workDir, cookie, songId, audioLevel,
     onProgress: (p) => { if (typeof onProgress === 'function') onProgress({ phase: 'download', progress: p }); },
   });
 

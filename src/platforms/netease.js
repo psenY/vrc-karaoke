@@ -12,10 +12,10 @@ function parseNeteaseUrl(input) {
   return m ? Number(m[1]) : null;
 }
 
-async function downloadWithVerify(songId, cookie, basePath, expectedMs, maxRetries = 2) {
+async function downloadWithVerify(songId, cookie, basePath, expectedMs, maxRetries = 2, level = 'standard') {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const { url } = await getSongUrl(songId, cookie);
-    if (!url) throw new Error('未获取到音频地址（可能是会员/无版权歌曲，需要提供 --cookie）');
+    const { url } = await getSongUrl(songId, cookie, level);
+    if (!url) throw new Error('未获取到音频地址（可能是会员/无版权歌曲，或当前音质需要 VIP/SVIP 权限）');
     const ext = url.split('?')[0].endsWith('.flac') ? '.flac' : '.mp3';
     const destPath = basePath + ext;
     await download(url, destPath);
@@ -74,9 +74,10 @@ module.exports = {
       translation: transMap[l.time] || '',
     }));
 
-    // 3. 音频（缓存复用 + outer/url 优先拿免费歌，失败走 song_url 试听拦截）
+    // 3. 音频（音质选择：standard 走 outer/url 免费 + 缓存；高品/无损走 song_url 对应音质）
     const detail = await getSongDetail(id);
-    const cachedPath = path.join(workDir, String(id) + '.mp3');
+    const audioLevel = options.audioLevel || 'standard';
+    const cachedPath = path.join(workDir, String(id) + (audioLevel !== 'standard' ? '_' + audioLevel : '') + '.mp3');
     let audio;
     // 缓存命中：已有完整音频（时长匹配），跳过下载
     if (fs.existsSync(cachedPath)) {
@@ -88,12 +89,17 @@ module.exports = {
       } catch (e) {}
     }
     if (!audio) {
-      const outerUrl = await getOuterUrl(id);
-      if (outerUrl) {
-        await download(outerUrl, cachedPath, 3, onProgress);
-        audio = { durationMs: await probeDuration(cachedPath), path: cachedPath };
+      if (audioLevel !== 'standard') {
+        // 高品(320k)/无损(FLAC)：直接用 song_url 对应音质（需 VIP/SVIP cookie）
+        audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id) + '_' + audioLevel), detail.dt || 0, 2, audioLevel);
       } else {
-        audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id)), detail.dt || 0);
+        const outerUrl = await getOuterUrl(id);
+        if (outerUrl) {
+          await download(outerUrl, cachedPath, 3, onProgress);
+          audio = { durationMs: await probeDuration(cachedPath), path: cachedPath };
+        } else {
+          audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id)), detail.dt || 0);
+        }
       }
     }
 
