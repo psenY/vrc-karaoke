@@ -62,13 +62,17 @@ module.exports = {
     if (!lrc) throw new Error('未获取到歌词');
     const parsed = parseLrc(lrc).lines;
     if (!parsed.length) throw new Error('歌词解析为空');
+    // 过滤音乐制作元信息行（作词/作曲/编曲/制作人/和声等），避免混入歌词时间轴干扰显示
+    const metaLineRe = /^(作词|作曲|编曲|制作人|制作|录音|混音|母带|和声|和声编写|吉他|贝斯|键盘|鼓|弦乐|监制|企划|词|曲|OP|SP|艺人统筹|配唱制作人)\s*[:：]/;
+    const lyricLines = parsed.filter(l => !metaLineRe.test(l.text));
+    if (!lyricLines.length) throw new Error('歌词解析为空');
     const transMap = {};
     if (tlyric) {
       for (const t of parseLrc(tlyric).lines) {
         transMap[t.time] = t.text;
       }
     }
-    const lines = parsed.map(l => ({
+    const lines = lyricLines.map(l => ({
       startMs: l.time,
       text: l.text,
       translation: transMap[l.time] || '',

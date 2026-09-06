@@ -215,7 +215,7 @@ function generateAss(lines, options = {}) {
       `Dialogue: 0,${formatAssTime(startMs)},${formatAssTime(endMs)},Current,,0,0,${curMarginV},,${curFull}`
     );
 
-    // 下一句（灰，对侧槽位）
+    // 下一句（灰，对侧槽位）：显示到下一句自己开始（间隔大时保持提前预览，不中途消失）
     if (showNext && i + 1 < lines.length) {
       const next = lines[i + 1];
       const nextText = getLineText(next);
@@ -226,8 +226,10 @@ function generateAss(lines, options = {}) {
         }
         const nextSlot = (i + 1) % 2;
         const nextMarginV = nextSlot === 0 ? topMarginV : bottomMarginV;
+        const nextStartTime = next.startMs ?? next.time;
+        const nextEnd = Math.max(endMs, nextStartTime);  // 至少显示到当前句结束；间隔大时持续到下一句开始
         events.push(
-          `Dialogue: 0,${formatAssTime(startMs)},${formatAssTime(endMs)},Next,,0,0,${nextMarginV},,${nextFull}`
+          `Dialogue: 0,${formatAssTime(startMs)},${formatAssTime(nextEnd)},Next,,0,0,${nextMarginV},,${nextFull}`
         );
       }
     }
