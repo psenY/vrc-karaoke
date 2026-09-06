@@ -382,12 +382,6 @@
     </div>
   </el-dialog>
 
-  <el-dialog v-model="loginVisible" title="登录" :width="isMobile ? '86%' : '320px'" :close-on-click-modal="false" :show-close="false">
-    <el-input v-model="loginPassword" type="password" placeholder="访问密码" show-password @keyup.enter="doLogin"></el-input>
-    <div style="margin-top:14px;text-align:right">
-      <el-button type="primary" @click="doLogin">登录</el-button>
-    </div>
-  </el-dialog>
 </div>
 
 <script>
@@ -447,8 +441,6 @@ createApp({
       introText: '本视频由 vrc-karaoke 生成',
       needAuth: false,
       token: localStorage.getItem('vrc-token') || '',
-      loginVisible: false,
-      loginPassword: '',
       adminPassword: '',
       historyFilter: '',
       lastGenerate: null,
@@ -804,7 +796,7 @@ createApp({
       if (this.token) headers['x-auth-token'] = this.token;
       try {
         const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-        if (r.status === 401) { this.needAuth = true; this.loginVisible = true; return { ok: false, error: '未登录' }; }
+        if (r.status === 401) { location.href = '/login'; return { ok: false, error: '未登录' }; }
         return r.json();
       } catch (e) {
         return { ok: false, error: '网络错误' };
@@ -815,30 +807,19 @@ createApp({
       if (this.token) headers['x-auth-token'] = this.token;
       try {
         const r = await fetch(url, { headers });
-        if (r.status === 401) { this.needAuth = true; this.loginVisible = true; return { ok: false, error: '未登录' }; }
+        if (r.status === 401) { location.href = '/login'; return { ok: false, error: '未登录' }; }
         return r.json();
       } catch (e) {
         return { ok: false, error: '网络错误' };
       }
     },
-    async doLogin() {
-      const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: this.loginPassword }) }).then(r => r.json());
-      if (!r.ok) return this.$message.error(r.error);
-      this.token = r.token || '';
-      localStorage.setItem('vrc-token', this.token);
-      this.loginVisible = false;
-      this.loginPassword = '';
-      this.$message.success('登录成功');
-      this.loadAll();          // 登录后立刻拉数据
-      this.startQueuePoll();
-    },
-    // 启动流程：先确认是否需要登录，未登录不发无效请求（避免控制台刷 401 报错）
+    // 启动流程：未登录（无 token 且需密码）跳独立登录页，不发无效请求
     async bootstrap() {
       const r = await this.get('/api/auth-status');
       const needAuth = !!(r.ok && r.needAuth);
       this.needAuth = needAuth;
       if (needAuth && !this.token) {
-        this.loginVisible = true;
+        location.href = '/login';
         return;
       }
       this.loadAll();

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vrc-karaoke · 登录</title>
+<style>
+  :root { --bg: #f5f6f8; --card: #ffffff; --text: #1f2329; --muted: #86909c; --border: #e5e6eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141414; --card: #1d1e1f; --text: #e5e6eb; --muted: #86909c; --border: #333435; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px 28px; width: 330px; max-width: 92vw; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 22px; }
+  input { width: 100%; padding: 11px 12px; font-size: 15px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); margin-bottom: 14px; outline: none; }
+  input:focus { border-color: #4a6cf7; }
+  button { width: 100%; padding: 11px; font-size: 15px; font-weight: 600; border-radius: 8px; border: none; background: #4a6cf7; color: #fff; cursor: pointer; }
+  button:hover { background: #5a7cff; }
+  button:disabled { opacity: .6; cursor: default; }
+  .err { color: #f56c6c; font-size: 13px; min-height: 18px; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>vrc-karaoke</h1>
+  <p class="sub">本服务已启用访问保护，请输入访问密码</p>
+  <input type="password" id="pwd" placeholder="访问密码" autocomplete="current-password" autofocus>
+  <button id="btn">登录</button>
+  <p class="err" id="err"></p>
+</div>
+<script>
+  var pwd = document.getElementById('pwd');
+  var btn = document.getElementById('btn');
+  var err = document.getElementById('err');
+  async function login() {
+    err.textContent = '';
+    btn.disabled = true;
+    btn.textContent = '登录中...';
+    try {
+      var r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd.value }) });
+      var d = await r.json();
+      if (!d.ok) { err.textContent = d.error || '登录失败'; btn.disabled = false; btn.textContent = '登录'; return; }
+      localStorage.setItem('vrc-token', d.token || '');
+      location.href = '/';
+    } catch (e) {
+      err.textContent = '网络错误，请重试';
+      btn.disabled = false;
+      btn.textContent = '登录';
+    }
+  }
+  btn.onclick = login;
+  pwd.addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
+</script>
+</body>
+</html>

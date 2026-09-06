@@ -17,6 +17,21 @@ const tokens = new Map(); // token -> 登录时间戳
 
 const app = express();
 app.use(express.json());
+
+// 访问保护：启用密码且未登录时，/ 返回轻量登录页（避免未登录加载整套应用）
+app.get('/', (req, res, next) => {
+  const cfg = readConfig();
+  if (!cfg.adminPassword) return next();
+  const cookie = req.headers.cookie || '';
+  const m = cookie.match(/vrc_auth=([^;]+)/);
+  const token = m ? m[1] : '';
+  if (token && tokens.has(token)) return next();
+  return res.sendFile(path.join(ROOT, 'public', 'login.html'));
+});
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(ROOT, 'public', 'login.html'));
+});
+
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/output', express.static(path.join(ROOT, 'output')));
 
@@ -111,6 +126,8 @@ app.post('/api/login', (req, res) => {
   if (sha256(password) === cfg.adminPassword) {
     const token = crypto.randomBytes(32).toString('hex');
     tokens.set(token, Date.now());
+    // 种 cookie，供 GET / 判断已登录（登录后直接进主应用）
+    res.setHeader('Set-Cookie', `vrc_auth=${token}; Path=/; Max-Age=86400; SameSite=Lax`);
     return res.json({ ok: true, needAuth: true, token });
   }
   res.json({ ok: false, error: '密码错误' });
