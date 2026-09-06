@@ -45,12 +45,13 @@ function probeBitrate(filePath) {
   });
 }
 
-/** 按音源实际码率对齐最终 AAC 码率（auto 逻辑）：无损级→320k、320k 级→320k、192k→192k、128k→128k */
+/** 按音源实际码率对齐最终 AAC 码率（auto 逻辑）：无损级→512k、320k 级→320k、192k→192k、128k→128k */
 function resolveAudioBitrate(audioBitrate, srcBitrate) {
   if (audioBitrate !== 'auto') return audioBitrate;
   if (!srcBitrate || srcBitrate < 140000) return '128k';
   if (srcBitrate < 220000) return '192k';
-  return '320k';  // 320k 及以上（含无损/母带）→ AAC 320k（播放器兼容上限）
+  if (srcBitrate < 800000) return '320k';   // 320k 音源 → AAC 320k
+  return '512k';  // 无损/高音质源(≥800k) → AAC 512k（接近无损，兼容播放器；MP4 封装 FLAC 播放器不认）
 }
 
 /**
@@ -169,7 +170,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
 
   // 1. 完整音频一次性转 AAC（音频完全连续，不参与分段，避免拼接处间隙）
   const aacPath = path.join(tmpDir, '_audio.aac');
-  await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ar', '44100', '-ac', '2', aacPath], null, onSpawn);
+  await runFfmpeg(['-y', '-i', audioPath, '-vn', '-c:a', 'aac', '-b:a', audioBitrate, '-ac', '2', aacPath], null, onSpawn);
 
   // 2. 视频分段并行编码（无音频 -an；coverPath 已是预生成的模糊背景图）
   const assFilter = (f) => `ass=${f}` + (fontDir ? `:fontsdir=${fontDir}` : '');
