@@ -513,7 +513,7 @@
         <span style="font-weight:600;color:var(--text);font-size:13px;flex:1;min-width:180px;word-break:break-all">{{ u.title }}</span>
         <span :style="{color: u.phase === 'done' ? '#67c23a' : u.phase === 'failed' ? '#f56c6c' : '#e6a23c', fontSize: '13px'}">{{ u.phaseText }}{{ u.error ? '：' + u.error.slice(0, 60) : '' }}</span>
         <a v-if="u.url" :href="u.url" target="_blank" style="color:#4a6cf7;font-size:13px">{{ u.bvid }}</a>
-        <span v-if="u.totalMB" style="color:var(--muted);font-size:12px">{{ u.uploadedMB }}/{{ u.totalMB }}MB</span>
+        <span v-if="u.totalMB" style="color:var(--muted);font-size:12px">{{ u.uploadedMB }}/{{ u.totalMB }}MB<template v-if="u.speed"> · {{ u.speed }}MB/s</template></span>
       </div>
       <el-progress v-if="u.phase !== 'done' && u.phase !== 'failed'" :percentage="u.progress" :stroke-width="5" style="margin-top:4px"></el-progress>
     </div>

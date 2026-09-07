@@ -154,7 +154,7 @@ function runNext() {
                     onProgress: p => {
                       const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
                         p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;
-                      biliUpPatch(upRec, { phase: p.phase, phaseText, progress: p.phase === 'uploading' ? Math.round((p.chunk / p.chunks) * 95) : (p.phase === 'finish' ? 96 : p.phase === 'publish' ? 98 : 2), uploadedMB: p.uploadedMB || upRec.uploadedMB, totalMB: p.totalMB || upRec.totalMB });
+                      const speed = (p.phase === 'uploading' && p.uploadedMB) ? +(p.uploadedMB / Math.max(1, (Date.now() - upRec.start) / 1000)).toFixed(1) : upRec.speed;
                     },
                   });
                 } catch (err) {
@@ -278,7 +278,7 @@ let biliUploadSeq = 0;
 try { biliUploads = JSON.parse(fs.readFileSync(BILI_UPLOADS_FILE, 'utf8')); biliUploadSeq = biliUploads.reduce((m, u) => Math.max(m, u.id || 0), 0); } catch (e) {}
 function biliUpSave() { try { fs.writeFileSync(BILI_UPLOADS_FILE, JSON.stringify(biliUploads.slice(0, 50), null, 2)); } catch (e) {} }
 function biliUpNew(title, outPath) {
-  const rec = { id: ++biliUploadSeq, title, outPath, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
+  const rec = { id: ++biliUploadSeq, title, outPath, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, speed: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
   biliUploads.unshift(rec);
   if (biliUploads.length > 50) biliUploads.length = 50;
   biliUpSave();
@@ -416,7 +416,8 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       onProgress: p => {
         const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
           p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;
-        biliUpPatch(upRec, { phase: p.phase, phaseText, progress: p.phase === 'uploading' ? Math.round((p.chunk / p.chunks) * 95) : (p.phase === 'finish' ? 96 : p.phase === 'publish' ? 98 : 2), uploadedMB: p.uploadedMB || upRec.uploadedMB, totalMB: p.totalMB || upRec.totalMB });
+        const speed = (p.phase === 'uploading' && p.uploadedMB) ? +(p.uploadedMB / Math.max(1, (Date.now() - upRec.start) / 1000)).toFixed(1) : upRec.speed;
+        biliUpPatch(upRec, { phase: p.phase, phaseText, progress: p.phase === 'uploading' ? Math.round((p.chunk / p.chunks) * 95) : (p.phase === 'finish' ? 96 : p.phase === 'publish' ? 98 : 2), uploadedMB: p.uploadedMB || upRec.uploadedMB, totalMB: p.totalMB || upRec.totalMB, speed });
       },
     });
     biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
