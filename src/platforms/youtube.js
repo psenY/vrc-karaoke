@@ -59,9 +59,11 @@ module.exports = {
 
   // YouTube 搜索（yt-dlp ytsearch，走 mihomo 代理）
   async search(keywords, offset = 0, limit = 10) {
-    const out = await runYtdlp([`ytsearch${limit}:${keywords}`, '--dump-single-json', '--flat-playlist', '--no-warnings']);
+    // yt-dlp 的 ytsearchN 只能按总数顺序取：取 offset+limit 条后切片，实现真正的分页
+    const n = offset + limit;
+    const out = await runYtdlp([`ytsearch${n}:${keywords}`, '--dump-single-json', '--flat-playlist', '--no-warnings']);
     const j = JSON.parse(out);
-    return (j.entries || []).map(e => ({
+    return (j.entries || []).slice(offset, offset + limit).map(e => ({
       id: e.id,
       name: e.title || '',
       artists: e.channel || '',
