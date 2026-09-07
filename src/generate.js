@@ -260,6 +260,11 @@ function cleanupWorkDir(workDir) {
 
 // 片头信息卡 ASS：纯黑背景上的白字/灰字信息，\pos 精确排版
 function buildIntroAss(lines, playResX, playResY) {
+  // 按 1080p 基准缩放：非 1080p 分辨率时 y 坐标/字号等比缩放（否则 720p/480p 信息卡位置错乱/超出画布）
+  const k = playResY / 1080;
+  const scaled = lines.map(l => ({ ...l, y: Math.round(l.y * k) }));
+  const styleMain = Math.round(92 * k);
+  const styleInfo = Math.round(44 * k);
   const header = `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${playResX}
@@ -269,15 +274,15 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: IntroMain,Noto Sans CJK SC,92,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,4,2,5,100,100,0,1
-Style: IntroInfo,Noto Sans CJK SC,44,&H00D0D0D0,&H00D0D0D0,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,3,1,5,100,100,0,1
+Style: IntroMain,Noto Sans CJK SC,${styleMain},&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.max(2, Math.round(4 * k))},2,5,100,100,0,1
+Style: IntroInfo,Noto Sans CJK SC,${styleInfo},&H00D0D0D0,&H00D0D0D0,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.max(1, Math.round(3 * k))},1,5,100,100,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
   // 左对齐：\an4(左中) + 统一 X（标题第一行左边第一个字位置），四行从同一起点左对齐
   const leftX = Math.round(playResX * 0.14);
-  const events = lines.map(l => `Dialogue: 0,0:00:00.00,0:00:03.00,${l.style},,0,0,0,,{\\pos(${leftX},${l.y})\\an4}${l.text}`);
+  const events = scaled.map(l => `Dialogue: 0,0:00:00.00,0:00:03.00,${l.style},,0,0,0,,{\\pos(${leftX},${l.y})\\an4}${l.text}`);
   return header + events.join('\n') + '\n';
 }
 
