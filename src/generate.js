@@ -226,12 +226,18 @@ async function generateVideo(input, options = {}) {
       ...(finalFlac ? ['-strict', '-2'] : ['-b:a', finalAudioBitrate]),
       '-shortest', '-movflags', '+faststart',
     ];
+    // 最终拼接：速度极快（-c:v copy），但仍报阶段进度（让前端显示「写入片头」而非卡死）
     await runFfmpeg([
       '-y',
       '-f', 'concat', '-safe', '0', '-i', introList,
       ...muxAudio,
       outPath,
-    ], null, onSpawn);
+    ], (sec) => {
+      if (typeof onProgress === 'function' && result.audioMs > 0) {
+        const totalS = result.audioMs / 1000 + 3;
+        onProgress({ phase: 'concat', progress: Math.min(1, sec / totalS) });
+      }
+    }, onSpawn);
     for (const p of [bodyOut, introPath, introAssPath, introList]) { try { fs.unlinkSync(p); } catch (e) {} }
   }
 

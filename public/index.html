@@ -341,8 +341,11 @@
         </span>
       </div>
       <!-- 进行中任务进度条（轮询刷新，刷新页面也能恢复显示） -->
+      <div v-if="q.status === 'failed'" style="margin-top:6px;color:#f56c6c;font-size:13px">失败：{{ q.error }}</div>
       <div v-if="q.status === 'running'" style="margin-top:6px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">{{ q.phase === 'download' ? '下载音频' : q.phase === 'concat' ? '写入片头' : '编码' }}</div>
         <el-progress v-if="q.phase === 'download'" :percentage="Math.round(q.downloadProgress || 0)" :stroke-width="5"></el-progress>
+        <el-progress v-else-if="q.phase === 'concat'" :percentage="Math.round((q.progress || 0) * 100)" :stroke-width="5"></el-progress>
         <el-progress v-else-if="q.phase === 'assemble' && !Array.isArray(q.progress)" :percentage="Math.round((q.progress || 0) * 100)" :stroke-width="5"></el-progress>
         <div v-else-if="Array.isArray(q.progress)" :style="'display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(' + (isMobile ? '80' : '120') + 'px,1fr))'">
           <div v-for="(p, i) in q.progress" :key="i">

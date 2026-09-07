@@ -86,7 +86,10 @@ function runNext() {
       const p = event && typeof event === 'object' ? event : { phase: 'assemble', progress: event };
       if (p.phase === 'download') {
         t.phase = 'download';
-        t.downloadProgress = p.progress;
+        t.downloadProgress = Math.round((p.progress || 0) * 100);  // 0-100 整数（前端直接显示）
+      } else if (p.phase === 'concat') {
+        t.phase = 'concat';
+        t.progress = p.progress;
       } else {
         t.phase = 'assemble';
         if (p.segIdx !== undefined) {
@@ -165,6 +168,7 @@ function runNext() {
       .catch(err => {
         if (t.status === 'cancelled') return;
         t.status = 'failed';
+        t.failedAt = Date.now();
         t.error = friendlyError(err.message);   // 用户可读的友好提示
         t.errorRaw = err.message || '';          // 原始技术错误（排查用）
         console.error(`[任务失败 ${t.id}] ${t.title || ''}: ${t.errorRaw}`);
@@ -741,9 +745,10 @@ app.post('/api/tasks', (req, res) => {
 
 // 队列状态（运行中 + 排队中）
 app.get('/api/queue', (req, res) => {
-  const runningList = [...tasks.values()].filter(t => t.status === 'running').map(t => ({
+  const runningList = [...tasks.values()].filter(t => t.status === 'running' || (t.status === 'failed' && Date.now() - (t.failedAt || 0) < 60000)).map(t => ({
     id: t.id, title: t.title, status: t.status,
     phase: t.phase, downloadProgress: t.downloadProgress, progress: t.progress,
+    error: t.status === 'failed' ? (t.error || '') : '',
   }));
   const pendingList = queue.map(q => ({ id: q.id, title: tasks.get(q.id)?.title || q.input, status: 'pending' }));
   res.json({ ok: true, running: runningList, pending: pendingList, paused: queuePaused });
