@@ -403,6 +403,7 @@
           <span v-if="loginLevel"> · Lv.{{ loginLevel }}</span>
         </div>
       </div>
+      <el-button size="small" plain @click="refreshAccount">刷新</el-button>
       <el-button type="danger" plain @click="logout">退出登录</el-button>
     </div>
     <!-- 未登录：cookie 输入 + 扫码登录 -->
@@ -1176,6 +1177,13 @@ createApp({
         this.loginLevel = r.level || 0;
         this.vipType = r.vipType || 0;
       }
+    },
+    // 刷新网易云账户信息（重新拉取 nickname/vip/等级）
+    async refreshAccount() {
+      const before = this.loginNickname;
+      await this.loadConfig();
+      if (this.loginNickname) this.$message.success('账户信息已刷新');
+      else if (before) this.$message.warning('登录已失效，请重新登录');
     },
     async logout() {
       const r = await this.post('/api/config', { cookie: '' });
