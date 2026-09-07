@@ -172,6 +172,28 @@ test('fitLyricLine 英文长句在空格处断行', () => {
 
 // ---- B站查重与历史去重 ----
 
+test('renderBiliTpl 模板变量替换', () => {
+  const { renderBiliTpl } = require('../src/core/bili-dedup');
+  const out = renderBiliTpl('{歌名} | {音质} {比特率} | {分辨率} | {日期}', {
+    songTitle: '晴天 - 周杰伦', levelLabel: '无损', brLabel: 'FLAC 900k', resolution: '1080p',
+  });
+  assert.ok(out.includes('晴天 - 周杰伦'));
+  assert.ok(out.includes('无损 FLAC 900k'));
+  assert.ok(out.includes('1080p'));
+  assert.ok(/\d{4}-\d{2}-\d{2}/.test(out));  // 日期
+});
+
+test('renderBiliTpl 空变量渲染为空串(不残留花括号)', () => {
+  const { renderBiliTpl } = require('../src/core/bili-dedup');
+  const out = renderBiliTpl('{歌名} | {音质}', {});
+  assert.equal(out, ' | ');
+});
+
+test('renderBiliTpl 空模板返回空串', () => {
+  const { renderBiliTpl } = require('../src/core/bili-dedup');
+  assert.equal(renderBiliTpl(null, { songTitle: 'x' }), '');
+});
+
 test('dedupeHistory 同title只留最新', () => {
   const { dedupeHistory } = require('../src/core/bili-dedup');
   const list = [

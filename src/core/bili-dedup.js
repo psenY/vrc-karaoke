@@ -43,4 +43,19 @@ function findBiliDup(history, songTitle) {
   }) || null;
 }
 
-module.exports = { dedupeHistory, findBiliDup };
+/**
+ * B站投稿模板渲染：支持 {歌名} {音质} {比特率} {分辨率} {日期} 变量。
+ * @param {string} tpl 模板字符串
+ * @param {{songTitle:string, levelLabel:string, brLabel:string, resolution:string}} vars 变量值
+ */
+function renderBiliTpl(tpl, vars) {
+  const v = vars || {};
+  return String(tpl || '')
+    .replace(/\{歌名\}/g, v.songTitle || '')
+    .replace(/\{音质\}/g, v.levelLabel || '')
+    .replace(/\{比特率\}/g, v.brLabel || '')
+    .replace(/\{分辨率\}/g, v.resolution || '')
+    .replace(/\{日期\}/g, new Date().toISOString().slice(0, 10));
+}
+
+module.exports = { dedupeHistory, findBiliDup, renderBiliTpl };

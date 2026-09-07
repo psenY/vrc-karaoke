@@ -206,7 +206,7 @@ function runNext() {
 }
 
 // ---- 历史记录 ----
-const { dedupeHistory, findBiliDup } = require('./core/bili-dedup');
+const { dedupeHistory, findBiliDup, renderBiliTpl } = require('./core/bili-dedup');
 function readHistory() {
   try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); }
   catch (e) { return []; }
@@ -298,15 +298,6 @@ app.get('/api/bili/uploads', requireAuth, (req, res) => {
 
 // ---- B站投稿模板渲染 ----
 // 变量：{歌名} {音质} {比特率} {分辨率} {日期}
-function renderBiliTpl(tpl, vars) {
-  return String(tpl || '')
-    .replace(/\{歌名\}/g, vars.songTitle)
-    .replace(/\{音质\}/g, vars.levelLabel)
-    .replace(/\{比特率\}/g, vars.brLabel)
-    .replace(/\{分辨率\}/g, vars.resolution)
-    .replace(/\{日期\}/g, new Date().toISOString().slice(0, 10));
-}
-
 function getBiliSettings() {
   const cfg = readConfig();
   return Object.assign({
