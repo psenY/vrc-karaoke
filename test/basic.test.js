@@ -99,3 +99,37 @@ test('generateAss 双语附加翻译', () => {
   assert.ok(ass.includes('翻译'));
   assert.ok(ass.includes('Style: Trans'));
 });
+
+// ---- 新增功能回归：空行 endMs / 长句断行 ----
+
+test('parseLrc 空行作为上一句结束时间(endMs)', () => {
+  const { lines } = parseLrc('[00:19.29]回忆上了发条\n[00:21.98]\n[00:22.95]总准时报到');
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0].text, '回忆上了发条');
+  assert.equal(lines[0].endMs, 21980);   // 空行时间 = 前一句结束
+  assert.equal(lines[1].time, 22950);
+});
+
+test('generateAss 当前句在空行处隐藏(用 endMs)', () => {
+  const ass = generateAss(
+    [
+      { startMs: 0, text: '第一句', endMs: 2000 },
+      { startMs: 5000, text: '第二句' },
+    ],
+    { audioDurationMs: 8000, highlight: 'line' }
+  );
+  // 第一句 Current 显示到 endMs=2000（不是下一句开始 5000）
+  assert.ok(ass.includes('0:00:00.00,0:00:02.00,Current'));
+});
+
+test('generateAss 下一句保持显示到它自己开始(gap 不空窗)', () => {
+  const ass = generateAss(
+    [
+      { startMs: 0, text: '第一句', endMs: 2000 },
+      { startMs: 5000, text: '第二句' },
+    ],
+    { audioDurationMs: 8000, highlight: 'line' }
+  );
+  // 第二句 Next: [0, 5000)（覆盖 gap 2s-5s）
+  assert.ok(ass.includes('0:00:00.00,0:00:05.00,Next'));
+});
