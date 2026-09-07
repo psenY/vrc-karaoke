@@ -751,6 +751,10 @@ createApp({
       this.progressText = '生成中...';
       this.progress = 0;
       this.result = '';
+      // 请求浏览器通知权限（生成完成提醒）
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
       const r = await this.post('/api/generate', this.lastGenerate);
       if (!r.ok) { this.progressText = ''; this.retryVisible = true; return this.$message.error(r.error); }
       this.poll(r.taskId);
@@ -837,8 +841,10 @@ createApp({
         this.batchProgress = `(全部完成 ${ids.length} 首 · 成功 ${success} · 失败 ${failed.length})`;
         if (failed.length) {
           this.$message.error(`批量完成，失败 ${failed.length} 首：` + failed.join('、'));
+          this.notifyDone(`批量完成，失败 ${failed.length} 首`, true);
         } else {
           this.$message.success(`批量完成 ${success} 首`);
+          this.notifyDone(`批量完成 ${success} 首`);
         }
         this.loadHistory();
       }
@@ -848,6 +854,7 @@ createApp({
       if (r.status === 'done') {
         this.generating = false;
         this.progressText = '';
+        this.notifyDone(r.title || '生成完成');
         const res = r.result;
         const filename = res.outPath.split('/').pop();
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
@@ -860,6 +867,7 @@ createApp({
         this.generating = false;
         this.retryVisible = true;
         this.progressText = '';
+        this.notifyDone('生成失败: ' + (r.title || ''), true);
         this.result = '<p style="color:#f56c6c">失败: ' + this.escHtml(r.error || '未知错误') + '</p>';
       } else {
         if (r.status === 'pending') {
@@ -1058,6 +1066,15 @@ createApp({
         this.qrStatus = 'scanned';
       }
       setTimeout(() => this.qrPoll(), 2000);
+    },
+    // 生成完成通知：页面标题提示 + 浏览器 Notification（无 emoji）
+    notifyDone(msg, isFail) {
+      const orig = document.title;
+      document.title = (isFail ? '失败: ' : '完成: ') + (msg || '');
+      setTimeout(() => { if (document.title.startsWith('完成:') || document.title.startsWith('失败:')) document.title = orig; }, 10000);
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try { new Notification(isFail ? '生成失败' : '生成完成', { body: String(msg || '').slice(0, 60) }); } catch (e) {}
+      }
     },
     escHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
