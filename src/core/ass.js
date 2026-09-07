@@ -149,21 +149,14 @@ function estTextWidth(text, fontSize) {
   return units * fontSize;
 }
 
-// 长句适配：**按句子长短自适应字号**——
-// 短句适度放大（上限 fs160，避免相邻句字号跳变刺眼）、标准句 fs150、
-// 长句优先缩字号保持单行（下限 fs90），单行下限仍放不下才断两行（fs≤90 继续缩到 60）。
-// metaLine=true 时为元信息行（作词/作曲等短标签）：不放大，保持标准字号。
-function fitLyricLine(text, fontSize, maxWidth, metaLine = false) {
+// 长句适配（用户要求：只有长句缩小保证单行，短句不放大）——
+// 单行放得下保持标准字号 fs150（含元信息行）；长句优先缩字号保持单行（下限 fs90）；
+// 单行下限仍放不下才断两行（fs≤90 继续缩到 60）。总高不超过槽位间距（防溢出屏幕顶部）。
+function fitLyricLine(text, fontSize, maxWidth) {
   const str = String(text);
   const w = estTextWidth(str, fontSize);
-  if (w <= maxWidth) {
-    if (metaLine) return { cut: 0, fontSize };
-    // 放大到占满 ~94% 屏宽（上限 fs160）
-    const units = w / fontSize;
-    const fillFs = Math.floor((maxWidth * 0.94) / units);
-    return { cut: 0, fontSize: Math.max(fontSize, Math.min(160, fillFs)) };
-  }
-  // 1. 优先：缩小字号保持单行
+  if (w <= maxWidth) return { cut: 0, fontSize };
+  // 长句：优先缩小字号保持单行
   let fs = fontSize;
   while (fs > 90) {
     fs -= 10;
@@ -264,9 +257,7 @@ function generateAss(lines, options = {}) {
     // 长句处理：断行 + 字号自适应（\an4 左对齐时右边距不约束，只留左边距 100）
     const maxWidth = playResX - 100;
     const transSize = Math.round(fontSize * 0.6);
-    // 元信息行（作词/作曲等"标签 : 内容"短行）：不参与 fill 放大，避免开场巨字跳变
-    const isMeta = /^(作词|作曲|编曲|制作人|制作|录音|混音|母带|和声|和声编写|吉他|贝斯|键盘|鼓|弦乐|监制|企划|词|曲|OP|SP|艺人统筹|配唱制作人|填词|谱曲|原唱|翻唱|翻奏)\s*[:：]/.test(curText);
-    const fitted = fitLyricLine(curText, fontSize, maxWidth, isMeta);
+    const fitted = fitLyricLine(curText, fontSize, maxWidth);
     let curFull = fitted.cut > 0 ? insertBreakAtTagged(highlightText, fitted.cut) : highlightText;
     if (fitted.fontSize !== fontSize) curFull = `{\\fs${fitted.fontSize}}` + curFull;
     // 双语：当前句附加翻译。翻译保持单行（超长缩字号），总行数≤3 防上槽溢出屏幕顶部
@@ -290,8 +281,7 @@ function generateAss(lines, options = {}) {
       const next = lines[i + 1];
       const nextText = getLineText(next);
       if (nextText) {
-        const nextIsMeta = /^(作词|作曲|编曲|制作人|制作|录音|混音|母带|和声|和声编写|吉他|贝斯|键盘|鼓|弦乐|监制|企划|词|曲|OP|SP|艺人统筹|配唱制作人|填词|谱曲|原唱|翻唱|翻奏)\s*[:：]/.test(nextText);
-        const nfitted = fitLyricLine(nextText, fontSize, maxWidth, nextIsMeta);
+        const nfitted = fitLyricLine(nextText, fontSize, maxWidth);
         let nextFull = nfitted.cut > 0 ? insertBreakAtTagged(escapeAssText(nextText), nfitted.cut) : escapeAssText(nextText);
         if (nfitted.fontSize !== fontSize) nextFull = `{\\fs${nfitted.fontSize}}` + nextFull;
         if (bilingual && next.translation) {
