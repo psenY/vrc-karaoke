@@ -62,23 +62,18 @@ async function uploadCoverFromUrl(cookies, imageUrl) {
   });
   if (img.status !== 200 || !img.buf.length) throw new Error('封面下载失败 HTTP ' + img.status);
 
-  // 2. 上传到B站图床（multipart form）
-  const boundary = '----vrcform' + Date.now();
-  const fileName = 'cover.' + (img.type.includes('png') ? 'png' : 'jpg');
-  const formParts = [];
-  formParts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="fileUp"; filename="${fileName}"\r\nContent-Type: ${img.type || 'image/jpeg'}\r\n\r\n`));
-  formParts.push(img.buf);
-  formParts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="csrf"\r\n\r\n${cookies.bili_jct}\r\n`));
-  formParts.push(Buffer.from(`--${boundary}--\r\n`));
-  const formBody = Buffer.concat(formParts);
+  // 2. 上传到B站图床（对齐 biliup：form 编码 data:image/jpeg;base64 + csrf，非 multipart）
+  const dataUrl = 'data:image/jpeg;base64,' + img.buf.toString('base64');
+  const params = new URLSearchParams({ cover: dataUrl, csrf: cookies.bili_jct });
+  const formBody = params.toString();
 
   const upRes = await request('https://member.bilibili.com/x/vu/web/cover/up', {
     method: 'POST',
     headers: {
       Cookie: cookieString(cookies),
-      'Content-Type': 'multipart/form-data; boundary=' + boundary,
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       Referer: 'https://member.bilibili.com/',
-      'Content-Length': formBody.length,
+      Origin: 'https://member.bilibili.com',
     },
     body: formBody,
   });
