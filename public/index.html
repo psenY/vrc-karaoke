@@ -341,6 +341,7 @@
         </span>
       </div>
       <!-- 进行中任务进度条（轮询刷新，刷新页面也能恢复显示） -->
+      <div v-if="q.status === 'skipped'" style="margin-top:6px;color:#67c23a;font-size:13px">已投过，跳过：{{ q.error }}</div>
       <div v-if="q.status === 'failed'" style="margin-top:6px;color:#f56c6c;font-size:13px">失败：{{ q.error }}</div>
       <div v-if="q.status === 'running'" style="margin-top:6px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:2px">{{ q.phase === 'download' ? '下载音频' : q.phase === 'concat' ? '写入片头' : '编码' }}</div>
@@ -467,6 +468,15 @@
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--muted);width:56px">标签</span>
           <el-input v-model="biliSettings.tags" size="small" style="flex:1;min-width:240px" placeholder="卡拉OK,歌词,VRChat"></el-input>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted);width:56px">查重</span>
+          <el-select v-model="biliSettings.checkScope" size="small" style="width:160px">
+            <el-option label="关闭" value="off"></el-option>
+            <el-option label="上传前查重" value="upload"></el-option>
+            <el-option label="生成前查重(省编码)" value="generate"></el-option>
+          </el-select>
+          <span style="font-size:12px;color:var(--muted)">按历史投稿记录检测同歌，命中跳过</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--muted);width:56px">分区</span>
@@ -670,7 +680,7 @@ createApp({
       biliQrLoading: false,
       autoBili: false,
       biliUploads: [],
-      biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130 },
+      biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130, checkScope: "off" },
       localAudio: '',
       localLrc: '',
       localAudioFile: null,

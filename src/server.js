@@ -100,6 +100,11 @@ function runNext() {
         }
       }
     };
+    // 生成前B站查重：fetch 完成拿到歌名后回调，命中则中止（省下载/编码）
+    options.checkBiliDup = (songTitle) => {
+      if (getBiliSettings().checkScope !== 'generate') return false;
+      return findBiliDup(songTitle);
+    };
     options.onSpawn = (proc) => {
       if (!t.procs) t.procs = [];
       t.procs.push(proc);
@@ -116,6 +121,15 @@ function runNext() {
           const cfg = readConfig();
           if (cfg.biliCookies && cfg.biliCookies.SESSDATA) {
             const songTitle = result.meta.title || '未命名';
+            // 上传前查重（checkScope=upload 或 generate 都查）
+            if (getBiliSettings().checkScope !== 'off') {
+              const dup = findBiliDup(songTitle);
+              if (dup) {
+                console.log(`[B站查重跳过] ${songTitle} 已投稿: ${dup.biliUrl}`);
+                t.biliError = `B站已投过（${dup.bvid || dup.biliUrl}），跳过重复投稿`;
+                return;
+              }
+            }
             const q = result.quality || {};
             const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || options.resolution || '' };
             const bs = getBiliSettings();
@@ -167,11 +181,19 @@ function runNext() {
       })
       .catch(err => {
         if (t.status === 'cancelled') return;
+        if (err && err.isBiliDup) {
+          // B站查重命中：非失败，绿色跳过
+          t.status = 'skipped';
+          t.failedAt = Date.now();
+          t.error = err.message;
+          console.log(`[任务跳过 ${t.id}] ${err.message}`);
+        } else {
         t.status = 'failed';
         t.failedAt = Date.now();
         t.error = friendlyError(err.message);   // 用户可读的友好提示
         t.errorRaw = err.message || '';          // 原始技术错误（排查用）
         console.error(`[任务失败 ${t.id}] ${t.title || ''}: ${t.errorRaw}`);
+        }
       })
       .finally(() => { running--; cleanupTasks(); runNext(); });
   }
@@ -279,12 +301,25 @@ function renderBiliTpl(tpl, vars) {
 
 function getBiliSettings() {
   const cfg = readConfig();
-  return cfg.biliSettings || {
+  return Object.assign({
     titleTpl: '{歌名} - vrc-karaoke',
     descTpl: '本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke\n{歌名} | {音质} {比特率} | {分辨率} | {日期}',
     tags: '卡拉OK,歌词,VRChat',
     tid: 130,
-  };
+    checkScope: 'off',  // off=不查重 upload=上传前查重 generate=生成前查重(编码前跳过)
+  }, cfg.biliSettings || {});
+}
+
+// B站查重：历史记录里该歌是否已有投稿（biliUrl 存在即本工具投过）
+// title 匹配：完全一致，或歌曲名相互包含（忽略大小写）
+function findBiliDup(songTitle) {
+  if (!songTitle) return null;
+  const t = String(songTitle).toLowerCase();
+  return readHistory().find(h => {
+    if (!h.biliUrl || !h.title) return false;
+    const ht = String(h.title).toLowerCase();
+    return ht === t || ht.includes(t) || t.includes(ht);
+  }) || null;
 }
 
 // B站投稿设置读取/保存
@@ -292,13 +327,14 @@ app.get('/api/bili/settings', requireAuth, (req, res) => {
   res.json({ ok: true, settings: getBiliSettings() });
 });
 app.post('/api/bili/settings', requireAuth, (req, res) => {
-  const { titleTpl, descTpl, tags, tid } = req.body || {};
+  const { titleTpl, descTpl, tags, tid, checkScope } = req.body || {};
   const cfg = readConfig();
   cfg.biliSettings = {
     titleTpl: String(titleTpl || '{歌名} - vrc-karaoke').slice(0, 160),
     descTpl: String(descTpl || '').slice(0, 2000),
     tags: String(tags || '卡拉OK,歌词,VRChat').slice(0, 200),
     tid: Number(tid) || 130,
+    checkScope: ['off', 'upload', 'generate'].includes(checkScope) ? checkScope : 'off',
   };
   writeConfig(cfg);
   res.json({ ok: true });
@@ -356,6 +392,11 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const safe = path.resolve(ROOT, 'output', path.basename(String(outPath || '')));
   if (!safe.startsWith(path.join(ROOT, 'output')) || !fs.existsSync(safe)) return res.json({ ok: false, error: '视频文件不存在' });
   const songTitle = (title || path.basename(safe)).replace(/\.mp4$/i, '');
+  // 手动投稿查重（checkScope 非 off 时）
+  if (getBiliSettings().checkScope !== 'off') {
+    const dup = findBiliDup(songTitle);
+    if (dup) return res.json({ ok: false, error: `B站已投过（${dup.bvid || '见历史'}），如需重投请关闭查重开关` });
+  }
   // 模板渲染（quality 从匹配的历史项取，老记录无则空）
   const bs = getBiliSettings();
   const hist = readHistory().find(h => h.outPath === safe);
@@ -745,10 +786,10 @@ app.post('/api/tasks', (req, res) => {
 
 // 队列状态（运行中 + 排队中）
 app.get('/api/queue', (req, res) => {
-  const runningList = [...tasks.values()].filter(t => t.status === 'running' || (t.status === 'failed' && Date.now() - (t.failedAt || 0) < 60000)).map(t => ({
+  const runningList = [...tasks.values()].filter(t => t.status === 'running' || ((t.status === 'failed' || t.status === 'skipped') && Date.now() - (t.failedAt || 0) < 60000)).map(t => ({
     id: t.id, title: t.title, status: t.status,
     phase: t.phase, downloadProgress: t.downloadProgress, progress: t.progress,
-    error: t.status === 'failed' ? (t.error || '') : '',
+    error: (t.status === 'failed' || t.status === 'skipped') ? (t.error || '') : '',
   }));
   const pendingList = queue.map(q => ({ id: q.id, title: tasks.get(q.id)?.title || q.input, status: 'pending' }));
   res.json({ ok: true, running: runningList, pending: pendingList, paused: queuePaused });

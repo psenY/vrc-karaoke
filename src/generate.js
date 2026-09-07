@@ -69,6 +69,16 @@ async function generateVideo(input, options = {}) {
     onProgress: (p) => { if (typeof onProgress === 'function') onProgress({ phase: 'download', progress: p }); },
   });
 
+  // 1.5 B站查重（可选开关：fetch 完拿到歌名后查历史，命中则中止生成，省下载/编码时间）
+  if (typeof options.checkBiliDup === 'function' && result.meta && result.meta.title) {
+    const dup = options.checkBiliDup(result.meta.title);
+    if (dup) {
+      const err = new Error(`B站已投过此歌（${dup.bvid || dup.biliUrl}），已跳过生成`);
+      err.isBiliDup = true;
+      throw err;
+    }
+  }
+
   // 2. 高亮默认值
   let h = highlight;
   if (h === undefined) h = result.meta.source === 'youtube' ? 'word' : 'line';
