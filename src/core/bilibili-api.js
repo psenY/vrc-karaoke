@@ -39,26 +39,23 @@ async function request(url, { method = 'GET', headers = {}, body = null, timeout
  * 封面上传接口：POST x/vu/web/cover/up（form: fileUp=@图片, csrf）→ data.url
  */
 async function uploadCoverFromUrl(cookies, imageUrl) {
-  // 1. 下载图片（buffer）
+  // 1. 下载图片（buffer，通用重定向跟随最多 3 次——CDN 可能多级 302）
   const img = await new Promise((resolve, reject) => {
-    const mod = imageUrl.startsWith('https') ? https : http;
-    const req = mod.get(imageUrl, { headers: { 'User-Agent': UA } }, res => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        // 跟随一次重定向
-        const r2 = mod.get(res.headers.location, { headers: { 'User-Agent': UA } }, r2res => {
-          const chunks = [];
-          r2res.on('data', c => chunks.push(c));
-          r2res.on('end', () => resolve({ status: r2res.statusCode, buf: Buffer.concat(chunks), type: r2res.headers['content-type'] || '' }));
-        });
-        r2.on('error', reject);
-        return;
-      }
-      const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve({ status: res.statusCode, buf: Buffer.concat(chunks), type: res.headers['content-type'] || '' }));
-    });
-    req.on('error', reject);
-    req.setTimeout(30000, () => req.destroy(new Error('封面下载超时')));
+    const fetchBuf = (u, redirects) => {
+      const mod = u.startsWith('https') ? https : http;
+      const req = mod.get(u, { headers: { 'User-Agent': UA } }, res => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects < 3) {
+          res.resume();
+          return fetchBuf(res.headers.location, redirects + 1);
+        }
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, buf: Buffer.concat(chunks), type: res.headers['content-type'] || '' }));
+      });
+      req.on('error', reject);
+      req.setTimeout(30000, () => req.destroy(new Error('封面下载超时')));
+    };
+    fetchBuf(imageUrl, 0);
   });
   if (img.status !== 200 || !img.buf.length) throw new Error('封面下载失败 HTTP ' + img.status);
 
