@@ -140,11 +140,11 @@ function buildEstimatedHighlight(text, startMs, endMs, mode) {
   return out;
 }
 
-// 估算文本显示宽度（全角≈1字宽、半角≈0.55字宽），单位 px
+// 估算文本显示宽度（全角≈1字宽、半角≈0.5字宽，Noto Sans CJK 拉丁实测约0.5em），单位 px
 function estTextWidth(text, fontSize) {
   let units = 0;
   for (const ch of String(text)) {
-    units += ch.charCodeAt(0) > 255 ? 1 : 0.55;
+    units += ch.charCodeAt(0) > 255 ? 1 : 0.5;
   }
   return units * fontSize;
 }
@@ -245,8 +245,8 @@ function generateAss(lines, options = {}) {
       highlightText = buildEstimatedHighlight(curText, startMs, endMs, highlight);
     }
 
-    // 长句处理：断行 + 字号自适应（槽位可用宽留边距）
-    const maxWidth = playResX - 200;
+    // 长句处理：断行 + 字号自适应（\an4 左对齐时右边距不约束，只留左边距 100）
+    const maxWidth = playResX - 100;
     const transSize = Math.round(fontSize * 0.6);
     const fitted = fitLyricLine(curText, fontSize, maxWidth);
     let curFull = fitted.cut > 0 ? insertBreakAtTagged(highlightText, fitted.cut) : highlightText;
