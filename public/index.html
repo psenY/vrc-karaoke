@@ -1271,17 +1271,17 @@ createApp({
         this.biliPollLoop();
       } finally { this.biliQrLoading = false; }
     },
-    async biliPollLoop() {
+    async biliPollLoop(retries = 5) {
       const r = await this.get('/api/bili/qr/check?key=' + this.biliQrKey);
-      if (!r.ok) return;
-      if (r.code === 0) {
+      if (r.ok && r.code === 0) {
         this.biliQrVisible = false;
         this.$message.success('B站登录成功');
         const b = await this.get('/api/bili/status');
         if (b.ok) { this.biliLogged = !!b.logged; this.biliUname = b.uname || ''; }
         return;
       }
-      if (this.biliQrVisible) setTimeout(() => this.biliPollLoop(), 2000);
+      // 失败/未确认继续轮询（网络偶发失败重试，不因单次失败停止）
+      if (this.biliQrVisible) setTimeout(() => this.biliPollLoop(r.ok ? 5 : Math.max(0, retries - 1)), 2000);
     },
     async refreshBili() {
       const b = await this.get('/api/bili/status');
