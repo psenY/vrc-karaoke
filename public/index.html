@@ -175,6 +175,9 @@
     </div>
     <el-collapse style="margin-top:8px">
       <el-collapse-item title="高级设置（分辨率 / 编码 / 质量）" name="adv">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+          <el-button size="small" plain @click="resetDefaults">恢复默认参数</el-button>
+        </div>
         <div class="opts">
           <div class="opt">
             <span>分辨率</span>
@@ -974,6 +977,22 @@ createApp({
       localStorage.setItem('vrc-presets', JSON.stringify(this.presets));
       this.presetName = '';
       this.$message.success('预设已保存: ' + name);
+    },
+    // 恢复默认生成参数（清空本地预设）
+    resetDefaults() {
+      Object.assign(this, {
+        codec: 'libx264', preset: 'veryfast', crf: 23, fps: 24,
+        audioBitrate: 'auto', audioLevel: 'higher', flacAudio: false, subtitleLang: 'auto',
+        highlight: '', bilingual: false, cover: true, coverMask: true, coverMaskLevel: 30,
+        background: '#1a1a2e', backgroundGradient: false, backgroundBottom: '#0a0a15',
+        segCount: 8, resolution: '1080p', introText: 'AUTO',
+        currentColor: '#FFFFFF', nextColor: '#969696',
+      });
+      this.presetName = '';
+      this.selectedPreset = '';
+      try { localStorage.removeItem('vrc_presets'); } catch (e) {}
+      this.presets = [];
+      this.$message.success('已恢复默认参数');
     },
     loadPreset(name) {
       const p = this.presets.find(x => x.name === name);
