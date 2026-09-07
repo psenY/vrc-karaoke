@@ -1117,7 +1117,8 @@ createApp({
     },
     // 恢复默认生成参数（清空本地预设）
     resetDefaults() {
-      Object.assign(this, {
+      this.$confirm('确定恢复默认参数吗？当前自定义参数将丢失', '恢复默认', { type: 'warning', confirmButtonText: '确定恢复', cancelButtonText: '取消' }).then(() => {
+        Object.assign(this, {
         codec: 'libx264', preset: 'veryfast', crf: 23, fps: 24,
         audioBitrate: 'auto', audioLevel: 'higher', flacAudio: false, subtitleLang: 'auto',
         highlight: '', bilingual: false, cover: true, coverMask: true, coverMaskLevel: 30,
@@ -1128,8 +1129,9 @@ createApp({
       this.presetName = '';
       this.selectedPreset = '';
       try { localStorage.removeItem('vrc_presets'); } catch (e) {}
-      this.presets = [];
-      this.$message.success('已恢复默认参数');
+        this.presets = [];
+        this.$message.success('已恢复默认参数');
+      }).catch(() => {});
     },
     loadPreset(name) {
       const p = this.presets.find(x => x.name === name);
