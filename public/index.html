@@ -450,6 +450,13 @@
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span style="color:var(--muted);font-size:13px">成品 {{ formatSize(outputSize) }} / 缓存 {{ formatSize(tmpSize) }} / 磁盘剩余 {{ formatSize(diskFree) }}</span>
           <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:150px"></el-input>
+          <el-select v-model="sourceFilter" placeholder="平台" size="small" clearable style="width:110px">
+            <el-option label="网易云" value="netease"></el-option>
+            <el-option label="YouTube" value="youtube"></el-option>
+            <el-option label="酷我" value="kuwo"></el-option>
+            <el-option label="QQ音乐" value="qqmusic"></el-option>
+            <el-option label="本地文件" value="local"></el-option>
+          </el-select>
           <el-button size="small" plain @click="cleanCache">清理缓存</el-button>
           <el-button size="small" plain @click="cleanOrphan">清理孤儿</el-button>
           <el-button v-if="historySelected.length || mobileSelected.length" size="small" type="danger" plain @click="batchDeleteHistory">删除选中({{ (historySelected.length || mobileSelected.length) }})</el-button>
@@ -601,6 +608,7 @@ createApp({
       adminPassword: '',
       adminOldPassword: '',
       historyFilter: '',
+      sourceFilter: '',
       lastGenerate: null,
       retryVisible: false,
       previewVisible: false,
@@ -640,7 +648,9 @@ createApp({
     isSVIP() { return this.vipType === 110; },                             // SVIP：甄音全景声/沉浸环绕声/超清母带
     filteredHistory() {
       const f = this.historyFilter.trim().toLowerCase();
-      return f ? this.history.filter(h => (h.title || h.input || '').toLowerCase().includes(f)) : this.history;
+      let list = f ? this.history.filter(h => (h.title || h.input || '').toLowerCase().includes(f)) : this.history;
+      if (this.sourceFilter) list = list.filter(h => h.source === this.sourceFilter);
+      return list;
     },
     lyricPreview() {
       if (!this.selectedLyric) return '';
