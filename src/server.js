@@ -136,7 +136,7 @@ function runNext() {
             const title = renderBiliTpl(bs.titleTpl, vars).slice(0, 80);
             const desc = renderBiliTpl(bs.descTpl, vars);
             t.biliUploading = true;
-            const upRec = biliUpNew(title, result.outPath, songTitle);
+            const upRec = biliUpNew(title, result.outPath, songTitle, result.quality);
             // 投稿自动重试 3 次（网络波动容错，指数退避 30s/60s）
             (async () => {
               let up = null, lastErr = null;
@@ -273,8 +273,8 @@ let biliUploads = [];
 let biliUploadSeq = 0;
 try { biliUploads = JSON.parse(fs.readFileSync(BILI_UPLOADS_FILE, 'utf8')); biliUploadSeq = biliUploads.reduce((m, u) => Math.max(m, u.id || 0), 0); } catch (e) {}
 function biliUpSave() { try { fs.writeFileSync(BILI_UPLOADS_FILE, JSON.stringify(biliUploads.slice(0, 50), null, 2)); } catch (e) {} }
-function biliUpNew(title, outPath, rawTitle) {
-  const rec = { id: ++biliUploadSeq, title, rawTitle: rawTitle || title, outPath, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, speed: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
+function biliUpNew(title, outPath, rawTitle, quality) {
+  const rec = { id: ++biliUploadSeq, title, rawTitle: rawTitle || title, outPath, quality: quality || null, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, speed: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
   biliUploads.unshift(rec);
   if (biliUploads.length > 50) biliUploads.length = 50;
   biliUpSave();
@@ -399,7 +399,8 @@ app.post('/api/bili/retry', requireAuth, async (req, res) => {
   const safe = path.resolve(ROOT, 'output', path.basename(String(rec.outPath)));
   if (!fs.existsSync(safe)) return res.json({ ok: false, error: '视频文件已不存在' });
   const songTitle = rec.rawTitle || rec.title;
-  const vars = { songTitle, levelLabel: '', brLabel: '', resolution: '' };
+  const q = rec.quality || {};
+  const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
   const bs = getBiliSettings();
   try {
     biliUpPatch(rec, { phase: 'preupload', phaseText: '准备中', progress: 0, error: '' });
@@ -449,7 +450,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const hist = readHistory().find(h => h.outPath === safe);
   const q = (hist && hist.quality) || {};
   const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
-  const upRec = biliUpNew(renderBiliTpl(bs.titleTpl, vars).slice(0, 80), safe, songTitle);
+  const upRec = biliUpNew(renderBiliTpl(bs.titleTpl, vars).slice(0, 80), safe, songTitle, Object.keys(q).length ? q : null);
   try {
     const up = await bili.uploadVideo({
       cookies: cfg.biliCookies,
