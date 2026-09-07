@@ -315,14 +315,17 @@ function getBiliSettings() {
 }
 
 // B站查重：历史记录里该歌是否已有投稿（biliUrl 存在即本工具投过）
-// title 匹配：完全一致，或歌曲名相互包含（忽略大小写）
+// title 匹配：完全一致；或短标题（≤3字）精确匹配；长标题（≥4字）才允许相互包含
+// （防短歌名误命中：如"谁"会包含匹配到所有含"谁"字的标题导致误跳过）
 function findBiliDup(songTitle) {
   if (!songTitle) return null;
   const t = String(songTitle).toLowerCase();
   return readHistory().find(h => {
     if (!h.biliUrl || !h.title) return false;
     const ht = String(h.title).toLowerCase();
-    return ht === t || ht.includes(t) || t.includes(ht);
+    if (ht === t) return true;
+    if (t.length <= 3 || ht.length <= 3) return false;  // 短标题只精确匹配
+    return ht.includes(t) || t.includes(ht);
   }) || null;
 }
 
