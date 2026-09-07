@@ -566,7 +566,11 @@ app.post('/api/trial', async (req, res) => {
 app.post('/api/playlist', async (req, res) => {
   try {
     const { url } = req.body || {};
-    const m = String(url || '').match(/playlist[?/]id[=/](\d+)/) || String(url || '').match(/[?&]id=(\d+)/);
+    // 只接受真正的歌单链接（防单曲链接 song?id= 被第二分支误当歌单解析）
+    if (!/playlist/i.test(String(url || ''))) {
+      return res.json({ ok: false, error: '这不是歌单链接——如生成单曲请用「直接生成」粘贴歌曲链接' });
+    }
+    const m = String(url || '').match(/playlist[?/]id[=/](\d+)/);
     if (!m) return res.json({ ok: false, error: '无法识别歌单链接（需网易云 playlist 链接）' });
     const playlist = await getPlaylist(m[1]);
     res.json({ ok: true, name: playlist.name, songs: playlist.songs });
