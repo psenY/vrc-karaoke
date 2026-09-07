@@ -20,17 +20,52 @@ function getJson(url, referer) {
   });
 }
 
+// QQ 音乐搜索：旧 client_search_cp GET 接口已被腾讯下线（返回空 body），
+// 迁移到 musicu.fcg POST 接口（music.search.SearchCgiService）
 function searchSong(keywords, limit = 5, page = 1) {
-  const url = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=${encodeURIComponent(keywords)}&format=json&p=${page}&n=${limit}&t=0`;
-  return getJson(url).then(r => (r.data?.song?.list || []).map(s => ({
-    id: s.songmid,
-    name: s.songname,
-    artists: (s.singer || []).map(x => x.name).join(' / '),
-    album: s.albumname || '',
-    interval: s.interval || 0, // 秒
-    duration: (s.interval || 0) * 1000, // 统一毫秒（前端 fmtDuration）
-    payplay: s.pay?.payplay || 0,
-  })));
+  const payload = {
+    'music.search.SearchCgiService': {
+      method: 'DoSearchForQQMusicDesktop',
+      module: 'music.search.SearchCgiService',
+      param: { query: keywords, search_type: 0, num_per_page: limit, page_num: page },
+    },
+  };
+  const opt = {
+    hostname: 'u.y.qq.com',
+    path: '/cgi-bin/musicu.fcg',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Referer: 'https://y.qq.com/',
+      Origin: 'https://y.qq.com',
+    },
+  };
+  const data = JSON.stringify(payload);
+  return new Promise((resolve, reject) => {
+    const req = https.request(opt, res => {
+      let d = '';
+      res.on('data', c => { d += c; });
+      res.on('end', () => {
+        try {
+          const r = JSON.parse(d);
+          const songs = (r['music.search.SearchCgiService']?.data?.body?.song?.list || []).map(s => ({
+            id: s.mid || s.songmid,
+            name: s.name || s.songname,
+            artists: (s.singer || []).map(x => x.name).join(' / '),
+            album: (s.album || {}).name || '',
+            interval: s.interval || 0, // 秒
+            duration: (s.interval || 0) * 1000, // 统一毫秒
+            payplay: s.pay?.payplay || 0,
+          }));
+          resolve(songs);
+        } catch (e) { reject(new Error('QQ 搜索解析失败: ' + d.slice(0, 80))); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => req.destroy(new Error('QQ 搜索超时')));
+    req.write(data);
+    req.end();
+  });
 }
 
 function getLyric(songmid) {
