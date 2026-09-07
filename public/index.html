@@ -347,6 +347,7 @@
         <el-checkbox :model-value="allSelected" :indeterminate="someSelected" @change="toggleAll">全选</el-checkbox>
         <span v-if="selectedCount" style="color:#67c23a">已选 {{ selectedCount }} 首</span>
         <span v-if="batchProgress" style="color:#e6a23c">{{ batchProgress }}</span>
+        <el-button v-if="batchFailed.length" size="small" type="danger" plain @click="retryFailedBatch">重试失败({{ batchFailed.length }})</el-button>
       </div>
       <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
         <div v-for="s in playlist" :key="s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
@@ -521,6 +522,8 @@ createApp({
       historySelected: [],
       mobileSelected: [],
       batchProgress: '',
+      batchTodo: [],
+      batchFailed: [],
       localAudio: '',
       localLrc: '',
       localAudioFile: null,
@@ -634,6 +637,20 @@ createApp({
       this.songs = r.songs;
       this.searchOffset = 10;
       if (!r.songs.length) this.$message.info('无结果');
+    },
+    // 重试批量中失败的歌曲（用当时链接重新入队）
+    async retryFailedBatch() {
+      const list = this.batchFailed.slice();
+      if (!list.length) return;
+      let ok = 0;
+      for (const s of list) {
+        const r = await this.post('/api/generate', this.buildGenerateBody(s.url));
+        if (r.ok && r.taskId) { ok++; this.batchTaskIds.push(r.taskId); }
+        else this.$message.warning(`重试失败：${s.name}${r.error ? ' (' + r.error + ')' : ''}`);
+      }
+      this.batchFailed = [];
+      this.$message.success(`已重试 ${ok}/${list.length} 首`);
+      if (ok) this.pollBatch();
     },
     async loadMore() {
       const r = await this.post('/api/search', { query: this.query.trim(), platform: this.platform, offset: this.searchOffset });
@@ -782,6 +799,8 @@ createApp({
       const total = todo.length;
       let done = 0;
       this.batchTaskIds = [];
+      this.batchFailed = [];
+      this.batchTodo = todo.map(s => ({ id: String(s.id), name: s.name, url: `https://music.163.com/song?id=${s.id}` }));
       this.batchProgress = `(0/${total} 已入队)`;
       if (skipped) this.$message.info(`已跳过 ${skipped} 首已生成过的歌`);
       for (const s of todo) {
@@ -798,13 +817,19 @@ createApp({
       if (!ids.length) return;
       let completed = 0, success = 0;
       const failed = [];
+      const failedIds = [];
       // 批量接口一次拿全部状态（大批量避免逐任务请求压力）
       const r = await this.post('/api/tasks', { ids });
       for (const t of (r.tasks || [])) {
         if (t.status === 'done') { completed++; success++; }
-        else if (t.status === 'failed') { completed++; failed.push(t.title || t.id); }
+        else if (t.status === 'failed') { completed++; failed.push(t.title || t.id); failedIds.push(t.id); }
         else if (t.status === 'cancelled') completed++;
       }
+      // 失败任务映射回歌曲（供"重试失败"）
+      this.batchFailed = failedIds.map(id => {
+        const idx = this.batchTaskIds.indexOf(id);
+        return this.batchTodo && this.batchTodo[idx] ? { ...this.batchTodo[idx], taskId: id } : null;
+      }).filter(Boolean);
       this.batchProgress = `(${completed}/${ids.length} 已完成 · 成功 ${success} · 失败 ${failed.length})`;
       if (completed < ids.length) {
         setTimeout(() => this.pollBatch(), 3000);
