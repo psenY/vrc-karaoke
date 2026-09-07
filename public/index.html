@@ -500,6 +500,8 @@
       </div>
     </div>
   </el-dialog>
+  <!-- 回到顶部浮动按钮（移动端长页面方便） -->
+  <button v-if="showTop" @click="backTop" style="position:fixed;right:14px;bottom:20px;z-index:2000;width:40px;height:40px;border-radius:50%;border:none;background:#4a6cf7;color:#fff;font-size:18px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">↑</button>
 
 </div>
 
@@ -536,6 +538,7 @@ createApp({
       trialId: '',
       trialAudio: null,
       advOpen: ['adv'],
+      showTop: false,
       historySelected: [],
       mobileSelected: [],
       batchProgress: '',
@@ -1160,6 +1163,10 @@ createApp({
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
     // 毫秒 → 分:秒（生成已用时间）
+    // 回到页面顶部
+    backTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
     fmtElapsed(ms) {
       const s = Math.floor(ms / 1000);
       const m = Math.floor(s / 60);
@@ -1244,6 +1251,8 @@ createApp({
   },
   mounted() {
     this.applyTheme();
+    // 回到顶部按钮：滚动超过 400px 显示
+    window.addEventListener('scroll', () => { this.showTop = (window.scrollY || document.documentElement.scrollTop) > 400; }, { passive: true });
     mql.addEventListener('change', (e) => {
       this.isSystemDark = e.matches;
       if (this.theme === 'system') this.applyTheme();
