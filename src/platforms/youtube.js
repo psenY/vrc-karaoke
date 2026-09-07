@@ -21,6 +21,11 @@ function runYtdlp(args) {
  * 解析 YouTube json3 自动字幕 → 逐句（含精确词级时间戳）。
  * 词级绝对时间 = event.tStartMs + seg.tOffsetMs
  */
+/**
+ * 解析 YouTube json3 自动字幕 → 逐句（含精确词级时间戳）。
+ * 按 event 边界分句（YouTube 显示行 = 唱的一句）；清洗 segs 内嵌换行（\n 会拆坏 ASS Dialogue）。
+ * 词级绝对时间 = event.tStartMs + seg.tOffsetMs
+ */
 function parseJson3(jsonText) {
   const data = JSON.parse(jsonText);
   const events = data.events || [];
