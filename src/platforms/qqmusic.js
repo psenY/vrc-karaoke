@@ -28,6 +28,7 @@ function searchSong(keywords, limit = 5) {
     artists: (s.singer || []).map(x => x.name).join(' / '),
     album: s.albumname || '',
     interval: s.interval || 0, // 秒
+    duration: (s.interval || 0) * 1000, // 统一毫秒（前端 fmtDuration）
     payplay: s.pay?.payplay || 0,
   })));
 }
