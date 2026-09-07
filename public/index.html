@@ -428,7 +428,7 @@
           <el-input v-model="historyFilter" placeholder="搜索歌名" size="small" clearable style="width:150px"></el-input>
           <el-button size="small" plain @click="cleanCache">清理缓存</el-button>
           <el-button size="small" plain @click="cleanOrphan">清理孤儿</el-button>
-          <el-button v-if="historySelected.length" size="small" type="danger" plain @click="batchDeleteHistory">删除选中({{ historySelected.length }})</el-button>
+          <el-button v-if="historySelected.length || mobileSelected.length" size="small" type="danger" plain @click="batchDeleteHistory">删除选中({{ (historySelected.length || mobileSelected.length) }})</el-button>
           <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
         </div>
       </div>
@@ -453,9 +453,14 @@
     <div v-else>
       <div v-if="!filteredHistory.length" style="color:var(--muted);padding:8px 0">暂无记录</div>
       <div class="hist-item" v-for="h in filteredHistory" :key="h.outPath + h.time">
-        <div class="hist-title">{{ h.title || h.input }}</div>
-        <div class="hist-meta">{{ fmtTime(h.time) }}</div>
-        <div class="hist-actions">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <el-checkbox v-model="mobileSelected" :label="h.outPath" style="margin-top:2px"></el-checkbox>
+          <div style="min-width:0;flex:1">
+            <div class="hist-title">{{ h.title || h.input }}</div>
+            <div class="hist-meta">{{ fmtTime(h.time) }}</div>
+          </div>
+        </div>
+        <div class="hist-actions" style="padding-left:28px">
           <a :href="'/output/' + h.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(h.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" text @click="redoHistory(h)">重做</el-button>
@@ -514,6 +519,7 @@ createApp({
       trialId: '',
       trialAudio: null,
       historySelected: [],
+      mobileSelected: [],
       batchProgress: '',
       localAudio: '',
       localLrc: '',
@@ -864,7 +870,10 @@ createApp({
     },
     // 批量删除选中的历史记录（勾选后一次删除）
     async batchDeleteHistory() {
-      const files = this.historySelected.map(h => h.outPath.split('/').pop());
+      // 桌面：historySelected 是对象数组；移动端：mobileSelected 是 outPath 字符串数组
+      const files = this.isMobile
+        ? this.mobileSelected.map(p => p.split('/').pop())
+        : this.historySelected.map(h => h.outPath.split('/').pop());
       if (!files.length) return;
       let ok = 0;
       for (const f of files) {
@@ -872,6 +881,7 @@ createApp({
         if (r.ok) ok++;
       }
       this.historySelected = [];
+      this.mobileSelected = [];
       this.$message.success(`已删除 ${ok}/${files.length} 个`);
       this.loadHistory();
     },
