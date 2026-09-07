@@ -645,6 +645,8 @@ createApp({
       this.songs = r.songs;
       this.searchOffset = 10;
       if (!r.songs.length) this.$message.info('无结果');
+      // 保存搜索状态（刷新恢复）
+      try { localStorage.setItem('vrc_search', JSON.stringify({ query: this.query.trim(), platform: this.platform, songs: this.songs })); } catch (e) {}
     },
     // 清空批量列表
     clearPlaylist() {
@@ -1183,6 +1185,16 @@ createApp({
       }
       this.loadAll();
       this.startQueuePoll();
+      // 恢复上次搜索状态（搜索词/平台/结果）
+      try {
+        const saved = JSON.parse(localStorage.getItem('vrc_search') || 'null');
+        if (saved && saved.query && saved.songs) {
+          this.query = saved.query;
+          this.platform = saved.platform || 'netease';
+          this.songs = saved.songs;
+          this.searchOffset = 10;
+        }
+      } catch (e) {}
     },
     loadAll() {
       this.loadHistory();
