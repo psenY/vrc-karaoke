@@ -789,7 +789,14 @@ app.get('/api/stats', (req, res) => {
     const parts = line.split(/\s+/);
     diskFree = (parseInt(parts[3], 10) || 0) * 1024;  // 可用 KB → 字节
   } catch (e) {}
-  res.json({ ok: true, outputSize: out.total, outputCount: out.count, tmpSize: tmp.total, tmpCount: tmp.count, diskFree });
+  // B站上传队列统计（总数/成功/失败/进行中）
+  const biliStat = { total: biliUploads.length, done: 0, failed: 0, active: 0 };
+  for (const u of biliUploads) {
+    if (u.phase === 'done') biliStat.done++;
+    else if (u.phase === 'failed') biliStat.failed++;
+    else if (u.phase !== 'cancelled') biliStat.active++;
+  }
+  res.json({ ok: true, outputSize: out.total, outputCount: out.count, tmpSize: tmp.total, tmpCount: tmp.count, diskFree, bili: biliStat });
 });
 
 // 清理 tmp 缓存（释放磁盘，下次生成重新下载）
