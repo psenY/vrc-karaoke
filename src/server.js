@@ -341,7 +341,7 @@ const biliQrKeys = new Map(); // reqKey -> qrcodeKey（简化：单会话直接�
 app.get('/api/bili/qr', requireAuth, async (req, res) => {
   try {
     const r = await bili.qrGenerate();
-    res.json({ ok: true, qrUrl: r.qrUrl, qrcodeKey: r.qrcodeKey });
+    res.json({ ok: true, qrUrl: r.qrUrl, qrcodeKey: r.qrcodeKey, qrimg: r.qrimg });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
