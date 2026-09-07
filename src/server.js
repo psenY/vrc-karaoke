@@ -151,11 +151,7 @@ function runNext() {
                     coverImageUrl: (result.meta && result.meta.coverUrl) || '',
                     tid: bs.tid,
                     tags: bs.tags,
-                    onProgress: p => {
-                      const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
-                        p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;
-                      const speed = (p.phase === 'uploading' && p.uploadedMB) ? +(p.uploadedMB / Math.max(1, (Date.now() - upRec.start) / 1000)).toFixed(1) : upRec.speed;
-                    },
+                    onProgress: makeBiliProgressHandler(upRec),
                   });
                 } catch (err) {
                   lastErr = err;
@@ -285,6 +281,15 @@ function biliUpNew(title, outPath) {
   return rec;
 }
 function biliUpPatch(rec, patch) { if (rec) { Object.assign(rec, patch); biliUpSave(); } }
+// onProgress → 队列记录更新的共享工厂（自动投稿/手动投稿共用）
+function makeBiliProgressHandler(upRec) {
+  return p => {
+    const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
+      p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;
+    const speed = (p.phase === 'uploading' && p.uploadedMB) ? +(p.uploadedMB / Math.max(1, (Date.now() - upRec.start) / 1000)).toFixed(1) : upRec.speed;
+    biliUpPatch(upRec, { phase: p.phase, phaseText, progress: p.phase === 'uploading' ? Math.round((p.chunk / p.chunks) * 95) : (p.phase === 'finish' ? 96 : p.phase === 'publish' ? 98 : 2), uploadedMB: p.uploadedMB || upRec.uploadedMB, totalMB: p.totalMB || upRec.totalMB, speed });
+  };
+}
 
 // 上传队列（前端轮询）
 app.get('/api/bili/uploads', requireAuth, (req, res) => {
@@ -413,12 +418,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       tid: bs.tid,
       tags: bs.tags,
       seasonId: bs.seasonId || 0,
-      onProgress: p => {
-        const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
-          p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;
-        const speed = (p.phase === 'uploading' && p.uploadedMB) ? +(p.uploadedMB / Math.max(1, (Date.now() - upRec.start) / 1000)).toFixed(1) : upRec.speed;
-        biliUpPatch(upRec, { phase: p.phase, phaseText, progress: p.phase === 'uploading' ? Math.round((p.chunk / p.chunks) * 95) : (p.phase === 'finish' ? 96 : p.phase === 'publish' ? 98 : 2), uploadedMB: p.uploadedMB || upRec.uploadedMB, totalMB: p.totalMB || upRec.totalMB, speed });
-      },
+      onProgress: makeBiliProgressHandler(upRec),
     });
     biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
     if (bs.seasonId) {
