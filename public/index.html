@@ -565,6 +565,7 @@ createApp({
       batchTodo: [],
       batchFailed: [],
       batchDonePaths: [],
+      batchStartTime: 0,
       localAudio: '',
       localLrc: '',
       localAudioFile: null,
@@ -924,6 +925,7 @@ createApp({
       this.batchTaskIds = [];
       this.batchFailed = [];
       this.batchTodo = todo.map(s => ({ id: String(s.id), name: s.name, url: `https://music.163.com/song?id=${s.id}` }));
+      this.batchStartTime = Date.now();
       this.batchProgress = `(0/${total} 已入队)`;
       if (skipped) this.$message.info(`已跳过 ${skipped} 首已生成过的歌`);
       for (const s of todo) {
@@ -955,7 +957,14 @@ createApp({
         const idx = this.batchTaskIds.indexOf(id);
         return this.batchTodo && this.batchTodo[idx] ? { ...this.batchTodo[idx], taskId: id } : null;
       }).filter(Boolean);
-      this.batchProgress = `(${completed}/${ids.length} 已完成 · 成功 ${success} · 失败 ${failed.length})`;
+      // 预计剩余时间（按已完成平均耗时估算）
+      let remainText = '';
+      if (this.batchStartTime && completed > 0 && completed < ids.length) {
+        const avgMs = (Date.now() - this.batchStartTime) / completed;
+        const remainMin = Math.ceil((avgMs * (ids.length - completed)) / 60000);
+        remainText = ` · 预计还需 ${remainMin} 分钟`;
+      }
+      this.batchProgress = `(${completed}/${ids.length} 已完成 · 成功 ${success} · 失败 ${failed.length}${remainText})`;
       if (completed < ids.length) {
         setTimeout(() => this.pollBatch(), 3000);
       } else {
