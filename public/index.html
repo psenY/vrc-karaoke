@@ -479,7 +479,7 @@
       </el-table-column>
       <el-table-column label="操作" width="180">
         <template #default="scope">
-          <a :href="'/output/' + scope.row.outPath.split('/').pop()" :download="(scope.row.title || scope.row.outPath.split('/').pop().replace(/\.[^.]*$/, '')).replace(/[\\/:*?"<>|\s]+/g, '_') + '.mp4'" style="color:#4a6cf7">下载</a>
+          <a :href="'/output/' + scope.row.outPath.split('/').pop()" :download="dlName(scope.row)" style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(scope.row.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" text @click="redoHistory(scope.row)">重做</el-button>
           <el-button size="small" text @click="copyLink(scope.row.outPath.split('/').pop())">复制</el-button>
@@ -499,7 +499,7 @@
           </div>
         </div>
         <div class="hist-actions" style="padding-left:28px">
-          <a :href="'/output/' + h.outPath.split('/').pop()" :download="(h.title || h.outPath.split('/').pop().replace(/\.[^.]*$/, '')).replace(/[\\/:*?"<>|\s]+/g, '_') + '.mp4'" style="color:#4a6cf7">下载</a>
+          <a :href="'/output/' + h.outPath.split('/').pop()" :download="dlName(h)" style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(h.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" text @click="redoHistory(h)">重做</el-button>
           <el-button size="small" text @click="copyLink(h.outPath.split('/').pop())">复制</el-button>
@@ -958,7 +958,7 @@ createApp({
         done++;
         this.batchProgress = `(${done}/${total} 已入队)`;
         this.batchDone = done;
-        this.batchProgress = `(${done}/${total} 已入队)`;
+      }
       this.pollBatch();
     },
     async pollBatch() {
@@ -1284,6 +1284,11 @@ createApp({
       if ('Notification' in window && Notification.permission === 'granted') {
         try { new Notification(isFail ? '生成失败' : '生成完成', { body: String(msg || '').slice(0, 60) }); } catch (e) {}
       }
+    },
+    // 下载文件名：歌名优先，去文件系统非法字符
+    dlName(item) {
+      const base = (item.title || (item.outPath || '').split('/').pop().replace(/\.[^.]*$/, '')) || 'video';
+      return base.replace(/[\\/:*?"<>|\s]+/g, '_') + '.mp4';
     },
     escHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
