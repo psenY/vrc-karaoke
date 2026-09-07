@@ -932,12 +932,13 @@ createApp({
     async batchGenerate() {
       const selected = this.playlist.filter(s => s.selected);
       if (!selected.length) return this.$message.warning('请先勾选要生成的歌曲');
-      // 已生成的歌曲 ID（跳过重复生成）
+      // 已生成的歌曲（跳过重复生成）：网易云按 id 匹配，其他平台按完整 input/url 匹配
       const doneIds = new Set(this.history.map(h => {
         const m = (h.input || '').match(/id=(\d+)/);
         return m ? m[1] : '';
       }).filter(Boolean));
-      const todo = selected.filter(s => !doneIds.has(String(s.id)));
+      const doneInputs = new Set(this.history.map(h => h.input || ''));
+      const todo = selected.filter(s => !doneIds.has(String(s.id)) && !doneInputs.has(s.url));
       const skipped = selected.length - todo.length;
       if (!todo.length) return this.$message.info('所选歌曲都已生成过，无需重复生成');
       const total = todo.length;
