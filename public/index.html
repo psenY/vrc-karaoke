@@ -1038,8 +1038,10 @@ createApp({
       this.history = r.ok ? r.history : [];
     },
     async clearHistory() {
-      const r = await this.get('/api/history/clear');
-      if (r.ok) { this.history = []; this.$message.success('已清空历史'); }
+      this.$confirm('清空历史记录？（不删除已生成的视频文件，如需清理文件请用「清理孤儿」）', '清空历史', { type: 'warning', confirmButtonText: '清空', cancelButtonText: '取消' }).then(async () => {
+        const r = await this.get('/api/history/clear');
+        if (r.ok) { this.history = []; this.$message.success('已清空历史'); }
+      }).catch(() => {});
     },
     async deleteHistory(filename) {
       const r = await this.post('/api/history/delete', { filename });
