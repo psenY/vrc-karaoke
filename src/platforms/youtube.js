@@ -97,7 +97,10 @@ module.exports = {
 
     // 2. 下载音频（转 mp3，有缓存则复用）
     const audioPath = base + '.mp3';
-    if (!fs.existsSync(audioPath)) {
+    if (fs.existsSync(audioPath)) {
+      // 缓存命中：进度直接拉满（前端显示 100% 而非误导性的 0%）
+      if (typeof options.onProgress === 'function') options.onProgress(1);
+    } else {
       const onLine = typeof options.onProgress === 'function' ? (line) => {
         const m = line.match(/\[download\]\s+([0-9.]+)%/);
         if (m) options.onProgress(parseFloat(m[1]) / 100);
