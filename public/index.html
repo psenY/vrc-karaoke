@@ -314,6 +314,7 @@
     <div style="display:flex;gap:8px;margin-top:8px">
       <el-button v-if="retryVisible" type="warning" size="small" @click="retry">重试</el-button>
       <el-button v-if="result && !generating" size="small" plain @click="doGenerate">重新生成</el-button>
+      <el-button v-if="lastErrorRaw" size="small" plain @click="showErrorDetail">错误详情</el-button>
     </div>
   </el-card>
 
@@ -548,6 +549,7 @@ createApp({
       progress: 0,
       progressText: '',
       startTime: 0,
+      lastErrorRaw: '',
       elapsedText: '',
       progressStatus: '',
       result: '',
@@ -1003,6 +1005,7 @@ createApp({
         this.generating = false;
         this.retryVisible = true;
         this.progressText = '';
+        this.lastErrorRaw = r.errorRaw || '';
         this.notifyDone('生成失败: ' + (r.title || ''), true);
         this.result = '<p style="color:#f56c6c">失败: ' + this.escHtml(r.error || '未知错误') + '</p>';
       } else {
@@ -1255,6 +1258,10 @@ createApp({
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
     // 毫秒 → 分:秒（生成已用时间）
+    // 显示失败原始技术错误（排查用）
+    showErrorDetail() {
+      this.$alert(this.lastErrorRaw || '无详细信息', '错误详情（原始技术信息）', { confirmButtonText: '知道了', customClass: 'error-detail-alert' });
+    },
     // 回到页面顶部
     backTop() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
