@@ -485,7 +485,7 @@
     </div>
   </el-card>
 
-  <el-dialog v-model="previewVisible" title="预览" :width="isMobile ? '92%' : '680px'">
+  <el-dialog v-model="previewVisible" title="预览" :width="isMobile ? '92%' : '680px'" :destroy-on-close="true">
     <video :src="previewUrl" controls autoplay style="width:100%;max-height:70vh;background:#000;border-radius:8px"></video>
   </el-dialog>
 
