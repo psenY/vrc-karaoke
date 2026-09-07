@@ -997,6 +997,7 @@ createApp({
         const dlName = ((res.meta && res.meta.title) || filename.replace(/\.[^.]+$/, '')).replace(/[\\/:*?"<>|\s]+/g, '_') + '.mp4';
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
           '<p style="color:#67c23a;font-weight:600;margin:0 0 12px">生成完成</p>' +
+          (res.durationMs || res.size ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">时长 ' + (res.durationMs ? this.fmtElapsed(res.durationMs) : '?') + ' · 大小 ' + this.formatSize(res.size || 0) + '</p>' : '') +
           '<video src="/output/' + this.escHtml(filename) + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
           '<div style="display:flex;gap:10px;align-items:center">' +
           '<a href="/output/' + this.escHtml(filename) + '" download="' + this.escHtml(dlName) + '" style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +

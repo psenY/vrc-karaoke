@@ -237,7 +237,10 @@ async function generateVideo(input, options = {}) {
     for (const p of [bodyOut, introPath, introAssPath, introList]) { try { fs.unlinkSync(p); } catch (e) {} }
   }
 
-  return { outPath, meta: result.meta, highlight: h };
+  // 结果附带视频大小/时长（前端结果区显示）
+  let fileSize = 0;
+  try { fileSize = fs.statSync(outPath).size; } catch (e) {}
+  return { outPath, meta: result.meta, highlight: h, size: fileSize, durationMs: result.audioMs || 0 };
   } finally {
     cleanupWorkDir(workDir);  // 任何结束方式(成功/失败/取消)都清理中间文件
   }
