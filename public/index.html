@@ -133,6 +133,10 @@
   <el-card class="card" shadow="never" v-if="selected">
     <template #header><b>已选歌曲</b></template>
     <span>{{ selected.name }} - {{ selected.artists }}</span>
+    <div style="margin-top:8px;display:flex;gap:10px;align-items:center">
+      <el-button v-if="isNeteaseUrl(selected.url)" size="small" circle :type="trialId === selected.id ? 'primary' : ''" @click="trialSong(selected)">{{ trialId === selected.id ? '⏸' : '▶' }}</el-button>
+      <el-button size="small" plain @click="deselectSong">取消选择</el-button>
+    </div>
     <div v-if="lyricPreview" style="margin-top:8px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted);white-space:pre-wrap;line-height:1.8">{{ lyricPreview }}</div>
     <div v-else style="margin-top:8px;font-size:13px;color:var(--muted)">歌词加载中或暂无歌词...</div>
   </el-card>
@@ -719,6 +723,12 @@ createApp({
       const a = new Audio(r.url);
       this.trialAudio = a;
       a.play().catch(() => { this.trialId = ''; this.$message.warning('试听播放失败'); });
+    },
+    // 取消已选歌曲（回到搜索）
+    deselectSong() {
+      this.selected = null;
+      this.lyricPreview = '';
+      this.$message.info('已取消选择');
     },
     selectSong(i) {
       this.selected = this.songs[i];
