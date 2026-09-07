@@ -474,7 +474,7 @@
       </el-table-column>
       <el-table-column label="操作" width="180">
         <template #default="scope">
-          <a :href="'/output/' + scope.row.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
+          <a :href="'/output/' + scope.row.outPath.split('/').pop()" :download="(scope.row.title || scope.row.outPath.split('/').pop().replace(/\.[^.]*$/, '')).replace(/[\\/:*?"<>|\s]+/g, '_') + '.mp4'" style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(scope.row.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" text @click="redoHistory(scope.row)">重做</el-button>
           <el-button size="small" text @click="copyLink(scope.row.outPath.split('/').pop())">复制</el-button>
@@ -494,7 +494,7 @@
           </div>
         </div>
         <div class="hist-actions" style="padding-left:28px">
-          <a :href="'/output/' + h.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
+          <a :href="'/output/' + h.outPath.split('/').pop()" :download="(h.title || h.outPath.split('/').pop().replace(/\.[^.]*$/, '')).replace(/[\\/:*?"<>|\s]+/g, '_') + '.mp4'" style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(h.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" text @click="redoHistory(h)">重做</el-button>
           <el-button size="small" text @click="copyLink(h.outPath.split('/').pop())">复制</el-button>
@@ -987,11 +987,13 @@ createApp({
         this.notifyDone(r.title || '生成完成');
         const res = r.result;
         const filename = res.outPath.split('/').pop();
+        // 下载文件名带歌名（去非法字符）
+        const dlName = ((res.meta && res.meta.title) || filename.replace(/\.[^.]+$/, '')).replace(/[\\/:*?"<>|\s]+/g, '_') + '.mp4';
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
           '<p style="color:#67c23a;font-weight:600;margin:0 0 12px">生成完成</p>' +
           '<video src="/output/' + this.escHtml(filename) + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
           '<div style="display:flex;gap:10px;align-items:center">' +
-          '<a href="/output/' + this.escHtml(filename) + '" download style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
+          '<a href="/output/' + this.escHtml(filename) + '" download="' + this.escHtml(dlName) + '" style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
           '<el-button size="small" @click="copyLink(filename)">复制链接</el-button>' +
           '</div>' +
           '</div>';
