@@ -1085,7 +1085,7 @@ createApp({
     async pollBatch() {
       const ids = this.batchTaskIds;
       if (!ids.length) return;
-      let completed = 0, success = 0;
+      let completed = 0, success = 0, skippedCount = 0;
       const failed = [];
       const failedIds = [];
       const donePaths = [];
@@ -1093,6 +1093,7 @@ createApp({
       const r = await this.post('/api/tasks', { ids });
       for (const t of (r.tasks || [])) {
         if (t.status === 'done') { completed++; success++; if (t.result && t.result.outPath) donePaths.push(t.result.outPath.split('/').pop()); }
+        else if (t.status === 'skipped') { completed++; skippedCount++; }
         else if (t.status === 'failed') { completed++; failed.push({ name: t.title || t.id, error: t.error || '' }); failedIds.push(t.id); }
         else if (t.status === 'cancelled') completed++;
       }
@@ -1114,7 +1115,7 @@ createApp({
       if (completed < ids.length) {
         setTimeout(() => this.pollBatch(), 3000);
       } else {
-        this.batchProgress = `(全部完成 ${ids.length} 首 · 成功 ${success} · 失败 ${failed.length})`;
+        this.batchProgress = `(全部完成 ${ids.length} 首 · 成功 ${success}${skippedCount ? ' · 跳过 ' + skippedCount : ''} · 失败 ${failed.length})`;
         if (failed.length) {
           this.$message.error(`批量完成，失败 ${failed.length} 首：` + failed.map(f => f.name + (f.error ? `（${f.error}）` : '')).join('、'));
           this.notifyDone(`批量完成，失败 ${failed.length} 首`, true);
@@ -1143,6 +1144,15 @@ createApp({
           '<a href="/output/' + this.escHtml(filename) + '" download="' + this.escHtml(dlName) + '" style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
           '<el-button size="small" @click="copyLink(filename)">复制链接</el-button>' +
           '</div>' +
+          '</div>';
+        this.loadHistory();
+      } else if (r.status === 'skipped') {
+        // B站查重命中跳过：绿色提示，不算失败
+        this.generating = false;
+        this.progressText = '';
+        this.result = '<div style="padding:14px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
+          '<p style="color:#67c23a;font-weight:600;margin:0">已投过，跳过生成</p>' +
+          '<p style="color:var(--muted);font-size:13px;margin:6px 0 0">' + this.escHtml(r.error || '') + '</p>' +
           '</div>';
         this.loadHistory();
       } else if (r.status === 'failed') {
