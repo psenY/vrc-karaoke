@@ -387,7 +387,7 @@
           <span style="width:22px;text-align:center;color:var(--muted);font-size:13px">{{ i + 1 }}</span>
           <el-checkbox v-model="s.selected"></el-checkbox>
           <div style="min-width:0;flex:1">
-            <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span> <span v-if="generatedSet.has(String(s.id))" style="color:var(--muted);font-size:12px;font-weight:normal">已生成</span></div>
+            <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span> <span v-if="isGenerated(s)" style="color:var(--muted);font-size:12px;font-weight:normal">已生成</span></div>
             <div style="color:var(--muted);font-size:13px">{{ s.artists }}</div>
           </div>
           <el-button v-if="isNeteaseUrl(s.url)" size="small" circle :type="trialId === s.id ? 'primary' : ''" @click="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
@@ -777,10 +777,18 @@ createApp({
     },
     // 历史已生成的网易云歌曲 id 集合（批量项标识"已生成"）
     generatedSet() {
-      return new Set(this.history.map(h => {
+      // 网易云 id 集合 + 全部 input 链接集合（跨平台批量项按 url 匹配，与 batchGenerate 跳过逻辑一致）
+      const ids = new Set();
+      const urls = new Set();
+      for (const h of this.history) {
         const m = (h.input || '').match(/id=(\d+)/);
-        return m ? m[1] : '';
-      }).filter(Boolean));
+        if (m) ids.add(m[1]);
+        if (h.input && /https?:\/\//.test(h.input)) urls.add(h.input);
+      }
+      return { ids, urls };
+    },
+    isGenerated(s) {
+      return this.generatedSet.ids.has(String(s.id)) || (s.url && this.generatedSet.urls.has(s.url));
     },
     vipLabel() {
       // 网易云 vipType: 0=普通 10=音乐包 11=黑胶VIP 110=黑胶SVIP
