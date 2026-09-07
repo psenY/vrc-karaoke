@@ -29,6 +29,9 @@ module.exports = {
   name: '本地文件',
 
   matches(input) {
+    // 安全加固：仅接受音频扩展名（防任意文件被当音频源处理）
+    if (typeof input !== 'string') return false;
+    if (!/\.(mp3|flac|m4a|wav|aac|ogg|opus)$/i.test(input)) return false;
     try { return fs.existsSync(input) && fs.statSync(input).isFile(); }
     catch (e) { return false; }
   },
