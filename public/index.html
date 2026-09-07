@@ -609,6 +609,7 @@ createApp({
       selectedPreset: '',
       batchTaskIds: [],
       selectedLyric: '',
+      selectedTlyric: '',
     };
   },
   watch: {
@@ -639,10 +640,16 @@ createApp({
     },
     lyricPreview() {
       if (!this.selectedLyric) return '';
-      return this.selectedLyric.split('\n').map(line => {
+      const clean = (text) => text.split('\n').map(line => {
         const m = line.match(/\[\d+:\d+[.:]\d+\](.*)/);
         return m ? m[1].trim() : '';
       }).filter(t => t).join('\n');
+      let out = clean(this.selectedLyric);
+      if (this.selectedTlyric) {
+        const tr = clean(this.selectedTlyric);
+        if (tr) out += '\n\n--- 翻译 ---\n' + tr;
+      }
+      return out;
     },
   },
   methods: {
@@ -740,7 +747,7 @@ createApp({
       this.selectedLyric = '';
       this.$message.success('已选: ' + this.selected.name);
       this.post('/api/lyric', { input: this.selected.url }).then(r => {
-        if (r.ok) this.selectedLyric = r.lrc || '';
+        if (r.ok) { this.selectedLyric = r.lrc || ''; this.selectedTlyric = r.tlyric || ''; }
       });
     },
     bgHex() {
