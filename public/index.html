@@ -1134,7 +1134,9 @@ createApp({
         this.loadConfig();
         return;
       } else if (r.code === 800) {
-        this.qrStatus = 'expired';
+        // 二维码过期：自动重新获取（无需手动点重新获取）
+        this.$message.warning('二维码已过期，正在刷新...');
+        this.startQrLogin();
         return;
       } else if (r.code === 802) {
         this.qrStatus = 'scanned';
