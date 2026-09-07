@@ -143,13 +143,22 @@ test('fitLyricLine 短句不断行', () => {
   assert.equal(r.fontSize, 150);
 });
 
-test('fitLyricLine 长中文句断行+缩字', () => {
+test('fitLyricLine 优先缩字号保持单行', () => {
+  const { fitLyricLine } = require('../src/core/ass');
+  // 13-14 字 @150 超宽 → 缩字号单行（不断行）
+  const r = fitLyricLine('一二三四五六七八九十十一二三', 150, 1820);
+  assert.equal(r.cut, 0);              // 不断行（优先缩字号）
+  assert.ok(r.fontSize >= 100);        // 还能保持较大字号
+  assert.ok(r.fontSize < 150);         // 确实缩了
+});
+
+test('fitLyricLine 超长句兜底断行(fs≤90)', () => {
   const { fitLyricLine } = require('../src/core/ass');
   const long = '这是一句非常非常长的中文歌词句子为了测试自动断行功能是否正常工作';
-  const r = fitLyricLine(long, 150, 1720);
-  assert.ok(r.cut > 0);                 // 断行
+  const r = fitLyricLine(long, 150, 1820);
+  assert.ok(r.cut > 0);                 // 超长兜底断行
   assert.ok(r.fontSize <= 90);         // 两行缩字防溢出屏幕顶部
-  assert.ok(r.fontSize >= 80);
+  assert.ok(r.fontSize >= 60);
 });
 
 test('fitLyricLine 英文长句在空格处断行', () => {

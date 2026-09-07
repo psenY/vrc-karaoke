@@ -149,15 +149,22 @@ function estTextWidth(text, fontSize) {
   return units * fontSize;
 }
 
-// 长句断行 + 字号自适应：单行放不下则拆两行（中文按字符对半、英文优先空格），
-// 两行时字号压到 ≤90（两行 ≤180px，配合翻译行总高不超过槽位间距，防溢出屏幕顶部），仍超则继续缩到 60
+// 长句适配：**优先缩字号保持单行**（fs 150→90），单行下限仍放不下才断两行（fs≤90 继续缩到 60）。
+// 两行 ≤180px、翻译行更小，总高不超过槽位间距（防溢出屏幕顶部）。
 function fitLyricLine(text, fontSize, maxWidth) {
   const str = String(text);
   if (estTextWidth(str, fontSize) <= maxWidth) return { cut: 0, fontSize };
+  // 1. 优先：缩小字号保持单行
+  let fs = fontSize;
+  while (fs > 90) {
+    fs -= 10;
+    if (estTextWidth(str, fs) <= maxWidth) return { cut: 0, fontSize: fs };
+  }
+  // 2. 兜底：断两行（fs 从 90 继续缩到 60）
   let cut = Math.floor(str.length / 2);
   const spaceIdx = str.lastIndexOf(' ', cut);
   if (spaceIdx > str.length * 0.25) cut = spaceIdx + 1;  // 英文优先在空格处断
-  let fs = Math.min(fontSize, 90);                        // 两行高度约束
+  fs = 90;
   while (fs >= 60) {
     if (estTextWidth(str.slice(0, cut), fs) <= maxWidth && estTextWidth(str.slice(cut), fs) <= maxWidth) break;
     fs -= 10;
