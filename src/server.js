@@ -74,8 +74,9 @@ function cleanupTasks() {
   }
 }
 
+let queuePaused = false;  // 队列暂停（暂停时不启动新任务，正在生成的不打断）
 function runNext() {
-  while (running < MAX_CONCURRENT && queue.length > 0) {
+  while (!queuePaused && running < MAX_CONCURRENT && queue.length > 0) {
     const { id, input, options } = queue.shift();
     const t = tasks.get(id);
     t.status = 'running';
@@ -533,7 +534,13 @@ app.get('/api/queue', (req, res) => {
     phase: t.phase, downloadProgress: t.downloadProgress, progress: t.progress,
   }));
   const pendingList = queue.map(q => ({ id: q.id, title: tasks.get(q.id)?.title || q.input, status: 'pending' }));
-  res.json({ ok: true, running: runningList, pending: pendingList });
+  res.json({ ok: true, running: runningList, pending: pendingList, paused: queuePaused });
+});
+
+// 队列暂停/恢复（toggle）
+app.post('/api/queue/pause', (req, res) => {
+  queuePaused = !queuePaused;
+  res.json({ ok: true, paused: queuePaused });
 });
 
 // 全部取消：清空 pending 队列 + 中断所有 running 任务

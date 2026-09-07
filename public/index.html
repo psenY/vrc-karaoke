@@ -322,6 +322,7 @@
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <b>任务队列</b>
+        <el-button size="small" plain @click="toggleQueuePause">{{ queuePaused ? '继续' : '暂停' }}</el-button>
         <el-button size="small" type="danger" plain @click="queueClearAll">全部取消</el-button>
       </div>
     </template>
@@ -569,6 +570,7 @@ createApp({
       batchFailed: [],
       batchDonePaths: [],
       batchStartTime: 0,
+      queuePaused: false,
       localAudio: '',
       localLrc: '',
       localAudioFile: null,
@@ -1196,7 +1198,11 @@ createApp({
     },
     async loadQueue() {
       const r = await this.get('/api/queue');
-      if (r.ok) this.queue = [...(r.running || []), ...(r.pending || [])];
+      if (r.ok) { this.queue = [...(r.running || []), ...(r.pending || [])]; this.queuePaused = !!r.paused; }
+    },
+    async toggleQueuePause() {
+      const r = await this.post('/api/queue/pause', {});
+      if (r.ok) { this.queuePaused = !!r.paused; this.$message.success(r.paused ? '队列已暂停' : '队列已继续'); }
     },
     async queueCancel(id) {
       const r = await this.post('/api/task/' + id + '/cancel', {});
