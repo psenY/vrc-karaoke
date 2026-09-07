@@ -108,6 +108,7 @@
       </el-upload>
       <span v-if="localLrc" style="color:var(--muted);font-size:12px">{{ localLrc }}</span>
       <el-button size="small" type="primary" @click="doUploadGenerate" :loading="uploading">上传并生成</el-button>
+      <el-button v-if="localAudio || localLrc" size="small" plain @click="clearUpload">清除</el-button>
       <span v-if="localAudio" style="color:var(--muted);font-size:12px">歌词可选（不选则用音频同名 .lrc）</span>
     </div>
   </el-card>
@@ -757,6 +758,11 @@ createApp({
         progressColor: this.progressColor,
         introText: this.addIntro ? 'AUTO' : '',
       };
+    },
+    // 清除已选的本地上传文件
+    clearUpload() {
+      this.localAudio = ''; this.localAudioFile = null;
+      this.localLrc = ''; this.localLrcFile = null;
     },
     onPickAudio(file) {
       this.localAudioFile = file.raw;
