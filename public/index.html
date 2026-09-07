@@ -366,6 +366,7 @@
         <span v-if="selectedCount" style="color:#67c23a">已选 {{ selectedCount }} 首</span>
         <span v-if="batchProgress" style="color:#e6a23c">{{ batchProgress }}</span>
         <el-button v-if="batchFailed.length" size="small" type="danger" plain @click="retryFailedBatch">重试失败({{ batchFailed.length }})</el-button>
+        <el-button v-if="batchDonePaths.length" size="small" plain @click="copyAllBatchLinks">复制全部链接({{ batchDonePaths.length }})</el-button>
       </div>
       <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
         <div v-for="s in playlist" :key="s.url || s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
@@ -553,6 +554,7 @@ createApp({
       batchProgress: '',
       batchTodo: [],
       batchFailed: [],
+      batchDonePaths: [],
       localAudio: '',
       localLrc: '',
       localAudioFile: null,
@@ -699,6 +701,17 @@ createApp({
       this.$message.success(`已加入批量列表（共 ${this.playlist.length} 首）`);
     },
     // 重试批量中失败的歌曲（用当时链接重新入队）
+    // 复制批量全部成功视频的直链（换行分隔）
+    copyAllBatchLinks() {
+      const urls = this.batchDonePaths.map(f => location.origin + '/output/' + f);
+      if (!urls.length) return;
+      const text = urls.join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => this.$message.success(`已复制 ${urls.length} 个链接`)).catch(() => this.$message.success(text));
+      } else {
+        this.$message.success(text);
+      }
+    },
     async retryFailedBatch() {
       const list = this.batchFailed.slice();
       if (!list.length) return;
@@ -906,13 +919,15 @@ createApp({
       let completed = 0, success = 0;
       const failed = [];
       const failedIds = [];
+      const donePaths = [];
       // 批量接口一次拿全部状态（大批量避免逐任务请求压力）
       const r = await this.post('/api/tasks', { ids });
       for (const t of (r.tasks || [])) {
-        if (t.status === 'done') { completed++; success++; }
+        if (t.status === 'done') { completed++; success++; if (t.result && t.result.outPath) donePaths.push(t.result.outPath.split('/').pop()); }
         else if (t.status === 'failed') { completed++; failed.push(t.title || t.id); failedIds.push(t.id); }
         else if (t.status === 'cancelled') completed++;
       }
+      this.batchDonePaths = donePaths;
       // 失败任务映射回歌曲（供"重试失败"）
       this.batchFailed = failedIds.map(id => {
         const idx = this.batchTaskIds.indexOf(id);

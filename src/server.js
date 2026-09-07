@@ -521,7 +521,7 @@ app.post('/api/tasks', (req, res) => {
   const { ids = [] } = req.body || {};
   const list = ids.map(id => {
     const t = tasks.get(id);
-    return t ? { id, status: t.status, title: t.title, error: t.error } : { id, status: 'missing' };
+    return t ? { id, status: t.status, title: t.title, error: t.error, result: t.result } : { id, status: 'missing' };
   });
   res.json({ ok: true, tasks: list });
 });
