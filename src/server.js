@@ -136,7 +136,7 @@ function runNext() {
             const title = renderBiliTpl(bs.titleTpl, vars).slice(0, 80);
             const desc = renderBiliTpl(bs.descTpl, vars);
             t.biliUploading = true;
-            const upRec = biliUpNew(title, result.outPath);
+            const upRec = biliUpNew(title, result.outPath, songTitle);
             // 投稿自动重试 3 次（网络波动容错，指数退避 30s/60s）
             (async () => {
               let up = null, lastErr = null;
@@ -273,8 +273,8 @@ let biliUploads = [];
 let biliUploadSeq = 0;
 try { biliUploads = JSON.parse(fs.readFileSync(BILI_UPLOADS_FILE, 'utf8')); biliUploadSeq = biliUploads.reduce((m, u) => Math.max(m, u.id || 0), 0); } catch (e) {}
 function biliUpSave() { try { fs.writeFileSync(BILI_UPLOADS_FILE, JSON.stringify(biliUploads.slice(0, 50), null, 2)); } catch (e) {} }
-function biliUpNew(title, outPath) {
-  const rec = { id: ++biliUploadSeq, title, outPath, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, speed: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
+function biliUpNew(title, outPath, rawTitle) {
+  const rec = { id: ++biliUploadSeq, title, rawTitle: rawTitle || title, outPath, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, speed: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
   biliUploads.unshift(rec);
   if (biliUploads.length > 50) biliUploads.length = 50;
   biliUpSave();
@@ -389,6 +389,47 @@ app.get('/api/bili/seasons', requireAuth, async (req, res) => {
   res.json({ ok: true, seasons });
 });
 
+// 上传队列失败重试：按队列记录 id 重投（用 rawTitle 重渲染模板，避免二次套模板）
+app.post('/api/bili/retry', requireAuth, async (req, res) => {
+  const cfg = readConfig();
+  if (!cfg.biliCookies || !cfg.biliCookies.SESSDATA) return res.json({ ok: false, error: '未登录B站' });
+  const { uploadId } = req.body || {};
+  const rec = biliUploads.find(u => u.id === Number(uploadId));
+  if (!rec || !rec.outPath) return res.json({ ok: false, error: '上传记录不存在' });
+  const safe = path.resolve(ROOT, 'output', path.basename(String(rec.outPath)));
+  if (!fs.existsSync(safe)) return res.json({ ok: false, error: '视频文件已不存在' });
+  const songTitle = rec.rawTitle || rec.title;
+  const vars = { songTitle, levelLabel: '', brLabel: '', resolution: '' };
+  const bs = getBiliSettings();
+  try {
+    biliUpPatch(rec, { phase: 'preupload', phaseText: '准备中', progress: 0, error: '' });
+    const up = await bili.uploadVideo({
+      cookies: cfg.biliCookies,
+      filePath: safe,
+      fileName: path.basename(safe),
+      title: renderBiliTpl(bs.titleTpl, vars).slice(0, 80),
+      desc: renderBiliTpl(bs.descTpl, vars),
+      tid: bs.tid,
+      tags: bs.tags,
+      seasonId: bs.seasonId || 0,
+      onProgress: makeBiliProgressHandler(rec),
+    });
+    biliUpPatch(rec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
+    if (bs.seasonId) {
+      const season = (await bili.listSeasons(cfg.biliCookies).catch(() => [])).find(s => s.id === bs.seasonId);
+      if (season && season.sectionId) {
+        await bili.addToSeason(cfg.biliCookies, { bvid: up.bvid, title: songTitle, seasonId: bs.seasonId, sectionId: season.sectionId })
+          .catch(err => console.error(`[B站合集补挂失败] ${songTitle}:`, err.message));
+      }
+    }
+    console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
+    res.json({ ok: true, url: up.url });
+  } catch (e) {
+    biliUpPatch(rec, { phase: 'failed', phaseText: '失败', error: e.message, end: Date.now() });
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // 手动补传：把已生成的历史视频投稿到B站（标题=歌名 - vrc-karaoke）
 app.post('/api/bili/push', requireAuth, async (req, res) => {
   const cfg = readConfig();
@@ -408,7 +449,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const hist = readHistory().find(h => h.outPath === safe);
   const q = (hist && hist.quality) || {};
   const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
-  const upRec = biliUpNew(renderBiliTpl(bs.titleTpl, vars).slice(0, 80), safe);
+  const upRec = biliUpNew(renderBiliTpl(bs.titleTpl, vars).slice(0, 80), safe, songTitle);
   try {
     const up = await bili.uploadVideo({
       cookies: cfg.biliCookies,

@@ -512,6 +512,7 @@
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-weight:600;color:var(--text);font-size:13px;flex:1;min-width:180px;word-break:break-all">{{ u.title }}</span>
         <span :style="{color: u.phase === 'done' ? '#67c23a' : u.phase === 'failed' ? '#f56c6c' : '#e6a23c', fontSize: '13px'}">{{ u.phaseText }}{{ u.error ? '：' + u.error.slice(0, 60) : '' }}</span>
+        <el-button v-if="u.phase === 'failed'" size="small" type="warning" plain @click="retryBiliUpload(u.id)">重试</el-button>
         <a v-if="u.url" :href="u.url" target="_blank" style="color:#4a6cf7;font-size:13px">{{ u.bvid }}</a>
         <span v-if="u.totalMB" style="color:var(--muted);font-size:12px">{{ u.uploadedMB }}/{{ u.totalMB }}MB<template v-if="u.speed"> · {{ u.speed }}MB/s</template></span>
       </div>
@@ -1411,6 +1412,11 @@ createApp({
     async dedupHistory() {
       const r = await this.post('/api/history/dedup', {});
       if (r.ok) { this.$message.success(r.removed ? `已清理 ${r.removed} 条重复记录` : '没有重复记录'); this.loadHistory(); }
+    },
+    async retryBiliUpload(uploadId) {
+      const r = await this.post('/api/bili/retry', { uploadId });
+      if (r.ok) this.$message.success('B站投稿成功：' + r.url);
+      else this.$message.error('重试失败：' + (r.error || '未知错误'));
     },
     async saveBiliSettings() {
       const r = await this.post('/api/bili/settings', this.biliSettings);
