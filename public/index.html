@@ -309,7 +309,12 @@
   </el-card>
 
   <el-card class="card" shadow="never" v-if="queue.length">
-    <template #header><b>任务队列</b></template>
+    <template #header>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>任务队列</b>
+        <el-button size="small" type="danger" plain @click="queueClearAll">全部取消</el-button>
+      </div>
+    </template>
     <div v-for="q in queue" :key="q.id" :style="'padding:8px 0;border-bottom:1px solid var(--el-border-color-light);'">
       <div :style="'display:flex;gap:8px;' + (isMobile ? 'flex-direction:column;align-items:flex-start' : 'align-items:center;justify-content:space-between')">
         <span style="color:var(--text);word-break:break-all">{{ q.status === 'running' ? '生成中' : '排队中' }}：{{ q.title }}</span>
@@ -1098,6 +1103,10 @@ createApp({
       const r = await this.post('/api/task/' + id + '/cancel', {});
       if (r.ok) this.$message.success('已取消任务');
       this.loadQueue();
+    },
+    async queueClearAll() {
+      const r = await this.post('/api/queue/clear', {});
+      if (r.ok) { this.$message.success('已全部取消'); this.loadQueue(); }
     },
     async queueTop(id) {
       const r = await this.post('/api/task/' + id + '/top', {});

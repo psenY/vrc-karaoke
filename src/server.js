@@ -536,6 +536,22 @@ app.get('/api/queue', (req, res) => {
   res.json({ ok: true, running: runningList, pending: pendingList });
 });
 
+// 全部取消：清空 pending 队列 + 中断所有 running 任务
+app.post('/api/queue/clear', (req, res) => {
+  for (const q of queue) {
+    const t = tasks.get(q.id);
+    if (t) t.status = 'cancelled';
+  }
+  queue.length = 0;
+  for (const t of tasks.values()) {
+    if (t.status === 'running') {
+      t.status = 'cancelled';
+      (t.procs || []).forEach(p => { try { p.kill('SIGKILL'); } catch (e) {} });
+    }
+  }
+  res.json({ ok: true });
+});
+
 // 取消任务（pending 移出队列 / running 中断 ffmpeg）
 app.post('/api/task/:id/cancel', (req, res) => {
   const t = tasks.get(req.params.id);
