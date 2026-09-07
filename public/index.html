@@ -296,7 +296,7 @@
       <el-button type="primary" @click="doGenerate" :loading="generating" :style="isMobile ? 'width:100%' : ''">生成视频</el-button>
       <el-progress v-if="progressText && phase==='download'" :percentage="downloadProgress" :style="isMobile ? 'margin-top:10px' : 'width:320px;margin-left:16px'"></el-progress>
       <el-progress v-if="progressText && phase==='assemble' && !Array.isArray(progress)" :percentage="progress" :status="progressStatus" :style="isMobile ? 'margin-top:10px' : 'width:320px;margin-left:16px'"></el-progress>
-      <span v-if="progressText" :style="isMobile ? 'color:#e6a23c;display:block;margin-top:6px' : 'color:#e6a23c;margin-left:8px'">{{ progressText }}</span>
+      <span v-if="progressText" :style="isMobile ? 'color:#e6a23c;display:block;margin-top:6px' : 'color:#e6a23c;margin-left:8px'">{{ progressText }}<span v-if="elapsedText" style="color:var(--muted)">（已用 {{ elapsedText }}）</span></span>
       <div v-if="progressText && Array.isArray(progress)" :style="'margin-top:12px;display:grid;gap:10px;width:100%;grid-template-columns:repeat(auto-fill,minmax(' + (isMobile ? '110' : '150') + 'px,1fr))'">
         <div v-for="(p, i) in progress" :key="i">
           <div style="font-size:12px;color:var(--muted);margin-bottom:2px">线程 {{ i + 1 }}</div>
@@ -516,6 +516,8 @@ createApp({
       backgroundBottom: '#0a0a15',
       progress: 0,
       progressText: '',
+      startTime: 0,
+      elapsedText: '',
       progressStatus: '',
       result: '',
       playlistUrl: '',
@@ -773,6 +775,8 @@ createApp({
       this.progressText = '生成中...';
       this.progress = 0;
       this.result = '';
+      this.startTime = Date.now();
+      this.elapsedText = '';
       // 请求浏览器通知权限（生成完成提醒）
       if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission().catch(() => {});
@@ -912,6 +916,7 @@ createApp({
           }
         }
         this.progressStatus = r.status === 'pending' ? 'warning' : '';
+        if (this.startTime) this.elapsedText = this.fmtElapsed(Date.now() - this.startTime);
         setTimeout(() => this.poll(taskId), 2000);
       }
     },
@@ -1128,6 +1133,12 @@ createApp({
     },
     escHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+    // 毫秒 → 分:秒（生成已用时间）
+    fmtElapsed(ms) {
+      const s = Math.floor(ms / 1000);
+      const m = Math.floor(s / 60);
+      return `${m}分${String(s % 60).padStart(2, '0')}秒`;
     },
     fmtTime(ts) {
       return new Date(ts).toLocaleString('zh-CN');
