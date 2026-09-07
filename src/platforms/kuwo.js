@@ -50,7 +50,7 @@ function searchSong(keywords, limit = 5) {
     name: s.name,
     artists: s.artist,
     album: s.album,
-    interval: s.duration,
+    duration: (s.duration || 0) * 1000,   // 酷我返回秒 → 统一毫秒（前端 fmtDuration 按毫秒）
   })));
 }
 
