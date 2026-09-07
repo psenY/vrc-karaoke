@@ -121,6 +121,7 @@
           <div class="name">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span></div>
           <div class="artists">{{ s.artists }}<span v-if="s.duration"> · {{ fmtDuration(s.duration) }}</span></div>
         </div>
+        <el-button size="small" plain style="margin-left:auto" @click.stop="addToBatch(s)">加入批量</el-button>
       </div>
     </div>
     <div style="text-align:center;margin-top:10px">
@@ -640,6 +641,12 @@ createApp({
       this.songs = r.songs;
       this.searchOffset = 10;
       if (!r.songs.length) this.$message.info('无结果');
+    },
+    // 搜索结果加入批量列表（不必靠歌单解析）
+    addToBatch(s) {
+      if (this.playlist.some(p => String(p.id) === String(s.id))) return this.$message.info('已在批量列表');
+      this.playlist.push({ ...s, selected: true });
+      this.$message.success(`已加入批量列表（共 ${this.playlist.length} 首）`);
     },
     // 重试批量中失败的歌曲（用当时链接重新入队）
     async retryFailedBatch() {
