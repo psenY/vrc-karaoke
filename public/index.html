@@ -115,7 +115,7 @@
   </el-card>
 
   <el-card class="card" shadow="never" v-if="songs.length">
-    <template #header><b>搜索结果</b>（点选一首，▶试听确认）</template>
+    <template #header><b>搜索结果</b>（点选一首，▶试听确认）<span style="color:var(--muted);font-weight:normal;font-size:13px">共 {{ songs.length }} 条</span></template>
     <div class="song-item" v-for="(s, i) in songs" :key="s.id" @click="selectSong(i)">
       <div style="display:flex;align-items:center;gap:10px">
         <el-button v-if="platform === 'netease'" size="small" :type="trialId === s.id ? 'primary' : ''" circle @click.stop="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
