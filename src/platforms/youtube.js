@@ -50,6 +50,20 @@ module.exports = {
     return /(youtube\.com|youtu\.be)/i.test(input || '');
   },
 
+  // YouTube 搜索（yt-dlp ytsearch，走 mihomo 代理）
+  async search(keywords, offset = 0, limit = 10) {
+    const out = await runYtdlp([`ytsearch${limit}:${keywords}`, '--dump-single-json', '--flat-playlist', '--no-warnings']);
+    const j = JSON.parse(out);
+    return (j.entries || []).map(e => ({
+      id: e.id,
+      name: e.title || '',
+      artists: e.channel || '',
+      album: '',
+      duration: e.duration || 0,
+      fee: 0,
+    }));
+  },
+
   async fetch(input, options = {}) {
     const workDir = options.workDir;
 

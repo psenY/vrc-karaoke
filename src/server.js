@@ -220,6 +220,7 @@ app.post('/api/search', async (req, res) => {
       if (p === 'netease') return `https://music.163.com/song?id=${s.id}`;
       if (p === 'qqmusic') return `https://y.qq.com/n/ryqq/songDetail/${s.id}`;
       if (p === 'kuwo') return `http://www.kuwo.cn/play_detail/${s.id}`;
+      if (p === 'youtube') return `https://www.youtube.com/watch?v=${s.id}`;
       return s.id;
     };
     res.json({
