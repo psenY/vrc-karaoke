@@ -1074,13 +1074,18 @@ createApp({
       this.batchFailed = [];
       this.batchDonePaths = [];
       try { localStorage.setItem('vrc_batchFailed', '[]'); } catch (e) {}
-      this.batchTodo = todo.map(s => ({ id: String(s.id), name: s.name, url: `https://music.163.com/song?id=${s.id}` }));
+      // 跨平台批量：优先用歌曲自身链接（加入批量的 YT/QQ 歌），网易云歌单 song 无 url 时按 id 拼
+      this.batchTodo = todo.map(s => {
+        const url = s.url || `https://music.163.com/song?id=${s.id}`;
+        return { id: String(s.id), name: s.name, url };
+      });
       this.batchStartTime = Date.now();
       this.batchTotal = total; this.batchDone = 0;
       this.batchProgress = `(0/${total} 已入队)`;
       if (skipped) this.$message.info(`已跳过 ${skipped} 首已生成过的歌`);
+      const urlById = new Map(this.batchTodo.map(t => [t.id, t.url]));
       for (const s of todo) {
-        const r = await this.post('/api/generate', this.buildGenerateBody(`https://music.163.com/song?id=${s.id}`));
+        const r = await this.post('/api/generate', this.buildGenerateBody(urlById.get(String(s.id)) || `https://music.163.com/song?id=${s.id}`));
         if (r.ok && r.taskId) this.batchTaskIds.push(r.taskId);
         else this.$message.warning(`入队失败：${s.name}${r.error ? ' (' + r.error + ')' : ''}`);
         done++;
