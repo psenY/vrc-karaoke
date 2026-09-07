@@ -452,6 +452,7 @@
           <a :href="'/output/' + scope.row.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(scope.row.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" text @click="redoHistory(scope.row)">重做</el-button>
+          <el-button size="small" text @click="copyLink(scope.row.outPath.split('/').pop())">复制</el-button>
           <el-button size="small" type="danger" text @click="deleteHistory(scope.row.outPath.split('/').pop())">删除</el-button>
         </template>
       </el-table-column>
@@ -471,6 +472,7 @@
           <a :href="'/output/' + h.outPath.split('/').pop()" download style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(h.outPath.split('/').pop())">预览</el-button>
           <el-button size="small" text @click="redoHistory(h)">重做</el-button>
+          <el-button size="small" text @click="copyLink(h.outPath.split('/').pop())">复制</el-button>
           <el-button size="small" type="danger" text @click="deleteHistory(h.outPath.split('/').pop())">删除</el-button>
         </div>
       </div>
