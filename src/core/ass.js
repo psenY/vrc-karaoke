@@ -144,7 +144,7 @@ function buildEstimatedHighlight(text, startMs, endMs, mode) {
 function estTextWidth(text, fontSize) {
   let units = 0;
   for (const ch of String(text)) {
-    units += ch.charCodeAt(0) > 255 ? 1 : 0.5;
+    units += ch.charCodeAt(0) > 255 ? 0.72 : 0.36;  // libass+Noto CJK 实测：全角≈0.72em(12字@150实测1300px)，半角≈0.36
   }
   return units * fontSize;
 }

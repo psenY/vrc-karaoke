@@ -145,8 +145,8 @@ test('fitLyricLine 短句保持标准字号(不放大)', () => {
 
 test('fitLyricLine 优先缩字号保持单行', () => {
   const { fitLyricLine } = require('../src/core/ass');
-  // 13-14 字 @150 超宽 → 缩字号单行（不断行）
-  const r = fitLyricLine('一二三四五六七八九十十一二三', 150, 1820);
+  // 20 字 @150 超宽 → 缩字号单行（不断行）
+  const r = fitLyricLine('一二三四五六七八九十十一二三四五六七八九', 150, 1820);
   assert.equal(r.cut, 0);              // 不断行（优先缩字号）
   assert.ok(r.fontSize >= 100);        // 还能保持较大字号
   assert.ok(r.fontSize < 150);         // 确实缩了
