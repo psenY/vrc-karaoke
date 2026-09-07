@@ -90,7 +90,22 @@ module.exports = {
       ko: ['ko', 'zh-Hans,zh-CN,zh', 'en', 'ja'],
     };
     const subLangs = langOrders[userLang] || langOrders.auto;
+    // 缓存复用：按语言优先级匹配 workDir 里已有的 json3（cleanup 不清 json3，重复生成免下载）
+    const cachedByLang = fs.readdirSync(workDir)
+      .filter(f => f.startsWith(videoId) && f.endsWith('.json3'))
+      .map(f => ({ lang: f.slice(videoId.length + 1, -'.json3'.length), path: path.join(workDir, f) }));
     for (const lang of subLangs) {
+      for (const want of lang.split(',')) {
+        const hit = cachedByLang.find(c => c.lang === want);
+        if (hit) {
+          lines = parseJson3(fs.readFileSync(hit.path, 'utf8'));
+          if (lines.length > 0) break;
+        }
+      }
+      if (lines.length > 0) break;
+    }
+    for (const lang of subLangs) {
+      if (lines.length > 0) break;
       try {
         await runYtdlp([
           '--skip-download', '--write-auto-sub', '--sub-format', 'json3',
