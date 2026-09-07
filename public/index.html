@@ -480,6 +480,25 @@
     </div>
   </el-card>
 
+  <el-card class="card" shadow="never" v-if="biliLogged || biliUploads.length">
+    <template #header>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>B站上传队列</b>
+        <span style="font-size:12px;color:var(--muted)">最近 {{ biliUploads.length }} 条</span>
+      </div>
+    </template>
+    <div v-if="!biliUploads.length" style="color:var(--muted);font-size:13px">暂无上传记录（勾选「生成完成自动投稿到B站」或在历史里点「投稿B站」后，这里显示实时进度）</div>
+    <div v-for="u in biliUploads" :key="u.id" style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-weight:600;color:var(--text);font-size:13px;flex:1;min-width:180px;word-break:break-all">{{ u.title }}</span>
+        <span :style="{color: u.phase === 'done' ? '#67c23a' : u.phase === 'failed' ? '#f56c6c' : '#e6a23c', fontSize: '13px'}">{{ u.phaseText }}{{ u.error ? '：' + u.error.slice(0, 60) : '' }}</span>
+        <a v-if="u.url" :href="u.url" target="_blank" style="color:#4a6cf7;font-size:13px">{{ u.bvid }}</a>
+        <span v-if="u.totalMB" style="color:var(--muted);font-size:12px">{{ u.uploadedMB }}/{{ u.totalMB }}MB</span>
+      </div>
+      <el-progress v-if="u.phase !== 'done' && u.phase !== 'failed'" :percentage="u.progress" :stroke-width="5" style="margin-top:4px"></el-progress>
+    </div>
+  </el-card>
+
   <el-card class="card" shadow="never">
     <template #header><b>访问控制</b></template>
     <!-- 未设置密码：设置密码 -->
@@ -521,6 +540,7 @@
           </el-select>
           <el-button size="small" plain @click="cleanCache">清理缓存</el-button>
           <el-button size="small" plain @click="cleanOrphan">清理孤儿</el-button>
+          <el-button size="small" plain @click="dedupHistory">清理重复</el-button>
           <el-button v-if="historySelected.length || mobileSelected.length" size="small" type="danger" plain @click="batchDeleteHistory">删除选中({{ (historySelected.length || mobileSelected.length) }})</el-button>
           <el-button v-if="history.length" size="small" type="danger" plain @click="clearHistory">清空</el-button>
         </div>
@@ -646,6 +666,7 @@ createApp({
       biliQrKey: '',
       biliQrLoading: false,
       autoBili: false,
+      biliUploads: [],
       biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130 },
       localAudio: '',
       localLrc: '',
@@ -1323,6 +1344,15 @@ createApp({
         this.$message.success(b.logged ? 'B站登录有效' : 'B站登录已失效');
       }
     },
+    async loadBiliUploads() {
+      if (!this.biliLogged) return;
+      const r = await this.get('/api/bili/uploads');
+      if (r.ok) this.biliUploads = r.uploads || [];
+    },
+    async dedupHistory() {
+      const r = await this.post('/api/history/dedup', {});
+      if (r.ok) { this.$message.success(r.removed ? `已清理 ${r.removed} 条重复记录` : '没有重复记录'); this.loadHistory(); }
+    },
     async saveBiliSettings() {
       const r = await this.post('/api/bili/settings', this.biliSettings);
       if (r.ok) this.$message.success('B站投稿设置已保存');
@@ -1504,7 +1534,7 @@ createApp({
     },
     startQueuePoll() {
       if (this.queueTimer) return;
-      this.queueTimer = setInterval(() => this.loadQueue(), 3000);
+      this.queueTimer = setInterval(() => { this.loadQueue(); if (this.biliLogged) this.loadBiliUploads(); }, 3000);
     },
     async setPassword() {
       if (!this.adminPassword) return this.$message.warning(this.needAuth ? '请输入新密码' : '请输入访问密码');

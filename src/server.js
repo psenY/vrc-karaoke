@@ -119,6 +119,7 @@ function runNext() {
             const title = renderBiliTpl(bs.titleTpl, vars).slice(0, 80);
             const desc = renderBiliTpl(bs.descTpl, vars);
             t.biliUploading = true;
+            const upRec = biliUpNew(title, result.outPath);
             // 投稿自动重试 3 次（网络波动容错，指数退避 30s/60s）
             (async () => {
               let up = null, lastErr = null;
@@ -132,6 +133,11 @@ function runNext() {
                     desc,
                     tid: bs.tid,
                     tags: bs.tags,
+                    onProgress: p => {
+                      const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
+                        p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;
+                      biliUpPatch(upRec, { phase: p.phase, phaseText, progress: p.phase === 'uploading' ? Math.round((p.chunk / p.chunks) * 95) : (p.phase === 'finish' ? 96 : p.phase === 'publish' ? 98 : 2), uploadedMB: p.uploadedMB || upRec.uploadedMB, totalMB: p.totalMB || upRec.totalMB });
+                    },
                   });
                 } catch (err) {
                   lastErr = err;
@@ -141,12 +147,14 @@ function runNext() {
               }
               t.biliUploading = false;
               if (up) {
+                biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
                 t.biliUrl = up.url;
                 t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
                 appendHistory({ input, title: songTitle, source: result.meta.source, outPath: result.outPath, url: result.url, biliUrl: up.url, quality: result.quality, time: Date.now() });
                 console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
               } else {
                 t.biliError = lastErr ? lastErr.message : '未知错误';
+                biliUpPatch(upRec, { phase: 'failed', phaseText: '失败', error: t.biliError, end: Date.now() });
               }
             })();
           } else {
@@ -166,13 +174,24 @@ function runNext() {
 }
 
 // ---- 历史记录 ----
+// 去重：同 title 只保留最新一条
+function dedupeHistory(list) {
+  const seen = new Set();
+  const out = [];
+  for (const h of list) {
+    const key = h.title || h.outPath || JSON.stringify(h).slice(0, 50);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(h);
+  }
+  return out;
+}
 function readHistory() {
   try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); }
   catch (e) { return []; }
 }
 function appendHistory(entry) {
-  const h = readHistory();
-  h.unshift(entry);
+  const h = dedupeHistory([entry, ...readHistory()]);  // 同 title 只留最新
   try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(h.slice(0, 100), null, 2)); } catch (e) {}
 }
 
@@ -225,6 +244,22 @@ app.post('/api/login', (req, res) => {
 // 查询是否需要登录
 app.get('/api/auth-status', (req, res) => {
   res.json({ ok: true, needAuth: !!readConfig().adminPassword });
+});
+
+// ---- B站上传队列记录（透明化：进度/阶段/最近记录，内存保留最近 30 条）----
+const biliUploads = [];
+let biliUploadSeq = 0;
+function biliUpNew(title, outPath) {
+  const rec = { id: ++biliUploadSeq, title, outPath, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
+  biliUploads.unshift(rec);
+  if (biliUploads.length > 30) biliUploads.length = 30;
+  return rec;
+}
+function biliUpPatch(rec, patch) { if (rec) Object.assign(rec, patch); }
+
+// 上传队列（前端轮询）
+app.get('/api/bili/uploads', requireAuth, (req, res) => {
+  res.json({ ok: true, uploads: biliUploads.slice(0, 30) });
 });
 
 // ---- B站投稿模板渲染 ----
@@ -322,6 +357,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const hist = readHistory().find(h => h.outPath === safe);
   const q = (hist && hist.quality) || {};
   const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
+  const upRec = biliUpNew(renderBiliTpl(bs.titleTpl, vars).slice(0, 80), safe);
   try {
     const up = await bili.uploadVideo({
       cookies: cfg.biliCookies,
@@ -331,11 +367,18 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       desc: renderBiliTpl(bs.descTpl, vars),
       tid: bs.tid,
       tags: bs.tags,
+      onProgress: p => {
+        const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
+          p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;
+        biliUpPatch(upRec, { phase: p.phase, phaseText, progress: p.phase === 'uploading' ? Math.round((p.chunk / p.chunks) * 95) : (p.phase === 'finish' ? 96 : p.phase === 'publish' ? 98 : 2), uploadedMB: p.uploadedMB || upRec.uploadedMB, totalMB: p.totalMB || upRec.totalMB });
+      },
     });
+    biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
     appendHistory({ input: '', title: songTitle, source: 'bili-push', outPath: safe, biliUrl: up.url, quality: Object.keys(q).length ? q : undefined, time: Date.now() });
     console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
     res.json({ ok: true, url: up.url, bvid: up.bvid });
   } catch (e) {
+    biliUpPatch(upRec, { phase: 'failed', phaseText: '失败', error: e.message, end: Date.now() });
     console.error(`[B站投稿失败] ${songTitle}:`, e.message);
     res.json({ ok: false, error: e.message });
   }
@@ -531,6 +574,15 @@ app.post('/api/generate', (req, res) => {
 });
 
 // 历史记录
+// 清理现有历史中的重复（同 title 留最新）
+app.post('/api/history/dedup', requireAuth, (req, res) => {
+  const h = readHistory();
+  const before = h.length;
+  const out = dedupeHistory(h);
+  try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(out, null, 2)); } catch (e) {}
+  res.json({ ok: true, removed: before - out.length, kept: out.length });
+});
+
 app.get('/api/history', (req, res) => {
   res.json({ ok: true, history: readHistory() });
 });

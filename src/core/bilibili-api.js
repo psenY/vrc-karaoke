@@ -95,7 +95,8 @@ async function checkLogin(cookies) {
  * @param {object} opts { cookies, filePath, fileName, title, desc, tid, tags, coverBuffer? }
  */
 async function uploadVideo(opts) {
-  const { cookies, filePath, fileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat' } = opts;
+  const { cookies, filePath, fileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat', onProgress = null } = opts;
+  const report = (phase, extra = {}) => { try { onProgress && onProgress({ phase, ...extra }); } catch (e) {} };
   const ck = cookieString(cookies);
   const fs = require('fs');
   const stat = fs.statSync(filePath);
@@ -103,6 +104,7 @@ async function uploadVideo(opts) {
 
   // 1. 预上传
   const preUrl = `https://member.bilibili.com/preupload?name=${encodeURIComponent(fileName)}&size=${fileSize}&r=upos&profile=ugcupos/bup&ssl=0&version=2.8.12&upcdn=bda2&build=2081200`;
+  report('preupload');
   const pre = await request(preUrl, { headers: { Cookie: ck } });
   const preJ = JSON.parse(pre.text);
   if (!preJ.upos_uri) throw new Error('B站预上传失败: ' + (preJ.msg || pre.text.slice(0, 100)));
@@ -128,9 +130,11 @@ async function uploadVideo(opts) {
   const data = fs.readFileSync(filePath);
   const CHUNK = preJ.chunk_size || 10485760;
   const chunks = Math.ceil(fileSize / CHUNK);
+  report('uploading', { chunk: 0, chunks, totalMB: +(fileSize / 1048576).toFixed(1) });
   for (let c = 0; c < chunks; c++) {
     const start = c * CHUNK;
     const size = Math.min(CHUNK, fileSize - start);
+    report('uploading', { chunk: c + 1, chunks, uploadedMB: +(Math.min(start + size, fileSize) / 1048576).toFixed(1), totalMB: +(fileSize / 1048576).toFixed(1) });
     const q = new URLSearchParams({
       partNumber: c + 1, uploadId, chunk: c, chunks,
       size, start, end: start + size, total: fileSize,
@@ -144,6 +148,7 @@ async function uploadVideo(opts) {
     if (putRes.status !== 200) throw new Error(`B站分片上传失败(第${c + 1}/${chunks}片): HTTP ${putRes.status} ` + putRes.text.slice(0, 100));
   }
 
+  report('finish');
   // 2.3 finish（POST ?name&uploadId&biz_id&output=json&profile=ugcupos/bup + parts JSON）
   const parts = Array.from({ length: chunks }, (_, i) => ({ partNumber: i + 1, eTag: 'etag' }));
   const finQ = new URLSearchParams({
@@ -157,6 +162,7 @@ async function uploadVideo(opts) {
   try { finJ = JSON.parse(finRes.text || '{}'); } catch (e) {}
   if (finJ.OK !== 1) throw new Error('B站上传完成确认失败: ' + finRes.text.slice(0, 120));
 
+  report('publish');
   // 3. 投稿 add/v3
   const addBody = JSON.stringify({
     copyright: 1,
