@@ -954,7 +954,7 @@ createApp({
       const r = await this.post('/api/tasks', { ids });
       for (const t of (r.tasks || [])) {
         if (t.status === 'done') { completed++; success++; if (t.result && t.result.outPath) donePaths.push(t.result.outPath.split('/').pop()); }
-        else if (t.status === 'failed') { completed++; failed.push(t.title || t.id); failedIds.push(t.id); }
+        else if (t.status === 'failed') { completed++; failed.push({ name: t.title || t.id, error: t.error || '' }); failedIds.push(t.id); }
         else if (t.status === 'cancelled') completed++;
       }
       this.batchDonePaths = donePaths;
@@ -976,7 +976,7 @@ createApp({
       } else {
         this.batchProgress = `(全部完成 ${ids.length} 首 · 成功 ${success} · 失败 ${failed.length})`;
         if (failed.length) {
-          this.$message.error(`批量完成，失败 ${failed.length} 首：` + failed.join('、'));
+          this.$message.error(`批量完成，失败 ${failed.length} 首：` + failed.map(f => f.name + (f.error ? `（${f.error}）` : '')).join('、'));
           this.notifyDone(`批量完成，失败 ${failed.length} 首`, true);
         } else {
           this.$message.success(`批量完成 ${success} 首`);
