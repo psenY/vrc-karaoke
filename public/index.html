@@ -816,6 +816,8 @@ createApp({
     async doGenerate() {
       const input = this.selected ? this.selected.url : this.query.trim();
       if (!input) return this.$message.warning('请先搜索选歌，或直接粘贴链接');
+      // 开始生成前停止试听播放
+      if (this.trialAudio) { this.trialAudio.pause(); this.trialAudio = null; this.trialId = ''; }
       // 磁盘空间预警：剩余不足 300MB 时提示（无损视频单首可达 100-200MB）
       if (this.diskFree > 0 && this.diskFree < 300 * 1024 * 1024) {
         this.$message.warning(`磁盘剩余空间不足（${this.formatSize(this.diskFree)}），生成大体积视频可能失败，建议先清理缓存或孤儿文件`);
