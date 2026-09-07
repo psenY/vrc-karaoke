@@ -369,13 +369,15 @@
         <el-button v-if="batchDonePaths.length" size="small" plain @click="copyAllBatchLinks">复制全部链接({{ batchDonePaths.length }})</el-button>
       </div>
       <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
-        <div v-for="s in playlist" :key="s.url || s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
+        <div v-for="(s, i) in playlist" :key="s.url || s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
           <el-checkbox v-model="s.selected"></el-checkbox>
           <div style="min-width:0;flex:1">
             <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }}</div>
             <div style="color:var(--muted);font-size:13px">{{ s.artists }}</div>
           </div>
           <el-button v-if="isNeteaseUrl(s.url)" size="small" circle :type="trialId === s.id ? 'primary' : ''" @click="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
+          <el-button size="small" text :disabled="i === 0" @click="moveBatch(s, -1)">上移</el-button>
+          <el-button size="small" text :disabled="i === playlist.length - 1" @click="moveBatch(s, 1)">下移</el-button>
           <el-button size="small" text type="danger" @click="removeFromBatch(s)">移除</el-button>
         </div>
       </div>
@@ -679,6 +681,15 @@ createApp({
       try { localStorage.setItem('vrc_search', JSON.stringify({ query: this.query.trim(), platform: this.platform, songs: this.songs })); } catch (e) {}
     },
     // 批量列表单项移除
+    // 批量列表项上移/下移（调整生成顺序）
+    moveBatch(s, dir) {
+      const idx = this.playlist.findIndex(p => String(p.url || '') === String(s.url || '') && String(p.id) === String(s.id));
+      const to = idx + dir;
+      if (idx < 0 || to < 0 || to >= this.playlist.length) return;
+      const tmp = this.playlist[idx];
+      this.playlist[idx] = this.playlist[to];
+      this.playlist[to] = tmp;
+    },
     removeFromBatch(s) {
       const idx = this.playlist.findIndex(p => String(p.id) === String(s.id));
       if (idx >= 0) this.playlist.splice(idx, 1);
