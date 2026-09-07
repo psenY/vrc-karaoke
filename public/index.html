@@ -360,7 +360,7 @@
         <el-button v-if="batchFailed.length" size="small" type="danger" plain @click="retryFailedBatch">重试失败({{ batchFailed.length }})</el-button>
       </div>
       <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
-        <div v-for="s in playlist" :key="s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
+        <div v-for="s in playlist" :key="s.url || s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
           <el-checkbox v-model="s.selected"></el-checkbox>
           <div style="min-width:0;flex:1">
             <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }}</div>
@@ -674,7 +674,8 @@ createApp({
     },
     // 搜索结果加入批量列表（不必靠歌单解析）
     addToBatch(s) {
-      if (this.playlist.some(p => String(p.id) === String(s.id))) return this.$message.info('已在批量列表');
+      // 去重按 url+id（跨平台 id 可能相同：网易云/酷我同 id 是不同歌）
+      if (this.playlist.some(p => String(p.url || '') === String(s.url || '') && String(p.id) === String(s.id))) return this.$message.info('已在批量列表');
       this.playlist.push({ ...s, selected: true });
       this.$message.success(`已加入批量列表（共 ${this.playlist.length} 首）`);
     },
