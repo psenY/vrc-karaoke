@@ -169,3 +169,44 @@ test('fitLyricLine 英文长句在空格处断行', () => {
   // 断点应在空格后（不切单词）
   assert.ok(en[r.cut - 1] === ' ' || en[r.cut] === ' ' || r.cut >= en.length);
 });
+
+// ---- B站查重与历史去重 ----
+
+test('dedupeHistory 同title只留最新', () => {
+  const { dedupeHistory } = require('../src/core/bili-dedup');
+  const list = [
+    { title: 'A', time: 3 },
+    { title: 'B', time: 2 },
+    { title: 'A', time: 1 },  // 重复，丢（保留最新在前的A）
+  ];
+  const out = dedupeHistory(list);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].title, 'A');
+  assert.equal(out[0].time, 3);
+});
+
+test('findBiliDup 完全一致命中', () => {
+  const { findBiliDup } = require('../src/core/bili-dedup');
+  const hist = [{ title: '谁 (Live版) - 廖俊涛', biliUrl: 'https://www.bilibili.com/video/BV1' }];
+  assert.ok(findBiliDup(hist, '谁 (Live版) - 廖俊涛'));
+});
+
+test('findBiliDup 短标题只精确匹配(防误命中)', () => {
+  const { findBiliDup } = require('../src/core/bili-dedup');
+  const hist = [{ title: '谁 (Live版) - 廖俊涛', biliUrl: 'https://bilibili.com/BV1' }];
+  // "谁"是短标题：不该命中包含它的长标题
+  assert.equal(findBiliDup(hist, '谁'), null);
+  assert.equal(findBiliDup(hist, '谁的青春不迷茫'), null);
+});
+
+test('findBiliDup 长标题允许包含匹配', () => {
+  const { findBiliDup } = require('../src/core/bili-dedup');
+  const hist = [{ title: '夜空中最亮的星 - 逃跑计划 高清重制版', biliUrl: 'https://bilibili.com/BV2' }];
+  assert.ok(findBiliDup(hist, '夜空中最亮的星 - 逃跑计划'));  // query 是 hist 的子串
+});
+
+test('findBiliDup 无biliUrl的历史不参与查重', () => {
+  const { findBiliDup } = require('../src/core/bili-dedup');
+  const hist = [{ title: '夜空中最亮的星 - 逃跑计划' }];  // 没投过
+  assert.equal(findBiliDup(hist, '夜空中最亮的星 - 逃跑计划'), null);
+});

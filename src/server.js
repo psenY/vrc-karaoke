@@ -103,7 +103,7 @@ function runNext() {
     // 生成前B站查重：fetch 完成拿到歌名后回调，命中则中止（省下载/编码）
     options.checkBiliDup = (songTitle) => {
       if (getBiliSettings().checkScope !== 'generate') return false;
-      return findBiliDup(songTitle);
+      return findBiliDup(readHistory(), songTitle);
     };
     options.onSpawn = (proc) => {
       if (!t.procs) t.procs = [];
@@ -123,7 +123,7 @@ function runNext() {
             const songTitle = result.meta.title || '未命名';
             // 上传前查重（checkScope=upload 或 generate 都查）
             if (getBiliSettings().checkScope !== 'off') {
-              const dup = findBiliDup(songTitle);
+              const dup = findBiliDup(readHistory(), songTitle);
               if (dup) {
                 console.log(`[B站查重跳过] ${songTitle} 已投稿: ${dup.biliUrl}`);
                 t.biliError = `B站已投过（${dup.bvid || dup.biliUrl}），跳过重复投稿`;
@@ -209,18 +209,7 @@ function runNext() {
 }
 
 // ---- 历史记录 ----
-// 去重：同 title 只保留最新一条
-function dedupeHistory(list) {
-  const seen = new Set();
-  const out = [];
-  for (const h of list) {
-    const key = h.title || h.outPath || JSON.stringify(h).slice(0, 50);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(h);
-  }
-  return out;
-}
+const { dedupeHistory, findBiliDup } = require('./core/bili-dedup');
 function readHistory() {
   try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); }
   catch (e) { return []; }
@@ -323,20 +312,6 @@ function getBiliSettings() {
   }, cfg.biliSettings || {});
 }
 
-// B站查重：历史记录里该歌是否已有投稿（biliUrl 存在即本工具投过）
-// title 匹配：完全一致；或短标题（≤3字）精确匹配；长标题（≥4字）才允许相互包含
-// （防短歌名误命中：如"谁"会包含匹配到所有含"谁"字的标题导致误跳过）
-function findBiliDup(songTitle) {
-  if (!songTitle) return null;
-  const t = String(songTitle).toLowerCase();
-  return readHistory().find(h => {
-    if (!h.biliUrl || !h.title) return false;
-    const ht = String(h.title).toLowerCase();
-    if (ht === t) return true;
-    if (t.length <= 3 || ht.length <= 3) return false;  // 短标题只精确匹配
-    return ht.includes(t) || t.includes(ht);
-  }) || null;
-}
 
 // B站投稿设置读取/保存
 app.get('/api/bili/settings', requireAuth, (req, res) => {
@@ -418,7 +393,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const songTitle = (title || path.basename(safe)).replace(/\.mp4$/i, '');
   // 手动投稿查重（checkScope 非 off 时）
   if (getBiliSettings().checkScope !== 'off') {
-    const dup = findBiliDup(songTitle);
+    const dup = findBiliDup(readHistory(), songTitle);
     if (dup) return res.json({ ok: false, error: `B站已投过（${dup.bvid || '见历史'}），如需重投请关闭查重开关` });
   }
   // 模板渲染（quality 从匹配的历史项取，老记录无则空）
