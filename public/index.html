@@ -863,7 +863,10 @@ createApp({
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
           '<p style="color:#67c23a;font-weight:600;margin:0 0 12px">生成完成</p>' +
           '<video src="/output/' + this.escHtml(filename) + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
+          '<div style="display:flex;gap:10px;align-items:center">' +
           '<a href="/output/' + this.escHtml(filename) + '" download style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
+          '<el-button size="small" @click="copyLink(filename)">复制链接</el-button>' +
+          '</div>' +
           '</div>';
         this.loadHistory();
       } else if (r.status === 'failed') {
@@ -1087,6 +1090,15 @@ createApp({
       setTimeout(() => this.qrPoll(), 2000);
     },
     // 生成完成通知：页面标题提示 + 浏览器 Notification（无 emoji）
+    // 复制输出直链（分享到 VRChat/B站）
+    copyLink(filename) {
+      const url = location.origin + '/output/' + filename;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => this.$message.success('链接已复制')).catch(() => this.$message.success(url));
+      } else {
+        this.$message.success(url);
+      }
+    },
     notifyDone(msg, isFail) {
       const orig = document.title;
       document.title = (isFail ? '失败: ' : '完成: ') + (msg || '');
