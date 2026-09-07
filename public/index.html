@@ -357,10 +357,11 @@
       <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
         <div v-for="s in playlist" :key="s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
           <el-checkbox v-model="s.selected"></el-checkbox>
-          <div>
-            <div style="font-weight:600;color:var(--text)">{{ s.name }}</div>
+          <div style="min-width:0;flex:1">
+            <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }}</div>
             <div style="color:var(--muted);font-size:13px">{{ s.artists }}</div>
           </div>
+          <el-button size="small" text type="danger" @click="removeFromBatch(s)">移除</el-button>
         </div>
       </div>
     </div>
@@ -647,6 +648,11 @@ createApp({
       if (!r.songs.length) this.$message.info('无结果');
       // 保存搜索状态（刷新恢复）
       try { localStorage.setItem('vrc_search', JSON.stringify({ query: this.query.trim(), platform: this.platform, songs: this.songs })); } catch (e) {}
+    },
+    // 批量列表单项移除
+    removeFromBatch(s) {
+      const idx = this.playlist.findIndex(p => String(p.id) === String(s.id));
+      if (idx >= 0) this.playlist.splice(idx, 1);
     },
     // 清空批量列表
     clearPlaylist() {
