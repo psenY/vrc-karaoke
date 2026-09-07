@@ -630,8 +630,12 @@
   </el-dialog>
   <el-dialog v-model="biliQrVisible" title="B站扫码登录" :width="isMobile ? '86%' : '320px'" :close-on-click-modal="false">
     <div style="text-align:center">
-      <p style="color:var(--muted)">请用哔哩哔哩 App 扫码</p>
-      <img v-if="biliQrImg" :src="biliQrImg" style="width:220px;height:220px">
+      <p v-if="!biliQrExpired" style="color:var(--muted)">请用哔哩哔哩 App 扫码</p>
+      <p v-else style="color:#f56c6c">二维码已过期</p>
+      <img v-if="biliQrImg && !biliQrExpired" :src="biliQrImg" style="width:220px;height:220px">
+      <div v-if="biliQrExpired" style="margin-top:8px">
+        <el-button size="small" @click="startBiliQr">重新获取</el-button>
+      </div>
     </div>
   </el-dialog>
   <!-- 回到顶部浮动按钮（移动端长页面方便） -->
@@ -691,6 +695,7 @@ createApp({
       biliQrImg: '',
       biliQrKey: '',
       biliQrLoading: false,
+      biliQrExpired: false,
       autoBili: false,
       biliUploads: [],
       biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130, checkScope: "off", seasonId: 0 },
@@ -1381,6 +1386,7 @@ createApp({
         if (!r.ok) return this.$message.error(r.error || '二维码获取失败');
         this.biliQrKey = r.qrcodeKey;
         this.biliQrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(r.qrUrl);
+        this.biliQrExpired = false;
         this.biliQrVisible = true;
         this.biliPollLoop();
       } finally { this.biliQrLoading = false; }
@@ -1392,6 +1398,11 @@ createApp({
         this.$message.success('B站登录成功');
         const b = await this.get('/api/bili/status');
         if (b.ok) { this.biliLogged = !!b.logged; this.biliUname = b.uname || ''; }
+        return;
+      }
+      if (r.ok && r.code === 86038) {
+        // 二维码已过期：停止轮询，提示重新获取
+        this.biliQrExpired = true;
         return;
       }
       // 失败/未确认继续轮询（网络偶发失败重试，不因单次失败停止）
