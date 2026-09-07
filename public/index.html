@@ -174,7 +174,7 @@
         </el-select>
       </div>
     </div>
-    <el-collapse style="margin-top:8px">
+    <el-collapse style="margin-top:8px" v-model="advOpen">
       <el-collapse-item title="高级设置（分辨率 / 编码 / 质量）" name="adv">
         <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
           <el-button size="small" plain @click="resetDefaults">恢复默认参数</el-button>
@@ -524,6 +524,7 @@ createApp({
       searchOffset: 0,
       trialId: '',
       trialAudio: null,
+      advOpen: ['adv'],
       historySelected: [],
       mobileSelected: [],
       batchProgress: '',
