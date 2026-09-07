@@ -798,11 +798,12 @@ createApp({
       if (!ids.length) return;
       let completed = 0, success = 0;
       const failed = [];
-      for (const id of ids) {
-        const r = await this.get('/api/task/' + id);
-        if (r.status === 'done') { completed++; success++; }
-        else if (r.status === 'failed') { completed++; failed.push(r.title || id); }
-        else if (r.status === 'cancelled') completed++;
+      // 批量接口一次拿全部状态（大批量避免逐任务请求压力）
+      const r = await this.post('/api/tasks', { ids });
+      for (const t of (r.tasks || [])) {
+        if (t.status === 'done') { completed++; success++; }
+        else if (t.status === 'failed') { completed++; failed.push(t.title || t.id); }
+        else if (t.status === 'cancelled') completed++;
       }
       this.batchProgress = `(${completed}/${ids.length} 已完成 · 成功 ${success} · 失败 ${failed.length})`;
       if (completed < ids.length) {

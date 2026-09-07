@@ -516,6 +516,16 @@ app.get('/api/task/:id', (req, res) => {
   res.json({ ok: true, status: t.status, title: t.title, result: t.result, error: t.error, errorRaw: t.errorRaw || '', progress: t.progress, phase: t.phase, downloadProgress: t.downloadProgress });
 });
 
+// 批量任务状态（大批量 pollBatch 用，减少逐任务请求）
+app.post('/api/tasks', (req, res) => {
+  const { ids = [] } = req.body || {};
+  const list = ids.map(id => {
+    const t = tasks.get(id);
+    return t ? { id, status: t.status, title: t.title, error: t.error } : { id, status: 'missing' };
+  });
+  res.json({ ok: true, tasks: list });
+});
+
 // 队列状态（运行中 + 排队中）
 app.get('/api/queue', (req, res) => {
   const runningList = [...tasks.values()].filter(t => t.status === 'running').map(t => ({
