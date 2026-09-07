@@ -159,7 +159,7 @@
         <el-color-picker v-model="background"></el-color-picker>
       </div>
       <div class="opt">
-        <el-checkbox v-model="backgroundGradient">渐变</el-checkbox>
+        <el-checkbox v-model="backgroundGradient" title="背景从顶部色渐变到底部色（仅纯色背景模式生效）">渐变</el-checkbox>
         <el-color-picker v-model="backgroundBottom" :disabled="!backgroundGradient"></el-color-picker>
       </div>
       <div class="opt">
@@ -205,7 +205,7 @@
             </el-select>
           </div>
           <div class="opt">
-            <span>质量CRF</span>
+            <span title="CRF 越小画质越高、文件越大。歌词视频画面静态，23 即可">质量CRF</span>
             <el-select v-model="crf" style="width:100px">
               <el-option label="18(高)" :value="18"></el-option>
               <el-option label="20" :value="20"></el-option>
@@ -214,7 +214,7 @@
             </el-select>
           </div>
           <div class="opt">
-            <span>帧率</span>
+            <span title="歌词视频画面静态，15-24fps 观感接近，低帧率省体积">帧率</span>
             <el-select v-model="fps" style="width:100px">
               <el-option label="15" :value="15"></el-option>
               <el-option label="20" :value="20"></el-option>
@@ -224,7 +224,7 @@
             </el-select>
           </div>
           <div class="opt">
-            <span>音质</span>
+            <span title="网易云音质档位（VIP/SVIP 对应开放），免费档仅标准/较高">音质</span>
             <el-select v-model="audioLevel" style="width:180px">
               <el-option label="标准 128k" value="standard"></el-option>
               <el-option label="较高 192k" value="higher"></el-option>
@@ -248,10 +248,10 @@
             </el-select>
           </div>
           <div class="opt">
-            <el-checkbox v-model="flacAudio" :disabled="!canFlac">无损封装(FLAC,部分KTV房不兼容)</el-checkbox>
+            <el-checkbox v-model="flacAudio" :disabled="!canFlac" title="无损封装：音频保持 FLAC 码率（无损音源专用，部分 KTV 房播放器不兼容，默认关）">无损封装(FLAC,部分KTV房不兼容)</el-checkbox>
           </div>
           <div class="opt">
-            <span>YT字幕</span>
+            <span title="YouTube 自动字幕语言（日语歌选日文=原文）">YT字幕</span>
             <el-select v-model="subtitleLang" style="width:100px">
               <el-option label="自动" value="auto"></el-option>
               <el-option label="中文" value="zh"></el-option>
@@ -279,7 +279,7 @@
         </div>
         <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--muted)">片头</span>
-          <el-checkbox v-model="addIntro">3秒信息卡(项目/开发者/歌曲/音质/参数)</el-checkbox>
+          <el-checkbox v-model="addIntro" title="前置 3 秒信息卡：生成方/开发者/歌曲/音质码率/视频参数（自动生成）">信息卡(项目/开发者/歌曲/音质/参数)</el-checkbox>
         </div>
         <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--muted)">参数预设</span>
