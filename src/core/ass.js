@@ -150,15 +150,15 @@ function estTextWidth(text, fontSize) {
 }
 
 // 长句断行 + 字号自适应：单行放不下则拆两行（中文按字符对半、英文优先空格），
-// 两行时字号压到 ≤110（保证两行不跨槽位重叠），仍超则继续缩到 80
+// 两行时字号压到 ≤90（两行 ≤180px，配合翻译行总高不超过槽位间距，防溢出屏幕顶部），仍超则继续缩到 60
 function fitLyricLine(text, fontSize, maxWidth) {
   const str = String(text);
   if (estTextWidth(str, fontSize) <= maxWidth) return { cut: 0, fontSize };
   let cut = Math.floor(str.length / 2);
   const spaceIdx = str.lastIndexOf(' ', cut);
   if (spaceIdx > str.length * 0.25) cut = spaceIdx + 1;  // 英文优先在空格处断
-  let fs = Math.min(fontSize, 110);                       // 两行高度约束
-  while (fs >= 80) {
+  let fs = Math.min(fontSize, 90);                        // 两行高度约束
+  while (fs >= 60) {
     if (estTextWidth(str.slice(0, cut), fs) <= maxWidth && estTextWidth(str.slice(cut), fs) <= maxWidth) break;
     fs -= 10;
   }
@@ -251,13 +251,13 @@ function generateAss(lines, options = {}) {
     const fitted = fitLyricLine(curText, fontSize, maxWidth);
     let curFull = fitted.cut > 0 ? insertBreakAtTagged(highlightText, fitted.cut) : highlightText;
     if (fitted.fontSize !== fontSize) curFull = `{\\fs${fitted.fontSize}}` + curFull;
-    // 双语：当前句附加翻译（长翻译同样断行）
+    // 双语：当前句附加翻译。翻译保持单行（超长缩字号），总行数≤3 防上槽溢出屏幕顶部
     if (bilingual && cur.translation) {
-      const tf = fitLyricLine(cur.translation, transSize, maxWidth);
-      const transFull = tf.cut > 0
-        ? escapeAssText(cur.translation.slice(0, tf.cut)) + '\\N' + escapeAssText(cur.translation.slice(tf.cut))
-        : escapeAssText(cur.translation);
-      curFull += `\\N{\\rTrans}${transFull}`;
+      const fsTag = (() => {
+        const tw = estTextWidth(cur.translation, transSize);
+        return tw > maxWidth ? `{\\fs${Math.max(28, Math.round(transSize * maxWidth / tw))}}` : '';
+      })();
+      curFull += `\\N{\\rTrans}${fsTag}${escapeAssText(cur.translation)}`;
     }
 
     // 交替槽位：句 i 在槽位 i%2
@@ -276,11 +276,9 @@ function generateAss(lines, options = {}) {
         let nextFull = nfitted.cut > 0 ? insertBreakAtTagged(escapeAssText(nextText), nfitted.cut) : escapeAssText(nextText);
         if (nfitted.fontSize !== fontSize) nextFull = `{\\fs${nfitted.fontSize}}` + nextFull;
         if (bilingual && next.translation) {
-          const tf = fitLyricLine(next.translation, transSize, maxWidth);
-          const transFull = tf.cut > 0
-            ? escapeAssText(next.translation.slice(0, tf.cut)) + '\\N' + escapeAssText(next.translation.slice(tf.cut))
-            : escapeAssText(next.translation);
-          nextFull += `\\N{\\rTrans}${transFull}`;
+          const tw = estTextWidth(next.translation, transSize);
+          const fsTag = tw > maxWidth ? `{\\fs${Math.max(28, Math.round(transSize * maxWidth / tw))}}` : '';
+          nextFull += `\\N{\\rTrans}${fsTag}${escapeAssText(next.translation)}`;
         }
         const nextSlot = (i + 1) % 2;
         const nextMarginV = nextSlot === 0 ? topMarginV : bottomMarginV;

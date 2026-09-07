@@ -81,7 +81,8 @@ module.exports = {
       await runYtdlp(['-x', '--audio-format', 'mp3', '-o', base + '.%(ext)s', '--no-warnings', input]);
     }
 
-    // 3. json3 自动字幕（按语言优先级逐个尝试；用户可选字幕语言）
+    // 3. json3 自动字幕。auto=视频原语言优先（不带 --sub-lang，yt-dlp 拿原生自动字幕，
+    //    避免英文歌被 YouTube 的 zh-Hans 自动翻译字幕抢先导致全中文）；明确选择按语言。
     let lines = [];
     const userLang = options.subtitleLang || 'auto';
     const langOrders = {
@@ -92,37 +93,43 @@ module.exports = {
       ko: ['ko', 'zh-Hans,zh-CN,zh', 'en', 'ja'],
     };
     const subLangs = langOrders[userLang] || langOrders.auto;
-    // 缓存复用：按语言优先级匹配 workDir 里已有的 json3（cleanup 不清 json3，重复生成免下载）
+    const useNativeFirst = userLang === 'auto';
+    // 缓存复用（仅明确选择语言时按优先级匹配；auto 不用缓存——原语言优先）
     const cachedByLang = fs.readdirSync(workDir)
       .filter(f => f.startsWith(videoId) && f.endsWith('.json3'))
       .map(f => ({ lang: f.slice(videoId.length + 1, -'.json3'.length), path: path.join(workDir, f) }));
-    for (const lang of subLangs) {
-      for (const want of lang.split(',')) {
-        const hit = cachedByLang.find(c => c.lang === want);
-        if (hit) {
-          lines = parseJson3(fs.readFileSync(hit.path, 'utf8'));
-          if (lines.length > 0) break;
+    if (!useNativeFirst) {
+      for (const lang of subLangs) {
+        for (const want of lang.split(',')) {
+          const hit = cachedByLang.find(c => c.lang === want);
+          if (hit) {
+            lines = parseJson3(fs.readFileSync(hit.path, 'utf8'));
+            if (lines.length > 0) break;
+          }
         }
+        if (lines.length > 0) break;
       }
-      if (lines.length > 0) break;
     }
-    for (const lang of subLangs) {
+    // 原语言字幕（无 --sub-lang）优先于翻译字幕列表
+    const attempts = useNativeFirst
+      ? [{ lang: 'native', args: ['--skip-download', '--write-auto-sub', '--sub-format', 'json3', '-o', base, '--no-warnings', input] },
+         ...subLangs.map(lang => ({ lang, args: ['--skip-download', '--write-auto-sub', '--sub-format', 'json3', '--sub-lang', lang, '-o', base, '--no-warnings', input] }))]
+      : subLangs.map(lang => ({ lang, args: ['--skip-download', '--write-auto-sub', '--sub-format', 'json3', '--sub-lang', lang, '-o', base, '--no-warnings', input] }));
+    for (const attempt of attempts) {
       if (lines.length > 0) break;
       try {
-        await runYtdlp([
-          '--skip-download', '--write-auto-sub', '--sub-format', 'json3',
-          '--sub-lang', lang, '-o', base, '--no-warnings', input,
-        ]);
-        const json3Files = fs.readdirSync(workDir)
-          .filter(f => f.startsWith(videoId) && f.endsWith('.json3'))
-          .map(f => path.join(workDir, f))
-          .sort();
-        if (json3Files.length > 0) {
-          lines = parseJson3(fs.readFileSync(json3Files[0], 'utf8'));
+        const before = new Set(fs.readdirSync(workDir).filter(f => f.startsWith(videoId) && f.endsWith('.json3')));
+        await runYtdlp(attempt.args);
+        // 取本次新增的 json3（避免与缓存混淆），无新增则回退全部
+        const after = fs.readdirSync(workDir).filter(f => f.startsWith(videoId) && f.endsWith('.json3'));
+        const fresh = after.filter(f => !before.has(f));
+        const pick = fresh.length ? fresh : after;
+        if (pick.length > 0) {
+          lines = parseJson3(fs.readFileSync(path.join(workDir, pick[0]), 'utf8'));
           if (lines.length > 0) break;
         }
       } catch (e) {
-        console.log(`[提示] 字幕语言 ${lang} 下载失败:`, e.message.split('\n')[0]);
+        console.log(`[提示] 字幕语言 ${attempt.lang} 下载失败:`, e.message.split('\n')[0]);
       }
     }
 

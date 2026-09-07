@@ -148,7 +148,7 @@ test('fitLyricLine 长中文句断行+缩字', () => {
   const long = '这是一句非常非常长的中文歌词句子为了测试自动断行功能是否正常工作';
   const r = fitLyricLine(long, 150, 1720);
   assert.ok(r.cut > 0);                 // 断行
-  assert.ok(r.fontSize <= 110);         // 两行缩字防跨槽位
+  assert.ok(r.fontSize <= 90);         // 两行缩字防溢出屏幕顶部
   assert.ok(r.fontSize >= 80);
 });
 
