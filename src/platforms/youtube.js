@@ -26,10 +26,12 @@ function parseJson3(jsonText) {
   const events = data.events || [];
   const lines = [];
   for (const ev of events) {
-    const segs = (ev.segs || []).filter(s => {
-      const t = (s.utf8 || '').trim();
-      return t !== '' && !/^\[.*\]$/.test(t); // 过滤空与 [Music]/[Applause] 等标签
-    });
+    const segs = (ev.segs || []).map(s => ({ ...s, utf8: String(s.utf8 || '').replace(/[\n\r]+/g, ' ') }))
+      .map(s => ({ ...s, utf8: s.utf8.replace(/\s+/g, ' ') }))
+      .filter(s => {
+        const t = s.utf8.trim();
+        return t !== '' && !/^\[.*\]$/.test(t); // 过滤空与 [Music]/[Applause] 等标签
+      });
     if (segs.length === 0) continue;
     const evStart = ev.tStartMs || 0;
     const words = segs.map(s => ({ text: s.utf8, startMs: evStart + (s.tOffsetMs || 0) }));
