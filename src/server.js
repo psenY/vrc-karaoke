@@ -165,6 +165,15 @@ function runNext() {
               t.biliUploading = false;
               if (up) {
                 biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
+                // 自动加入合集（add/v3 的 season_id 不生效，需事后补挂；失败仅日志不影响投稿结果）
+                if (bs.seasonId) {
+                  const season = (await bili.listSeasons(cfg.biliCookies).catch(() => [])).find(s => s.id === bs.seasonId);
+                  if (season && season.sectionId) {
+                    await bili.addToSeason(cfg.biliCookies, { bvid: up.bvid, title, seasonId: bs.seasonId, sectionId: season.sectionId })
+                      .then(() => console.log(`[B站合集] 已加入合集 ${season.title}`))
+                      .catch(err => console.error(`[B站合集补挂失败] ${songTitle}:`, err.message));
+                  }
+                }
                 t.biliUrl = up.url;
                 t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
                 appendHistory({ input, title: songTitle, source: result.meta.source, outPath: result.outPath, url: result.url, biliUrl: up.url, quality: result.quality, time: Date.now() });
@@ -435,6 +444,14 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       },
     });
     biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
+    if (bs.seasonId) {
+      const season = (await bili.listSeasons(cfg.biliCookies).catch(() => [])).find(s => s.id === bs.seasonId);
+      if (season && season.sectionId) {
+        await bili.addToSeason(cfg.biliCookies, { bvid: up.bvid, title: songTitle, seasonId: bs.seasonId, sectionId: season.sectionId })
+          .then(() => console.log(`[B站合集] 已加入合集 ${season.title}`))
+          .catch(err => console.error(`[B站合集补挂失败] ${songTitle}:`, err.message));
+      }
+    }
     appendHistory({ input: '', title: songTitle, source: 'bili-push', outPath: safe, biliUrl: up.url, quality: Object.keys(q).length ? q : undefined, time: Date.now() });
     console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
     res.json({ ok: true, url: up.url, bvid: up.bvid });

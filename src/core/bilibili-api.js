@@ -203,8 +203,45 @@ async function listSeasons(cookies) {
   const r = await request('https://member.bilibili.com/x2/creative/web/seasons?pn=1&ps=50', { headers: { Cookie: cookieString(cookies), Referer: 'https://member.bilibili.com/' } });
   try {
     const j = JSON.parse(r.text);
-    return (j.data && j.data.seasons || []).map(s => ({ id: s.season.id, title: s.season.title, total: s.season.total || 0 }));
+    return (j.data && j.data.seasons || []).map(s => ({
+      id: s.season.id,
+      title: s.season.title,
+      sectionId: (s.sections && s.sections.sections && s.sections.sections[0] && s.sections.sections[0].id) || 0,
+      total: (s.sections && s.sections.sections && s.sections.sections[0] && s.sections.sections[0].epCount) || 0,
+    }));
   } catch (e) { return []; }
 }
 
-module.exports = { qrGenerate, qrPoll, cookieString, checkLogin, uploadVideo, listSeasons };
+/**
+ * 投稿后把视频补挂进合集（add/v3 的 season_id 不生效，必须事后 episodes/add，csrf 放 query）。
+ */
+async function addToSeason(cookies, { bvid, aid, cid, title, seasonId, sectionId }) {
+  if (!cid && bvid) {
+    const v = await request(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, { headers: { Cookie: cookieString(cookies) } });
+    try { cid = JSON.parse(v.text).data.cid; } catch (e) {}
+  }
+  if (!aid || !cid) throw new Error('无法获取视频 aid/cid，合集补挂失败');
+  const q = new URLSearchParams({ csrf: cookies.bili_jct });
+  const body = {
+    episodes: [{ aid: Number(aid), cid: Number(cid), title: title || '' }],
+    sectionId: Number(sectionId),
+    seasonId: Number(seasonId),
+    csrf: cookies.bili_jct,
+  };
+  const r = await request(`https://member.bilibili.com/x2/creative/web/season/section/episodes/add?${q}`, {
+    method: 'POST',
+    headers: {
+      Cookie: cookieString(cookies),
+      'Content-Type': 'application/json;charset=UTF-8',
+      Referer: 'https://member.bilibili.com/',
+      Origin: 'https://member.bilibili.com',
+    },
+    body: JSON.stringify(body),
+  });
+  let j = {};
+  try { j = JSON.parse(r.text || '{}'); } catch (e) {}
+  if (j.code !== 0) throw new Error('合集补挂失败: ' + (j.message || r.text.slice(0, 100)));
+  return { ok: true };
+}
+
+module.exports = { qrGenerate, qrPoll, cookieString, checkLogin, uploadVideo, listSeasons, addToSeason };
