@@ -368,6 +368,7 @@
         <el-button v-if="playlist.length" size="small" plain @click="clearPlaylist">清空</el-button>
         <span v-if="selectedCount" style="color:#67c23a">已选 {{ selectedCount }} 首</span>
         <span v-if="batchProgress" style="color:#e6a23c">{{ batchProgress }}</span>
+        <el-progress v-if="batchTaskIds.length && batchProgress" :percentage="batchPercent" :stroke-width="6" style="width:160px"></el-progress>
         <el-button v-if="batchFailed.length" size="small" type="danger" plain @click="retryFailedBatch">重试失败({{ batchFailed.length }})</el-button>
         <el-button v-if="batchDonePaths.length" size="small" plain @click="copyAllBatchLinks">复制全部链接({{ batchDonePaths.length }})</el-button>
       </div>
@@ -643,6 +644,11 @@ createApp({
     selectedCount() { return this.playlist.filter(s => s.selected).length; },
     allSelected() { return this.playlist.length > 0 && this.selectedCount === this.playlist.length; },
     someSelected() { return this.selectedCount > 0 && this.selectedCount < this.playlist.length; },
+    // 批量完成百分比（按已完成/总数，从 batchProgress 文本解析避免额外状态）
+    batchPercent() {
+      const m = (this.batchProgress || '').match(/(\d+)\/(\d+) 已完成/);
+      return m && +m[2] ? Math.round((+m[1] / +m[2]) * 100) : 0;
+    },
     vipLabel() {
       // 网易云 vipType: 0=普通 10=音乐包 11=黑胶VIP 110=黑胶SVIP
       const map = { 0: '普通用户', 10: '音乐包', 11: '黑胶VIP', 110: '黑胶SVIP' };
