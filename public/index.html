@@ -890,6 +890,7 @@ createApp({
         else this.$message.warning(`重试失败：${s.name}${r.error ? ' (' + r.error + ')' : ''}`);
       }
       this.batchFailed = [];
+      try { localStorage.setItem('vrc_batchFailed', '[]'); } catch (e) {}
       this.$message.success(`已重试 ${ok}/${list.length} 首`);
       if (ok) this.pollBatch();
     },
@@ -1072,6 +1073,7 @@ createApp({
       this.batchTaskIds = [];
       this.batchFailed = [];
       this.batchDonePaths = [];
+      try { localStorage.setItem('vrc_batchFailed', '[]'); } catch (e) {}
       this.batchTodo = todo.map(s => ({ id: String(s.id), name: s.name, url: `https://music.163.com/song?id=${s.id}` }));
       this.batchStartTime = Date.now();
       this.batchTotal = total; this.batchDone = 0;
@@ -1103,11 +1105,12 @@ createApp({
         else if (t.status === 'cancelled') completed++;
       }
       this.batchDonePaths = donePaths;
-      // 失败任务映射回歌曲（供"重试失败"）
+      // 失败任务映射回歌曲（供"重试失败"）；持久化到 localStorage（刷新页面恢复）
       this.batchFailed = failedIds.map(id => {
         const idx = this.batchTaskIds.indexOf(id);
         return this.batchTodo && this.batchTodo[idx] ? { ...this.batchTodo[idx], taskId: id } : null;
       }).filter(Boolean);
+      try { localStorage.setItem('vrc_batchFailed', JSON.stringify(this.batchFailed)); } catch (e) {}
       // 预计剩余时间（按已完成平均耗时估算）
       let remainText = '';
       if (this.batchStartTime && completed > 0 && completed < ids.length) {
@@ -1572,6 +1575,8 @@ createApp({
     },
     startQueuePoll() {
       if (this.queueTimer) return;
+      // 恢复批量失败列表（刷新不丢"重试失败"）
+      try { this.batchFailed = JSON.parse(localStorage.getItem('vrc_batchFailed') || '[]'); } catch (e) {}
       this.queueTimer = setInterval(() => { this.loadQueue(); if (this.biliLogged) this.loadBiliUploads(); }, 3000);
     },
     async setPassword() {
