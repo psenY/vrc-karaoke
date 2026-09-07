@@ -327,4 +327,4 @@ function generateAss(lines, options = {}) {
   return buildHeader(playResX, playResY, fontName, fontSize, { currentColor, nextColor, titleColor, progressColor }) + events.join('\n') + '\n';
 }
 
-module.exports = { generateAss, formatAssTime, segmentAss, buildWordHighlight, buildEstimatedHighlight, escapeAssText };
+module.exports = { generateAss, formatAssTime, segmentAss, buildWordHighlight, buildEstimatedHighlight, escapeAssText, fitLyricLine };

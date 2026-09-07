@@ -133,3 +133,30 @@ test('generateAss 下一句保持显示到它自己开始(gap 不空窗)', () =>
   // 第二句 Next: [0, 5000)（覆盖 gap 2s-5s）
   assert.ok(ass.includes('0:00:00.00,0:00:05.00,Next'));
 });
+
+// ---- 长句断行回归 ----
+
+test('fitLyricLine 短句不断行', () => {
+  const { fitLyricLine } = require('../src/core/ass');
+  const r = fitLyricLine('短句', 150, 1720);
+  assert.equal(r.cut, 0);
+  assert.equal(r.fontSize, 150);
+});
+
+test('fitLyricLine 长中文句断行+缩字', () => {
+  const { fitLyricLine } = require('../src/core/ass');
+  const long = '这是一句非常非常长的中文歌词句子为了测试自动断行功能是否正常工作';
+  const r = fitLyricLine(long, 150, 1720);
+  assert.ok(r.cut > 0);                 // 断行
+  assert.ok(r.fontSize <= 110);         // 两行缩字防跨槽位
+  assert.ok(r.fontSize >= 80);
+});
+
+test('fitLyricLine 英文长句在空格处断行', () => {
+  const { fitLyricLine } = require('../src/core/ass');
+  const en = 'This is a very long English lyric sentence that should wrap at word boundaries correctly';
+  const r = fitLyricLine(en, 150, 1720);
+  assert.ok(r.cut > 0);
+  // 断点应在空格后（不切单词）
+  assert.ok(en[r.cut - 1] === ' ' || en[r.cut] === ' ' || r.cut >= en.length);
+});
