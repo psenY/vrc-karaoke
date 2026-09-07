@@ -383,6 +383,14 @@ app.post('/api/bili/logout', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// 合集列表（投稿时选择自动加入）
+app.get('/api/bili/seasons', requireAuth, async (req, res) => {
+  const cfg = readConfig();
+  if (!cfg.biliCookies || !cfg.biliCookies.SESSDATA) return res.json({ ok: false, error: '未登录B站' });
+  const seasons = await bili.listSeasons(cfg.biliCookies).catch(() => []);
+  res.json({ ok: true, seasons });
+});
+
 // 手动补传：把已生成的历史视频投稿到B站（标题=歌名 - vrc-karaoke）
 app.post('/api/bili/push', requireAuth, async (req, res) => {
   const cfg = readConfig();
@@ -412,6 +420,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       desc: renderBiliTpl(bs.descTpl, vars),
       tid: bs.tid,
       tags: bs.tags,
+      seasonId: bs.seasonId || 0,
       onProgress: p => {
         const phaseText = p.phase === 'uploading' ? `上传分片 ${p.chunk}/${p.chunks}` :
           p.phase === 'preupload' ? '准备中' : p.phase === 'finish' ? '合并分片' : p.phase === 'publish' ? '提交投稿' : p.phase;

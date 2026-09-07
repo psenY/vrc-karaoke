@@ -487,6 +487,13 @@
             <el-option label="音乐·演奏" :value="59"></el-option>
             <el-option label="音乐·MV" :value="193"></el-option>
           </el-select>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted);width:56px">合集</span>
+          <el-select v-model="biliSettings.seasonId" size="small" style="width:220px" placeholder="不加入合集">
+            <el-option label="不加入合集" :value="0"></el-option>
+            <el-option v-for="s in biliSeasons" :key="s.id" :label="s.title + ' (' + (s.total || 0) + '个视频)'" :value="s.id"></el-option>
+          </el-select>
+          <span style="font-size:12px;color:var(--muted)">投稿后自动加入所选合集</span>
           <el-button size="small" type="primary" @click="saveBiliSettings">保存设置</el-button>
         </div>
       </div>
@@ -680,7 +687,8 @@ createApp({
       biliQrLoading: false,
       autoBili: false,
       biliUploads: [],
-      biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130, checkScope: "off" },
+      biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130, checkScope: "off", seasonId: 0 },
+      biliSeasons: [],
       localAudio: '',
       localLrc: '',
       localAudioFile: null,
@@ -1325,6 +1333,8 @@ createApp({
       if (b.ok) { this.biliLogged = !!b.logged; this.biliUname = b.uname || ''; }
       const bs = await this.get('/api/bili/settings');
       if (bs.ok && bs.settings) this.biliSettings = bs.settings;
+      const seas = await this.get('/api/bili/seasons');
+      if (seas.ok) this.biliSeasons = seas.seasons || [];
     },
     // B站扫码登录
     async startBiliQr() {
