@@ -59,7 +59,7 @@ module.exports = {
       name: e.title || '',
       artists: e.channel || '',
       album: '',
-      duration: e.duration || 0,
+      duration: (e.duration || 0) * 1000, // yt-dlp 秒 → 统一毫秒（前端 fmtDuration）
       fee: 0,
     }));
   },
