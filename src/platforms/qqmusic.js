@@ -20,8 +20,8 @@ function getJson(url, referer) {
   });
 }
 
-function searchSong(keywords, limit = 5) {
-  const url = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=${encodeURIComponent(keywords)}&format=json&p=1&n=${limit}&t=0`;
+function searchSong(keywords, limit = 5, page = 1) {
+  const url = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=${encodeURIComponent(keywords)}&format=json&p=${page}&n=${limit}&t=0`;
   return getJson(url).then(r => (r.data?.song?.list || []).map(s => ({
     id: s.songmid,
     name: s.songname,
@@ -72,7 +72,7 @@ module.exports = {
   id: 'qqmusic',
   name: 'QQ音乐',
 
-  search: (kw, offset = 0) => searchSong(kw, 5),
+  search: (kw, offset = 0, limit = 10) => searchSong(kw, limit, Math.floor(offset / limit) + 1),  // offset → 页码
 
   matches(input) {
     return /y\.qq\.com/.test(input || '');

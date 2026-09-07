@@ -43,8 +43,8 @@ function parseSearch(text) {
   return songs;
 }
 
-function searchSong(keywords, limit = 5) {
-  const url = `http://search.kuwo.cn/r.s?client=kt&all=${encodeURIComponent(keywords)}&pn=0&rn=${limit}&ft=music&strformat=json&encoding=utf8&mobi=1`;
+function searchSong(keywords, limit = 5, page = 1) {
+  const url = `http://search.kuwo.cn/r.s?client=kt&all=${encodeURIComponent(keywords)}&pn=${page - 1}&rn=${limit}&ft=music&strformat=json&encoding=utf8&mobi=1`;
   return get(url).then(parseSearch).then(songs => songs.map(s => ({
     id: s.id,
     name: s.name,
@@ -83,7 +83,7 @@ module.exports = {
   id: 'kuwo',
   name: '酷我音乐',
 
-  search: (kw, offset = 0) => searchSong(kw, 5),
+  search: (kw, offset = 0, limit = 10) => searchSong(kw, limit, Math.floor(offset / limit) + 1),  // offset → 页码(pn 0-based)
 
   matches(input) {
     return /kuwo\.cn/.test(input || '');
