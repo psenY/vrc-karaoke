@@ -140,11 +140,15 @@ function buildEstimatedHighlight(text, startMs, endMs, mode) {
   return out;
 }
 
-// 估算文本显示宽度（全角≈1字宽、半角≈0.5字宽，Noto Sans CJK 拉丁实测约0.5em），单位 px
+// 估算文本显示宽度（libass+Noto CJK 标尺渲染实测，单位 px）：
+// 中文/日文全角 0.74em、韩文谚文 0.63em、拉丁/半角 0.37em
 function estTextWidth(text, fontSize) {
   let units = 0;
   for (const ch of String(text)) {
-    units += ch.charCodeAt(0) > 255 ? 0.72 : 0.36;  // libass+Noto CJK 实测：全角≈0.72em(12字@150实测1300px)，半角≈0.36
+    const c = ch.charCodeAt(0);
+    if (c >= 0xac00 && c <= 0xd7af) units += 0.63;       // 韩文谚文
+    else if (c > 255) units += 0.70;                      // CJK(汉字/假名)/全角标点
+    else units += 0.37;                                   // 拉丁/数字/半角
   }
   return units * fontSize;
 }
