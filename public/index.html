@@ -361,6 +361,7 @@
             <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }}</div>
             <div style="color:var(--muted);font-size:13px">{{ s.artists }}</div>
           </div>
+          <el-button v-if="isNeteaseUrl(s.url)" size="small" circle :type="trialId === s.id ? 'primary' : ''" @click="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
           <el-button size="small" text type="danger" @click="removeFromBatch(s)">移除</el-button>
         </div>
       </div>
@@ -694,6 +695,10 @@ createApp({
       this.searchOffset += r.songs.length;
     },
     // 网易云 30s 试听（确认选对版本）
+    // 判断是否网易云链接（决定是否显示试听按钮）
+    isNeteaseUrl(url) {
+      return /music\.163\.com/.test(String(url || ''));
+    },
     async trialSong(s) {
       if (this.trialAudio) { this.trialAudio.pause(); this.trialAudio = null; }
       if (this.trialId === s.id) { this.trialId = ''; return; }
