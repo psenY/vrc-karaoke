@@ -273,15 +273,19 @@ app.get('/api/auth-status', (req, res) => {
 });
 
 // ---- B站上传队列记录（透明化：进度/阶段/最近记录，内存保留最近 30 条）----
-const biliUploads = [];
+const BILI_UPLOADS_FILE = path.join(ROOT, 'output', 'bili_uploads.json');
+let biliUploads = [];
 let biliUploadSeq = 0;
+try { biliUploads = JSON.parse(fs.readFileSync(BILI_UPLOADS_FILE, 'utf8')); biliUploadSeq = biliUploads.reduce((m, u) => Math.max(m, u.id || 0), 0); } catch (e) {}
+function biliUpSave() { try { fs.writeFileSync(BILI_UPLOADS_FILE, JSON.stringify(biliUploads.slice(0, 50), null, 2)); } catch (e) {} }
 function biliUpNew(title, outPath) {
   const rec = { id: ++biliUploadSeq, title, outPath, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
   biliUploads.unshift(rec);
-  if (biliUploads.length > 30) biliUploads.length = 30;
+  if (biliUploads.length > 50) biliUploads.length = 50;
+  biliUpSave();
   return rec;
 }
-function biliUpPatch(rec, patch) { if (rec) Object.assign(rec, patch); }
+function biliUpPatch(rec, patch) { if (rec) { Object.assign(rec, patch); biliUpSave(); } }
 
 // 上传队列（前端轮询）
 app.get('/api/bili/uploads', requireAuth, (req, res) => {
