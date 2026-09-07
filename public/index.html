@@ -373,6 +373,7 @@
       </div>
       <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
         <div v-for="(s, i) in playlist" :key="s.url || s.id" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border)">
+          <span style="width:22px;text-align:center;color:var(--muted);font-size:13px">{{ i + 1 }}</span>
           <el-checkbox v-model="s.selected"></el-checkbox>
           <div style="min-width:0;flex:1">
             <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }}</div>
