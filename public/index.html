@@ -509,6 +509,7 @@
         <template #default="scope">
           <a :href="'/output/' + scope.row.outPath.split('/').pop()" :download="dlName(scope.row)" style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(scope.row.outPath.split('/').pop())">预览</el-button>
+          <el-button v-if="biliLogged && !scope.row.biliUrl" size="small" type="success" text @click="pushBili(scope.row)">投稿B站</el-button>
           <el-button size="small" text @click="redoHistory(scope.row)">重做</el-button>
           <el-button size="small" text @click="copyLink(scope.row.outPath.split('/').pop())">复制</el-button>
           <el-button size="small" type="danger" text @click="deleteHistory(scope.row.outPath.split('/').pop())">删除</el-button>
@@ -529,6 +530,7 @@
         <div class="hist-actions" style="padding-left:28px">
           <a :href="'/output/' + h.outPath.split('/').pop()" :download="dlName(h)" style="color:#4a6cf7">下载</a>
           <el-button size="small" type="primary" text @click="previewVideo(h.outPath.split('/').pop())">预览</el-button>
+          <el-button v-if="biliLogged && !h.biliUrl" size="small" type="success" text @click="pushBili(h)">投稿B站</el-button>
           <el-button size="small" text @click="redoHistory(h)">重做</el-button>
           <el-button size="small" text @click="copyLink(h.outPath.split('/').pop())">复制</el-button>
           <el-button size="small" type="danger" text @click="deleteHistory(h.outPath.split('/').pop())">删除</el-button>
@@ -1293,6 +1295,19 @@ createApp({
     async biliLogout() {
       const r = await this.post('/api/bili/logout', {});
       if (r.ok) { this.biliLogged = false; this.biliUname = ''; this.$message.success('已退出B站登录'); }
+    },
+    // 手动补传：把历史视频投稿到B站（投稿失败或未勾自动投稿的用）
+    async pushBili(h) {
+      const loading = this.$message({ message: '正在上传B站，请稍候…', duration: 0, type: 'info' });
+      try {
+        const r = await this.post('/api/bili/push', { outPath: h.outPath, title: h.title });
+        if (r.ok) {
+          this.$message.success('B站投稿成功：' + r.url);
+          this.loadHistory();
+        } else {
+          this.$message.error('B站投稿失败：' + (r.error || '未知错误'));
+        }
+      } finally { loading.close(); }
     },
     // 刷新网易云账户信息（重新拉取 nickname/vip/等级）
     async refreshAccount() {

@@ -114,25 +114,36 @@ function runNext() {
           if (cfg.biliCookies && cfg.biliCookies.SESSDATA) {
             const songTitle = result.meta.title || '未命名';
             t.biliUploading = true;
-            bili.uploadVideo({
-              cookies: cfg.biliCookies,
-              filePath: result.outPath,
-              fileName: result.outPath.split('/').pop(),
-              title: `${songTitle} - vrc-karaoke`,
-              desc: `本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke`,
-              tid: 130,
-              tags: '卡拉OK,歌词,VRChat',
-            }).then(up => {
+            // 投稿自动重试 3 次（网络波动容错，指数退避 30s/60s）
+            (async () => {
+              let up = null, lastErr = null;
+              for (let attempt = 1; attempt <= 3 && !up; attempt++) {
+                try {
+                  up = await bili.uploadVideo({
+                    cookies: cfg.biliCookies,
+                    filePath: result.outPath,
+                    fileName: result.outPath.split('/').pop(),
+                    title: `${songTitle} - vrc-karaoke`,
+                    desc: `本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke`,
+                    tid: 130,
+                    tags: '卡拉OK,歌词,VRChat',
+                  });
+                } catch (err) {
+                  lastErr = err;
+                  console.error(`[B站投稿失败] ${songTitle} 第${attempt}/3次:`, err.message);
+                  if (attempt < 3) await new Promise(r => setTimeout(r, 30000 * attempt));
+                }
+              }
               t.biliUploading = false;
-              t.biliUrl = up.url;
-              t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
-              appendHistory({ input, title: songTitle, source: result.meta.source, outPath: result.outPath, url: result.url, biliUrl: up.url, time: Date.now() });
-              console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
-            }).catch(err => {
-              t.biliUploading = false;
-              t.biliError = err.message;
-              console.error(`[B站投稿失败] ${songTitle}:`, err.message);
-            });
+              if (up) {
+                t.biliUrl = up.url;
+                t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
+                appendHistory({ input, title: songTitle, source: result.meta.source, outPath: result.outPath, url: result.url, biliUrl: up.url, time: Date.now() });
+                console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
+              } else {
+                t.biliError = lastErr ? lastErr.message : '未知错误';
+              }
+            })();
           } else {
             t.biliError = '未登录B站，自动上传跳过';
           }
@@ -252,6 +263,34 @@ app.post('/api/bili/logout', requireAuth, (req, res) => {
   delete cfg.biliCookies;
   writeConfig(cfg);
   res.json({ ok: true });
+});
+
+// 手动补传：把已生成的历史视频投稿到B站（标题=歌名 - vrc-karaoke）
+app.post('/api/bili/push', requireAuth, async (req, res) => {
+  const cfg = readConfig();
+  if (!cfg.biliCookies || !cfg.biliCookies.SESSDATA) return res.json({ ok: false, error: '未登录B站' });
+  const { outPath, title } = req.body || {};
+  // 安全：只允许 output 目录内的已有文件
+  const safe = path.resolve(ROOT, 'output', path.basename(String(outPath || '')));
+  if (!safe.startsWith(path.join(ROOT, 'output')) || !fs.existsSync(safe)) return res.json({ ok: false, error: '视频文件不存在' });
+  const songTitle = (title || path.basename(safe)).replace(/\.mp4$/i, '');
+  try {
+    const up = await bili.uploadVideo({
+      cookies: cfg.biliCookies,
+      filePath: safe,
+      fileName: path.basename(safe),
+      title: `${songTitle} - vrc-karaoke`,
+      desc: `本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke`,
+      tid: 130,
+      tags: '卡拉OK,歌词,VRChat',
+    });
+    appendHistory({ input: '', title: songTitle, source: 'bili-push', outPath: safe, biliUrl: up.url, time: Date.now() });
+    console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
+    res.json({ ok: true, url: up.url, bvid: up.bvid });
+  } catch (e) {
+    console.error(`[B站投稿失败] ${songTitle}:`, e.message);
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 // 鉴权中间件（未启用密码时放行；启用后需 token，token 24 小时过期）
