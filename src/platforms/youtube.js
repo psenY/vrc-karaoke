@@ -7,13 +7,26 @@ const { probeDuration } = require('../core/ffmpeg');
 
 const PROXY = process.env.YTDLP_PROXY || 'http://192.168.100.1:7890';
 
-function runYtdlp(args) {
+function runYtdlp(args, onLine = null) {
   return new Promise((resolve, reject) => {
     const fullArgs = ['--proxy', PROXY, '--js-runtimes', `node:${process.execPath}`, ...args];
-    execFile('yt-dlp', fullArgs, { maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+    const child = execFile('yt-dlp', fullArgs, { maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) reject(new Error((stderr || err.message).slice(-1500)));
       else resolve(stdout);
     });
+    // 逐行回调（下载进度：--newline 时 [download] xx.x% 每块刷新一行）
+    if (typeof onLine === 'function') {
+      let buf = '';
+      child.stdout.on('data', c => {
+        buf += c.toString();
+        let idx;
+        while ((idx = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, idx).trim();
+          buf = buf.slice(idx + 1);
+          if (line) onLine(line);
+        }
+      });
+    }
   });
 }
 
@@ -85,7 +98,11 @@ module.exports = {
     // 2. 下载音频（转 mp3，有缓存则复用）
     const audioPath = base + '.mp3';
     if (!fs.existsSync(audioPath)) {
-      await runYtdlp(['-x', '--audio-format', 'mp3', '-o', base + '.%(ext)s', '--no-warnings', input]);
+      const onLine = typeof options.onProgress === 'function' ? (line) => {
+        const m = line.match(/\[download\]\s+([0-9.]+)%/);
+        if (m) options.onProgress(parseFloat(m[1]) / 100);
+      } : null;
+      await runYtdlp(['-x', '--audio-format', 'mp3', '--newline', '-o', base + '.%(ext)s', '--no-warnings', input], onLine);
     }
 
     // 3. json3 自动字幕。auto=视频原语言优先（不带 --sub-lang，yt-dlp 拿原生自动字幕，
