@@ -179,6 +179,14 @@ docker compose up -d --build
 2. **依赖**:装 ffmpeg(含 libass) + yt-dlp
 3. `node src/server.js`
 
+## 安全模型(公网部署)
+
+- **访问密码**:设置后所有 `/api` 与 `/output`(生成的视频)均需登录;未设置时全开放(仅建议内网)
+- **Token**:登录签发,24 小时过期;前端经 header 携带,`<video>/<a>` 标签经 `?token=` 查询参数传入
+- **暴力破解防护**:登录接口每 IP 连续失败 5 次锁定 5 分钟
+- **B站凭证**:扫码登录的 cookie 持久化在 `data/config.json`(.gitignore 已排除,不入库)
+- **直链注意**:复制的视频直链内含 token(24h 有效),适合短期分享;若链接外泄可修改访问密码使全部 token 失效
+
 ## 输出
 
 - MP4(H.264+AAC,默认 1080p/24fps,可调),纯色背景码率极低,一首 4 分钟歌约 8-10MB
