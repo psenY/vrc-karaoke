@@ -879,7 +879,7 @@ createApp({
     // 重试批量中失败的歌曲（用当时链接重新入队）
     // 复制批量全部成功视频的直链（换行分隔）
     copyAllBatchLinks() {
-      const urls = this.batchDonePaths.map(f => location.origin + '/output/' + f);
+      const urls = this.batchDonePaths.map(f => location.origin + this.outUrl(f));
       if (!urls.length) return;
       const text = urls.join('\n');
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1160,9 +1160,9 @@ createApp({
         this.result = '<div style="padding:16px;background:#1f2a1f;border:1px solid #2e5a2e;border-radius:8px">' +
           '<p style="color:#67c23a;font-weight:600;margin:0 0 12px">生成完成</p>' +
           (res.durationMs || res.size ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">时长 ' + (res.durationMs ? this.fmtElapsed(res.durationMs) : '?') + ' · 大小 ' + this.formatSize(res.size || 0) + '</p>' : '') +
-          '<video src="/output/' + this.escHtml(filename) + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
+          '<video src="' + this.escHtml(this.outUrl(filename)) + '" controls style="width:100%;max-height:380px;border-radius:8px;background:#000;margin-bottom:12px"></video>' +
           '<div style="display:flex;gap:10px;align-items:center">' +
-          '<a href="/output/' + this.escHtml(filename) + '" download="' + this.escHtml(dlName) + '" style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
+          '<a href="' + this.escHtml(this.outUrl(filename)) + '" download="' + this.escHtml(dlName) + '" style="display:inline-block;padding:8px 16px;background:#4a6cf7;color:#fff;border-radius:6px;text-decoration:none">下载 MP4</a>' +
           '<el-button size="small" @click="copyLink(filename)">复制链接</el-button>' +
           '</div>' +
           '</div>';
@@ -1236,8 +1236,13 @@ createApp({
       this.$message.success(`已删除 ${ok}/${files.length} 个`);
       this.loadHistory();
     },
+    // /output 资源 URL：启用访问密码时带 token（video/a 标签无法带 header，经 query 传入）
+    outUrl(filename) {
+      const base = '/output/' + filename;
+      return this.needAuth && this.token ? base + '?token=' + encodeURIComponent(this.token) : base;
+    },
     previewVideo(filename) {
-      this.previewUrl = '/output/' + filename;
+      this.previewUrl = this.outUrl(filename);
       this.previewVisible = true;
     },
     // 历史记录重新生成：用当时的歌曲链接 + 当前参数重新入队
@@ -1491,7 +1496,7 @@ createApp({
     // 生成完成通知：页面标题提示 + 浏览器 Notification（无 emoji）
     // 复制输出直链（分享到 VRChat/B站）
     copyLink(filename) {
-      const url = location.origin + '/output/' + filename;
+      const url = location.origin + this.outUrl(filename);
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(() => this.$message.success('链接已复制')).catch(() => this.$message.success(url));
       } else {

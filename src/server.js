@@ -43,7 +43,7 @@ app.get('/login', (req, res) => {
 });
 
 app.use(express.static(path.join(ROOT, 'public')));
-app.use('/output', express.static(path.join(ROOT, 'output')));
+// /output 静态在 requireAuth 定义后挂载（启用密码时需登录才能访问生成的视频）
 
 const tasks = new Map();
 let taskSeq = 0;
@@ -452,6 +452,8 @@ function requireAuth(req, res, next) {
   return res.status(401).json({ ok: false, error: '未登录或登录已过期', needAuth: true });
 }
 app.use('/api', requireAuth);
+// 生成的视频属于用户数据：启用密码后必须登录才能访问（video/a 标签经 query token 传入）
+app.use('/output', requireAuth, express.static(path.join(ROOT, 'output')));
 
 // 设置/修改访问密码（需已登录；改密码需验证原密码；空密码=取消保护）
 app.post('/api/set-password', (req, res) => {
