@@ -84,7 +84,8 @@ async function generateVideo(input, options = {}) {
       const maskFilter = coverMask && coverMaskLevel > 0
         ? `,drawbox=w=iw:h=ih:t=fill:color=black@${(Math.min(90, coverMaskLevel) / 100).toFixed(2)}`
         : '';
-      await runFfmpeg(['-y', '-loop', '1', '-i', coverPath, '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=8:2${maskFilter}`, '-frames:v', '1', blurredPath], null, onSpawn);
+      // blur 20:5：MV 缩略图自带字幕/标题/时间戳等大文字需彻底模糊成色块（一次性预生成，不影响编码速度）
+      await runFfmpeg(['-y', '-loop', '1', '-i', coverPath, '-vf', `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=20:5${maskFilter}`, '-frames:v', '1', blurredPath], null, onSpawn);
       coverPath = blurredPath;  // 后续用已模糊的背景图
     } catch (e) {
       console.log('[提示] 封面处理失败，退回纯色背景:', e.message.split('\n')[0]);

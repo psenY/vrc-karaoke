@@ -141,6 +141,13 @@ module.exports = {
     if (!lines.length) throw new Error('未获取到 YouTube 字幕（该视频可能无自动字幕）');
 
     // 统一 lines 格式（加整句 text）
+    // ⚠️ json3 event 时间大量重叠（滚动字幕），若不裁剪，重叠窗口内新旧两句 Dialogue 同屏（三行歌词/跳变）
+    lines.sort((a, b) => a.startMs - b.startMs);
+    for (let i = 0; i < lines.length; i++) {
+      if (i + 1 < lines.length && lines[i].endMs > lines[i + 1].startMs) {
+        lines[i].endMs = lines[i + 1].startMs;  // 下一句开始时上一句必须消失
+      }
+    }
     const unifiedLines = lines.map(l => ({ ...l, text: l.words.map(w => w.text).join('') }));
     const audioMs = await probeDuration(audioPath);
 
