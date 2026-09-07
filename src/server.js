@@ -148,6 +148,7 @@ function runNext() {
                     fileName: result.outPath.split('/').pop(),
                     title,
                     desc,
+                    coverImageUrl: (result.meta && result.meta.coverUrl) || '',
                     tid: bs.tid,
                     tags: bs.tags,
                     onProgress: p => {
