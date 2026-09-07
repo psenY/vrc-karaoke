@@ -110,7 +110,10 @@ function runNext() {
       })
       .catch(err => {
         if (t.status === 'cancelled') return;
-        t.status = 'failed'; t.error = friendlyError(err.message);
+        t.status = 'failed';
+        t.error = friendlyError(err.message);   // 用户可读的友好提示
+        t.errorRaw = err.message || '';          // 原始技术错误（排查用）
+        console.error(`[任务失败 ${t.id}] ${t.title || ''}: ${t.errorRaw}`);
       })
       .finally(() => { running--; cleanupTasks(); runNext(); });
   }
@@ -510,7 +513,7 @@ app.post('/api/output/clean', (req, res) => {
 app.get('/api/task/:id', (req, res) => {
   const t = tasks.get(req.params.id);
   if (!t) return res.json({ ok: false, error: '任务不存在' });
-  res.json({ ok: true, status: t.status, title: t.title, result: t.result, error: t.error, progress: t.progress, phase: t.phase, downloadProgress: t.downloadProgress });
+  res.json({ ok: true, status: t.status, title: t.title, result: t.result, error: t.error, errorRaw: t.errorRaw || '', progress: t.progress, phase: t.phase, downloadProgress: t.downloadProgress });
 });
 
 // 队列状态（运行中 + 排队中）
