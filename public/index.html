@@ -1227,10 +1227,8 @@ createApp({
       } catch (e) {}
     },
     loadAll() {
-      this.loadHistory();
-      this.loadConfig();
-      this.loadQueue();
-      this.loadStats();
+      // 并行加载（互不依赖，减少串行等待）
+      Promise.all([this.loadHistory(), this.loadConfig(), this.loadQueue(), this.loadStats()]);
     },
     startQueuePoll() {
       if (this.queueTimer) return;
