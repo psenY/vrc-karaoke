@@ -422,6 +422,17 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       onProgress: makeBiliProgressHandler(upRec),
     });
     biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
+    // 更新匹配的历史条目（同 outPath 或同 title），补 biliUrl——避免 append 空输入新记录被去重挤掉原记录
+    {
+      const hist = readHistory();
+      const target = hist.find(h => h.outPath === safe) || hist.find(h => h.title === songTitle && !h.biliUrl);
+      if (target) {
+        target.biliUrl = up.url;
+        try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(hist, null, 2)); } catch (e) {}
+      } else {
+        appendHistory({ input: '', title: songTitle, source: 'bili-push', outPath: safe, biliUrl: up.url, time: Date.now() });
+      }
+    }
     if (bs.seasonId) {
       const season = (await bili.listSeasons(cfg.biliCookies).catch(() => [])).find(s => s.id === bs.seasonId);
       if (season && season.sectionId) {
