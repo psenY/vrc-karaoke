@@ -877,6 +877,20 @@ process.on('uncaughtException', (err) => {
   console.error('[错误] 未捕获异常:', err.message || err);
 });
 
+// 内存防泄漏：周期清理过期 token 与已解除锁定的 loginFails 条目（30 分钟一次）
+setInterval(() => {
+  const now = Date.now();
+  let pruned = 0;
+  for (const [tk, ts] of tokens) {
+    if (now - ts >= TOKEN_TTL) { tokens.delete(tk); pruned++; }
+  }
+  for (const [ip, rec] of loginFails) {
+    if (rec.lockUntil && rec.lockUntil < now && rec.count === 0) { loginFails.delete(ip); pruned++; }
+    else if (rec.lockUntil && rec.lockUntil < now) { loginFails.delete(ip); pruned++; }  // 锁已过期的记录一并清
+  }
+  if (pruned) console.log(`[内存清理] 移除过期 token/锁定记录 ${pruned} 条`);
+}, 30 * 60 * 1000);
+
 // 优雅关闭（docker stop 时收到 SIGTERM）
 process.on('SIGTERM', () => {
   console.log('[提示] 收到 SIGTERM，正在关闭...');
