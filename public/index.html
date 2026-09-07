@@ -944,6 +944,7 @@ createApp({
       let done = 0;
       this.batchTaskIds = [];
       this.batchFailed = [];
+      this.batchDonePaths = [];
       this.batchTodo = todo.map(s => ({ id: String(s.id), name: s.name, url: `https://music.163.com/song?id=${s.id}` }));
       this.batchStartTime = Date.now();
       this.batchTotal = total; this.batchDone = 0;
