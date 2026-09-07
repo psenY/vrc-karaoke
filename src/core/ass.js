@@ -149,11 +149,18 @@ function estTextWidth(text, fontSize) {
   return units * fontSize;
 }
 
-// 长句适配：**优先缩字号保持单行**（fs 150→90），单行下限仍放不下才断两行（fs≤90 继续缩到 60）。
-// 两行 ≤180px、翻译行更小，总高不超过槽位间距（防溢出屏幕顶部）。
+// 长句适配：**按句子长短自适应字号占满屏宽**——
+// 短句放大（上限 fs200）、标准句 fs150、长句优先缩字号保持单行（下限 fs90），
+// 单行下限仍放不下才断两行（fs≤90 继续缩到 60）。总高不超过槽位间距（防溢出屏幕顶部）。
 function fitLyricLine(text, fontSize, maxWidth) {
   const str = String(text);
-  if (estTextWidth(str, fontSize) <= maxWidth) return { cut: 0, fontSize };
+  const w = estTextWidth(str, fontSize);
+  if (w <= maxWidth) {
+    // 放大到占满 ~94% 屏宽（上限 fs200）：短句更大更易读
+    const units = w / fontSize;
+    const fillFs = Math.floor((maxWidth * 0.94) / units);
+    return { cut: 0, fontSize: Math.max(fontSize, Math.min(200, fillFs)) };
+  }
   // 1. 优先：缩小字号保持单行
   let fs = fontSize;
   while (fs > 90) {

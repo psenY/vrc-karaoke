@@ -136,11 +136,11 @@ test('generateAss 下一句保持显示到它自己开始(gap 不空窗)', () =>
 
 // ---- 长句断行回归 ----
 
-test('fitLyricLine 短句不断行', () => {
+test('fitLyricLine 短句不断行(放大占满)', () => {
   const { fitLyricLine } = require('../src/core/ass');
   const r = fitLyricLine('短句', 150, 1720);
   assert.equal(r.cut, 0);
-  assert.equal(r.fontSize, 150);
+  assert.ok(r.fontSize >= 150 && r.fontSize <= 200);  // fill 放大（上限200）
 });
 
 test('fitLyricLine 优先缩字号保持单行', () => {
