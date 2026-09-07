@@ -34,6 +34,60 @@ async function request(url, { method = 'GET', headers = {}, body = null, timeout
   }
 }
 
+/**
+ * 从 URL 下载图片并上传到B站图床（投稿封面用）。返回图床 URL。
+ * 封面上传接口：POST x/vu/web/cover/up（form: fileUp=@图片, csrf）→ data.url
+ */
+async function uploadCoverFromUrl(cookies, imageUrl) {
+  // 1. 下载图片（buffer）
+  const img = await new Promise((resolve, reject) => {
+    const mod = imageUrl.startsWith('https') ? https : http;
+    const req = mod.get(imageUrl, { headers: { 'User-Agent': UA } }, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        // 跟随一次重定向
+        const r2 = mod.get(res.headers.location, { headers: { 'User-Agent': UA } }, r2res => {
+          const chunks = [];
+          r2res.on('data', c => chunks.push(c));
+          r2res.on('end', () => resolve({ status: r2res.statusCode, buf: Buffer.concat(chunks), type: r2res.headers['content-type'] || '' }));
+        });
+        r2.on('error', reject);
+        return;
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, buf: Buffer.concat(chunks), type: res.headers['content-type'] || '' }));
+    });
+    req.on('error', reject);
+    req.setTimeout(30000, () => req.destroy(new Error('封面下载超时')));
+  });
+  if (img.status !== 200 || !img.buf.length) throw new Error('封面下载失败 HTTP ' + img.status);
+
+  // 2. 上传到B站图床（multipart form）
+  const boundary = '----vrcform' + Date.now();
+  const fileName = 'cover.' + (img.type.includes('png') ? 'png' : 'jpg');
+  const formParts = [];
+  formParts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="fileUp"; filename="${fileName}"\r\nContent-Type: ${img.type || 'image/jpeg'}\r\n\r\n`));
+  formParts.push(img.buf);
+  formParts.push(Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="csrf"\r\n\r\n${cookies.bili_jct}\r\n`));
+  formParts.push(Buffer.from(`--${boundary}--\r\n`));
+  const formBody = Buffer.concat(formParts);
+
+  const upRes = await request('https://member.bilibili.com/x/vu/web/cover/up', {
+    method: 'POST',
+    headers: {
+      Cookie: cookieString(cookies),
+      'Content-Type': 'multipart/form-data; boundary=' + boundary,
+      Referer: 'https://member.bilibili.com/',
+      'Content-Length': formBody.length,
+    },
+    body: formBody,
+  });
+  let j = {};
+  try { j = JSON.parse(upRes.text || '{}'); } catch (e) {}
+  if (j.code !== 0 || !j.data || !j.data.url) throw new Error('封面上传失败: ' + (j.message || upRes.text.slice(0, 80)));
+  return j.data.url;
+}
+
 /** node http 原版请求（用于 upos init/finish：需要显式 Content-Length: 0，fetch/undici 会剥离 CL） */
 function requestRaw(url, { method = 'GET', headers = {}, body = null, timeoutMs = 30000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -95,7 +149,7 @@ async function checkLogin(cookies) {
  * @param {object} opts { cookies, filePath, fileName, title, desc, tid, tags, coverBuffer? }
  */
 async function uploadVideo(opts) {
-  const { cookies, filePath, fileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat', onProgress = null, seasonId = 0 } = opts;
+  const { cookies, filePath, fileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat', onProgress = null, seasonId = 0, coverImageUrl = '' } = opts;
   const report = (phase, extra = {}) => { try { onProgress && onProgress({ phase, ...extra }); } catch (e) {} };
   const ck = cookieString(cookies);
   const fs = require('fs');
@@ -163,8 +217,20 @@ async function uploadVideo(opts) {
   if (finJ.OK !== 1) throw new Error('B站上传完成确认失败: ' + finRes.text.slice(0, 120));
 
   report('publish');
+  // 2.5 封面（可选：从 URL 下载后上传到B站图床，add/v3 用返回的图片 URL；失败降级=自动截帧）
+  let coverUrl = '';
+  if (coverImageUrl) {
+    try {
+      coverUrl = await uploadCoverFromUrl(cookies, coverImageUrl);
+      console.log('[B站封面] 上传成功:', coverUrl.slice(0, 60));
+    } catch (e) {
+      console.log('[B站封面] 上传失败(降级自动截帧):', e.message);
+    }
+  }
+
   // 3. 投稿 add/v3
   const addBody = JSON.stringify({
+    ...(coverUrl ? { cover: coverUrl } : {}),
     copyright: 1,
     source: '',
     tid,
@@ -244,4 +310,4 @@ async function addToSeason(cookies, { bvid, aid, cid, title, seasonId, sectionId
   return { ok: true };
 }
 
-module.exports = { qrGenerate, qrPoll, cookieString, checkLogin, uploadVideo, listSeasons, addToSeason };
+module.exports = { qrGenerate, qrPoll, cookieString, checkLogin, uploadVideo, listSeasons, addToSeason, uploadCoverFromUrl };
