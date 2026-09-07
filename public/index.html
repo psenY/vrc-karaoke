@@ -287,6 +287,12 @@
           <span style="font-size:13px;color:var(--muted)">片头</span>
           <el-checkbox v-model="addIntro" title="前置 3 秒信息卡：生成方/开发者/歌曲/音质码率/视频参数（自动生成）">信息卡(项目/开发者/歌曲/音质/参数)</el-checkbox>
         </div>
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted)">B站投稿</span>
+          <el-checkbox v-model="autoBili" :disabled="!biliLogged" title="生成完成后自动投稿到B站（需先在下方扫码登录B站）">生成完成自动投稿到B站</el-checkbox>
+          <span v-if="autoBili && !biliLogged" style="color:#f56c6c;font-size:12px">请先扫码登录B站</span>
+          <span v-if="autoBili && biliLogged" style="font-size:12px;color:var(--muted)">标题=歌名 - vrc-karaoke，分区=音乐综合</span>
+        </div>
         <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--muted)">参数预设</span>
           <el-input v-model="presetName" placeholder="预设名称" size="small" style="width:130px"></el-input>
@@ -425,6 +431,28 @@
   </el-card>
 
   <el-card class="card" shadow="never">
+    <template #header>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <b>B站投稿</b>
+        <span v-if="biliLogged" style="color:#67c23a">已登录{{ biliUname ? '：' + biliUname : '' }}</span>
+        <span v-else style="color:var(--muted)">未登录</span>
+      </div>
+    </template>
+    <!-- 未登录：扫码 -->
+    <div v-if="!biliLogged">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <el-button size="small" type="success" @click="startBiliQr" :loading="biliQrLoading">扫码登录B站</el-button>
+        <span style="font-size:12px;color:var(--muted)">用哔哩哔哩 App 扫码，登录后生成完成可自动投稿</span>
+      </div>
+    </div>
+    <!-- 已登录：退出 -->
+    <div v-else style="display:flex;gap:10px;align-items:center">
+      <el-button size="small" plain @click="refreshBili">刷新状态</el-button>
+      <el-button size="small" type="danger" plain @click="biliLogout">退出登录</el-button>
+    </div>
+  </el-card>
+
+  <el-card class="card" shadow="never">
     <template #header><b>访问控制</b></template>
     <!-- 未设置密码：设置密码 -->
     <el-row v-if="!needAuth" :gutter="8">
@@ -524,6 +552,12 @@
       </div>
     </div>
   </el-dialog>
+  <el-dialog v-model="biliQrVisible" title="B站扫码登录" :width="isMobile ? '86%' : '320px'" :close-on-click-modal="false">
+    <div style="text-align:center">
+      <p style="color:var(--muted)">请用哔哩哔哩 App 扫码</p>
+      <img v-if="biliQrImg" :src="biliQrImg" style="width:220px;height:220px">
+    </div>
+  </el-dialog>
   <!-- 回到顶部浮动按钮（移动端长页面方便） -->
   <button v-if="showTop" @click="backTop" style="position:fixed;right:14px;bottom:20px;z-index:2000;width:40px;height:40px;border-radius:50%;border:none;background:#4a6cf7;color:#fff;font-size:18px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)">↑</button>
 
@@ -575,6 +609,13 @@ createApp({
       batchDone: 0,
       batchStartTime: 0,
       queuePaused: false,
+      biliLogged: false,
+      biliUname: '',
+      biliQrVisible: false,
+      biliQrImg: '',
+      biliQrKey: '',
+      biliQrLoading: false,
+      autoBili: false,
       localAudio: '',
       localLrc: '',
       localAudioFile: null,
@@ -825,6 +866,7 @@ createApp({
         coverMaskLevel: this.coverMaskLevel,
         background: this.bgHex(),
         backgroundBottom: this.backgroundGradient ? this.backgroundBottom : '',
+        autoBili: this.autoBili && this.biliLogged,
         segCount: this.segCount,
         resolution: this.resolution,
         codec: this.codec,
@@ -1213,6 +1255,44 @@ createApp({
         this.loginLevel = r.level || 0;
         this.vipType = r.vipType || 0;
       }
+      // B站登录状态
+      const b = await this.get('/api/bili/status');
+      if (b.ok) { this.biliLogged = !!b.logged; this.biliUname = b.uname || ''; }
+    },
+    // B站扫码登录
+    async startBiliQr() {
+      this.biliQrLoading = true;
+      try {
+        const r = await this.get('/api/bili/qr');
+        if (!r.ok) return this.$message.error(r.error || '二维码获取失败');
+        this.biliQrKey = r.qrcodeKey;
+        this.biliQrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(r.qrUrl);
+        this.biliQrVisible = true;
+        this.biliPollLoop();
+      } finally { this.biliQrLoading = false; }
+    },
+    async biliPollLoop() {
+      const r = await this.get('/api/bili/qr/check?key=' + this.biliQrKey);
+      if (!r.ok) return;
+      if (r.code === 0) {
+        this.biliQrVisible = false;
+        this.$message.success('B站登录成功');
+        const b = await this.get('/api/bili/status');
+        if (b.ok) { this.biliLogged = !!b.logged; this.biliUname = b.uname || ''; }
+        return;
+      }
+      if (this.biliQrVisible) setTimeout(() => this.biliPollLoop(), 2000);
+    },
+    async refreshBili() {
+      const b = await this.get('/api/bili/status');
+      if (b.ok) {
+        this.biliLogged = !!b.logged; this.biliUname = b.uname || '';
+        this.$message.success(b.logged ? 'B站登录有效' : 'B站登录已失效');
+      }
+    },
+    async biliLogout() {
+      const r = await this.post('/api/bili/logout', {});
+      if (r.ok) { this.biliLogged = false; this.biliUname = ''; this.$message.success('已退出B站登录'); }
     },
     // 刷新网易云账户信息（重新拉取 nickname/vip/等级）
     async refreshAccount() {

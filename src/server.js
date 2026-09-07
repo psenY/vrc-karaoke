@@ -108,6 +108,35 @@ function runNext() {
         t.result = result;
         t.title = result.meta.title;
         appendHistory({ input, title: result.meta.title, source: result.meta.source, outPath: result.outPath, url: result.url, time: Date.now() });
+        // 自动上传B站（可选开关；失败降级不阻断，错误信息附加到任务）
+        if (options.autoBili) {
+          const cfg = readConfig();
+          if (cfg.biliCookies && cfg.biliCookies.SESSDATA) {
+            const songTitle = result.meta.title || '未命名';
+            t.biliUploading = true;
+            bili.uploadVideo({
+              cookies: cfg.biliCookies,
+              filePath: result.outPath,
+              fileName: result.outPath.split('/').pop(),
+              title: `${songTitle} - vrc-karaoke`,
+              desc: `本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke`,
+              tid: 130,
+              tags: '卡拉OK,歌词,VRChat',
+            }).then(up => {
+              t.biliUploading = false;
+              t.biliUrl = up.url;
+              t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
+              appendHistory({ input, title: songTitle, source: result.meta.source, outPath: result.outPath, url: result.url, biliUrl: up.url, time: Date.now() });
+              console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
+            }).catch(err => {
+              t.biliUploading = false;
+              t.biliError = err.message;
+              console.error(`[B站投稿失败] ${songTitle}:`, err.message);
+            });
+          } else {
+            t.biliError = '未登录B站，自动上传跳过';
+          }
+        }
       })
       .catch(err => {
         if (t.status === 'cancelled') return;
@@ -180,6 +209,49 @@ app.post('/api/login', (req, res) => {
 // 查询是否需要登录
 app.get('/api/auth-status', (req, res) => {
   res.json({ ok: true, needAuth: !!readConfig().adminPassword });
+});
+
+// ---- B站投稿（扫码登录 + 自动上传）----
+const bili = require('./core/bilibili-api');
+const biliQrKeys = new Map(); // reqKey -> qrcodeKey（简化：单会话直接传 key）
+
+// B站扫码：生成二维码
+app.get('/api/bili/qr', requireAuth, async (req, res) => {
+  try {
+    const r = await bili.qrGenerate();
+    res.json({ ok: true, qrUrl: r.qrUrl, qrcodeKey: r.qrcodeKey });
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// B站扫码：轮询（成功返回 cookie 并保存 config）
+app.get('/api/bili/qr/check', requireAuth, async (req, res) => {
+  try {
+    const r = await bili.qrPoll(req.query.key || '');
+    if (r.code === 0 && r.cookies && r.cookies.SESSDATA) {
+      const cfg = readConfig();
+      cfg.biliCookies = r.cookies;
+      writeConfig(cfg);
+      res.json({ ok: true, code: 0, uname: '' });
+    } else {
+      res.json({ ok: true, code: r.code });
+    }
+  } catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+// B站登录状态
+app.get('/api/bili/status', requireAuth, async (req, res) => {
+  const cfg = readConfig();
+  if (!cfg.biliCookies || !cfg.biliCookies.SESSDATA) return res.json({ ok: true, logged: false });
+  const st = await bili.checkLogin(cfg.biliCookies).catch(() => ({ isLogin: false }));
+  res.json({ ok: true, logged: !!st.isLogin, uname: st.uname || '', level: st.level || 0 });
+});
+
+// B站退出登录
+app.post('/api/bili/logout', requireAuth, (req, res) => {
+  const cfg = readConfig();
+  delete cfg.biliCookies;
+  writeConfig(cfg);
+  res.json({ ok: true });
 });
 
 // 鉴权中间件（未启用密码时放行；启用后需 token，token 24 小时过期）
@@ -330,7 +402,7 @@ app.post('/api/config', (req, res) => {
 
 // 生成（异步任务）
 app.post('/api/generate', (req, res) => {
-  const { input, highlight, bilingual, background, backgroundBottom, upload, cookie, cover, coverMask, coverMaskLevel, segCount, resolution, codec, preset, crf, fps, audioBitrate, currentColor, nextColor, titleColor, progressColor, introText, audioLevel, flacAudio, subtitleLang } = req.body || {};
+  const { input, highlight, bilingual, background, backgroundBottom, upload, cookie, cover, coverMask, coverMaskLevel, segCount, resolution, codec, preset, crf, fps, audioBitrate, currentColor, nextColor, titleColor, progressColor, introText, audioLevel, flacAudio, subtitleLang, autoBili } = req.body || {};
   if (!input) return res.json({ ok: false, error: '缺少输入' });
   const taskId = 't' + (++taskSeq);
   const cfg = readConfig();
@@ -364,6 +436,7 @@ app.post('/api/generate', (req, res) => {
       audioLevel: audioLevel || 'higher',
       flacAudio: !!flacAudio,
       subtitleLang: subtitleLang || 'auto',
+      autoBili: !!autoBili,
     },
   });
   res.json({ ok: true, taskId });
