@@ -571,6 +571,8 @@ createApp({
       batchTodo: [],
       batchFailed: [],
       batchDonePaths: [],
+      batchTotal: 0,
+      batchDone: 0,
       batchStartTime: 0,
       queuePaused: false,
       localAudio: '',
@@ -644,10 +646,9 @@ createApp({
     selectedCount() { return this.playlist.filter(s => s.selected).length; },
     allSelected() { return this.playlist.length > 0 && this.selectedCount === this.playlist.length; },
     someSelected() { return this.selectedCount > 0 && this.selectedCount < this.playlist.length; },
-    // 批量完成百分比（按已完成/总数，从 batchProgress 文本解析避免额外状态）
+    // 批量完成百分比（batchTotal/batchDone 数值状态）
     batchPercent() {
-      const m = (this.batchProgress || '').match(/(\d+)\/(\d+) 已完成/);
-      return m && +m[2] ? Math.round((+m[1] / +m[2]) * 100) : 0;
+      return this.batchTotal ? Math.min(100, Math.round((this.batchDone / this.batchTotal) * 100)) : 0;
     },
     vipLabel() {
       // 网易云 vipType: 0=普通 10=音乐包 11=黑胶VIP 110=黑胶SVIP
@@ -938,6 +939,7 @@ createApp({
       this.batchFailed = [];
       this.batchTodo = todo.map(s => ({ id: String(s.id), name: s.name, url: `https://music.163.com/song?id=${s.id}` }));
       this.batchStartTime = Date.now();
+      this.batchTotal = total; this.batchDone = 0;
       this.batchProgress = `(0/${total} 已入队)`;
       if (skipped) this.$message.info(`已跳过 ${skipped} 首已生成过的歌`);
       for (const s of todo) {
@@ -946,7 +948,8 @@ createApp({
         else this.$message.warning(`入队失败：${s.name}${r.error ? ' (' + r.error + ')' : ''}`);
         done++;
         this.batchProgress = `(${done}/${total} 已入队)`;
-      }
+        this.batchDone = done;
+        this.batchProgress = `(${done}/${total} 已入队)`;
       this.pollBatch();
     },
     async pollBatch() {
@@ -976,6 +979,7 @@ createApp({
         const remainMin = Math.ceil((avgMs * (ids.length - completed)) / 60000);
         remainText = ` · 预计还需 ${remainMin} 分钟`;
       }
+      this.batchDone = completed;
       this.batchProgress = `(${completed}/${ids.length} 已完成 · 成功 ${success} · 失败 ${failed.length}${remainText})`;
       if (completed < ids.length) {
         setTimeout(() => this.pollBatch(), 3000);
