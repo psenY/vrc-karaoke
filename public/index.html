@@ -377,7 +377,7 @@
           <span style="width:22px;text-align:center;color:var(--muted);font-size:13px">{{ i + 1 }}</span>
           <el-checkbox v-model="s.selected"></el-checkbox>
           <div style="min-width:0;flex:1">
-            <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }}</div>
+            <div style="font-weight:600;color:var(--text);word-break:break-all">{{ s.name }} <span v-if="s.fee" style="color:#e6a23c;font-size:12px;font-weight:normal">VIP</span></div>
             <div style="color:var(--muted);font-size:13px">{{ s.artists }}</div>
           </div>
           <el-button v-if="isNeteaseUrl(s.url)" size="small" circle :type="trialId === s.id ? 'primary' : ''" @click="trialSong(s)">{{ trialId === s.id ? '⏸' : '▶' }}</el-button>
