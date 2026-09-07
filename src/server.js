@@ -107,12 +107,17 @@ function runNext() {
         t.status = 'done';
         t.result = result;
         t.title = result.meta.title;
-        appendHistory({ input, title: result.meta.title, source: result.meta.source, outPath: result.outPath, url: result.url, time: Date.now() });
+        appendHistory({ input, title: result.meta.title, source: result.meta.source, outPath: result.outPath, url: result.url, quality: result.quality, time: Date.now() });
         // 自动上传B站（可选开关；失败降级不阻断，错误信息附加到任务）
         if (options.autoBili) {
           const cfg = readConfig();
           if (cfg.biliCookies && cfg.biliCookies.SESSDATA) {
             const songTitle = result.meta.title || '未命名';
+            const q = result.quality || {};
+            const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || options.resolution || '' };
+            const bs = getBiliSettings();
+            const title = renderBiliTpl(bs.titleTpl, vars).slice(0, 80);
+            const desc = renderBiliTpl(bs.descTpl, vars);
             t.biliUploading = true;
             // 投稿自动重试 3 次（网络波动容错，指数退避 30s/60s）
             (async () => {
@@ -123,10 +128,10 @@ function runNext() {
                     cookies: cfg.biliCookies,
                     filePath: result.outPath,
                     fileName: result.outPath.split('/').pop(),
-                    title: `${songTitle} - vrc-karaoke`,
-                    desc: `本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke`,
-                    tid: 130,
-                    tags: '卡拉OK,歌词,VRChat',
+                    title,
+                    desc,
+                    tid: bs.tid,
+                    tags: bs.tags,
                   });
                 } catch (err) {
                   lastErr = err;
@@ -138,7 +143,7 @@ function runNext() {
               if (up) {
                 t.biliUrl = up.url;
                 t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
-                appendHistory({ input, title: songTitle, source: result.meta.source, outPath: result.outPath, url: result.url, biliUrl: up.url, time: Date.now() });
+                appendHistory({ input, title: songTitle, source: result.meta.source, outPath: result.outPath, url: result.url, biliUrl: up.url, quality: result.quality, time: Date.now() });
                 console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
               } else {
                 t.biliError = lastErr ? lastErr.message : '未知错误';
@@ -222,6 +227,44 @@ app.get('/api/auth-status', (req, res) => {
   res.json({ ok: true, needAuth: !!readConfig().adminPassword });
 });
 
+// ---- B站投稿模板渲染 ----
+// 变量：{歌名} {音质} {比特率} {分辨率} {日期}
+function renderBiliTpl(tpl, vars) {
+  return String(tpl || '')
+    .replace(/\{歌名\}/g, vars.songTitle)
+    .replace(/\{音质\}/g, vars.levelLabel)
+    .replace(/\{比特率\}/g, vars.brLabel)
+    .replace(/\{分辨率\}/g, vars.resolution)
+    .replace(/\{日期\}/g, new Date().toISOString().slice(0, 10));
+}
+
+function getBiliSettings() {
+  const cfg = readConfig();
+  return cfg.biliSettings || {
+    titleTpl: '{歌名} - vrc-karaoke',
+    descTpl: '本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke\n{歌名} | {音质} {比特率} | {分辨率} | {日期}',
+    tags: '卡拉OK,歌词,VRChat',
+    tid: 130,
+  };
+}
+
+// B站投稿设置读取/保存
+app.get('/api/bili/settings', requireAuth, (req, res) => {
+  res.json({ ok: true, settings: getBiliSettings() });
+});
+app.post('/api/bili/settings', requireAuth, (req, res) => {
+  const { titleTpl, descTpl, tags, tid } = req.body || {};
+  const cfg = readConfig();
+  cfg.biliSettings = {
+    titleTpl: String(titleTpl || '{歌名} - vrc-karaoke').slice(0, 160),
+    descTpl: String(descTpl || '').slice(0, 2000),
+    tags: String(tags || '卡拉OK,歌词,VRChat').slice(0, 200),
+    tid: Number(tid) || 130,
+  };
+  writeConfig(cfg);
+  res.json({ ok: true });
+});
+
 // ---- B站投稿（扫码登录 + 自动上传）----
 const bili = require('./core/bilibili-api');
 const biliQrKeys = new Map(); // reqKey -> qrcodeKey（简化：单会话直接传 key）
@@ -274,17 +317,22 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const safe = path.resolve(ROOT, 'output', path.basename(String(outPath || '')));
   if (!safe.startsWith(path.join(ROOT, 'output')) || !fs.existsSync(safe)) return res.json({ ok: false, error: '视频文件不存在' });
   const songTitle = (title || path.basename(safe)).replace(/\.mp4$/i, '');
+  // 模板渲染（quality 从匹配的历史项取，老记录无则空）
+  const bs = getBiliSettings();
+  const hist = readHistory().find(h => h.outPath === safe);
+  const q = (hist && hist.quality) || {};
+  const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
   try {
     const up = await bili.uploadVideo({
       cookies: cfg.biliCookies,
       filePath: safe,
       fileName: path.basename(safe),
-      title: `${songTitle} - vrc-karaoke`,
-      desc: `本视频由 vrc-karaoke 生成\nhttps://github.com/psenY/vrc-karaoke`,
-      tid: 130,
-      tags: '卡拉OK,歌词,VRChat',
+      title: renderBiliTpl(bs.titleTpl, vars).slice(0, 80),
+      desc: renderBiliTpl(bs.descTpl, vars),
+      tid: bs.tid,
+      tags: bs.tags,
     });
-    appendHistory({ input: '', title: songTitle, source: 'bili-push', outPath: safe, biliUrl: up.url, time: Date.now() });
+    appendHistory({ input: '', title: songTitle, source: 'bili-push', outPath: safe, biliUrl: up.url, quality: Object.keys(q).length ? q : undefined, time: Date.now() });
     console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
     res.json({ ok: true, url: up.url, bvid: up.bvid });
   } catch (e) {

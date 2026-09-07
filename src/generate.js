@@ -125,16 +125,13 @@ async function generateVideo(input, options = {}) {
   }
 
   // 3.2 片头信息卡（introText === 'AUTO' 时自动生成：生成方/开发者/歌曲/音质码率/参数）
-  // levelLabel/brLabel 供 5.5 前置片头片段复用
   let finalIntro = introText;
-  let levelLabel = '';
-  let brLabel = '';
+  // 音质标签/码率（无条件计算：片头信息卡与B站投稿模板共用）
+  const qualityLabels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
+  const levelLabel = qualityLabels[audioLevel] || audioLevel;
+  // 音频码率：无损封装(FLAC音源)显示 FLAC 音源码率；否则显示 AAC 目标码率
+  const brLabel = finalFlac ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
   if (introText === 'AUTO') {
-    const esc = escapeAssText;
-    const labels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
-    levelLabel = labels[audioLevel] || audioLevel;
-    // 音频码率：无损封装(FLAC音源)显示 FLAC 音源码率；否则显示 AAC 目标码率
-    brLabel = finalFlac ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
     finalIntro = 'on';  // 标记：需要前置片头片段
   }
 
@@ -241,7 +238,7 @@ async function generateVideo(input, options = {}) {
   // 结果附带视频大小/时长（前端结果区显示）
   let fileSize = 0;
   try { fileSize = fs.statSync(outPath).size; } catch (e) {}
-  return { outPath, meta: result.meta, highlight: h, size: fileSize, durationMs: result.audioMs || 0 };
+  return { outPath, meta: result.meta, highlight: h, size: fileSize, durationMs: result.audioMs || 0, quality: { levelLabel, brLabel, resolution, fps, preset, crf } };
   } finally {
     cleanupWorkDir(workDir);  // 任何结束方式(成功/失败/取消)都清理中间文件
   }

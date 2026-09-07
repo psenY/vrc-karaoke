@@ -445,10 +445,38 @@
         <span style="font-size:12px;color:var(--muted)">用哔哩哔哩 App 扫码，登录后生成完成可自动投稿</span>
       </div>
     </div>
-    <!-- 已登录：退出 -->
-    <div v-else style="display:flex;gap:10px;align-items:center">
-      <el-button size="small" plain @click="refreshBili">刷新状态</el-button>
-      <el-button size="small" type="danger" plain @click="biliLogout">退出登录</el-button>
+    <!-- 已登录：设置 + 退出 -->
+    <div v-else>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        <el-button size="small" plain @click="refreshBili">刷新状态</el-button>
+        <el-button size="small" type="danger" plain @click="biliLogout">退出登录</el-button>
+        <span style="font-size:12px;color:var(--muted)">模板变量：{歌名} {音质} {比特率} {分辨率} {日期}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted);width:56px">标题</span>
+          <el-input v-model="biliSettings.titleTpl" size="small" style="flex:1;min-width:240px" placeholder="{歌名} - vrc-karaoke"></el-input>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted);width:56px;margin-top:6px">简介</span>
+          <el-input v-model="biliSettings.descTpl" size="small" type="textarea" :rows="3" style="flex:1;min-width:240px"></el-input>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted);width:56px">标签</span>
+          <el-input v-model="biliSettings.tags" size="small" style="flex:1;min-width:240px" placeholder="卡拉OK,歌词,VRChat"></el-input>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted);width:56px">分区</span>
+          <el-select v-model="biliSettings.tid" size="small" style="width:160px">
+            <el-option label="音乐·音乐综合" :value="130"></el-option>
+            <el-option label="音乐·翻唱" :value="31"></el-option>
+            <el-option label="音乐·音乐现场" :value="243"></el-option>
+            <el-option label="音乐·演奏" :value="59"></el-option>
+            <el-option label="音乐·MV" :value="193"></el-option>
+          </el-select>
+          <el-button size="small" type="primary" @click="saveBiliSettings">保存设置</el-button>
+        </div>
+      </div>
     </div>
   </el-card>
 
@@ -618,6 +646,7 @@ createApp({
       biliQrKey: '',
       biliQrLoading: false,
       autoBili: false,
+      biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130 },
       localAudio: '',
       localLrc: '',
       localAudioFile: null,
@@ -1257,9 +1286,11 @@ createApp({
         this.loginLevel = r.level || 0;
         this.vipType = r.vipType || 0;
       }
-      // B站登录状态
+      // B站登录状态 + 投稿设置
       const b = await this.get('/api/bili/status');
       if (b.ok) { this.biliLogged = !!b.logged; this.biliUname = b.uname || ''; }
+      const bs = await this.get('/api/bili/settings');
+      if (bs.ok && bs.settings) this.biliSettings = bs.settings;
     },
     // B站扫码登录
     async startBiliQr() {
@@ -1291,6 +1322,11 @@ createApp({
         this.biliLogged = !!b.logged; this.biliUname = b.uname || '';
         this.$message.success(b.logged ? 'B站登录有效' : 'B站登录已失效');
       }
+    },
+    async saveBiliSettings() {
+      const r = await this.post('/api/bili/settings', this.biliSettings);
+      if (r.ok) this.$message.success('B站投稿设置已保存');
+      else this.$message.error(r.error || '保存失败');
     },
     async biliLogout() {
       const r = await this.post('/api/bili/logout', {});
