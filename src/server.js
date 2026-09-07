@@ -63,6 +63,10 @@ function friendlyError(msg) {
   if (m.includes('未找到歌词文件')) return '未找到歌词文件（需与音频同目录同名的 .lrc）';
   if (m.includes('ENOTFOUND') || m.includes('ECONNRESET') || m.includes('ETIMEDOUT')) return '网络错误，请稍后重试';
   if (m.includes('封面') && m.includes('下载')) return '封面下载失败（不影响生成，已用纯色背景）';
+  if (m.includes('fetch failed')) return '网络连接失败（B站上传或远程服务不可达），请稍后重试';
+  if (m.includes('CSRF')) return 'B站登录状态异常，请重新扫码登录后再试';
+  if (m.includes('B站上传')) return 'B站上传失败：' + m;
+  if (m.includes('B站投稿失败')) return 'B站投稿失败：' + m;
   return m;
 }
 
