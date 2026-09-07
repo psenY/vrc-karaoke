@@ -310,7 +310,10 @@
       </div>
     </div>
     <div class="result-box" v-html="result"></div>
-    <el-button v-if="retryVisible" type="warning" size="small" @click="retry" style="margin-top:8px">重试</el-button>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <el-button v-if="retryVisible" type="warning" size="small" @click="retry">重试</el-button>
+      <el-button v-if="result && !generating" size="small" plain @click="doGenerate">重新生成</el-button>
+    </div>
   </el-card>
 
   <el-card class="card" shadow="never" v-if="queue.length">
