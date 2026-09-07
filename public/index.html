@@ -349,6 +349,7 @@
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px">
         <span>歌单 <b>{{ playlistName }}</b> 共 {{ playlist.length }} 首</span>
         <el-checkbox :model-value="allSelected" :indeterminate="someSelected" @change="toggleAll">全选</el-checkbox>
+        <el-button v-if="playlist.length" size="small" plain @click="clearPlaylist">清空</el-button>
         <span v-if="selectedCount" style="color:#67c23a">已选 {{ selectedCount }} 首</span>
         <span v-if="batchProgress" style="color:#e6a23c">{{ batchProgress }}</span>
         <el-button v-if="batchFailed.length" size="small" type="danger" plain @click="retryFailedBatch">重试失败({{ batchFailed.length }})</el-button>
@@ -641,6 +642,16 @@ createApp({
       this.songs = r.songs;
       this.searchOffset = 10;
       if (!r.songs.length) this.$message.info('无结果');
+    },
+    // 清空批量列表
+    clearPlaylist() {
+      this.playlist = [];
+      this.playlistName = '';
+      this.batchTaskIds = [];
+      this.batchProgress = '';
+      this.batchFailed = [];
+      this.batchTodo = [];
+      this.$message.success('已清空批量列表');
     },
     // 搜索结果加入批量列表（不必靠歌单解析）
     addToBatch(s) {
