@@ -12,7 +12,30 @@ const crypto = require('crypto');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
-function request(url, { method = 'GET', headers = {}, body = null, timeoutMs = 30000 } = {}) {
+async function request(url, { method = 'GET', headers = {}, body = null, timeoutMs = 30000 } = {}) {
+  // 用 node 22 内置 fetch（undici）：header/body/Content-Length 处理更标准，upos 网关兼容性好
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'User-Agent': UA, ...headers },
+      body: body === null || body === undefined ? undefined : body,
+      signal: ac.signal,
+    });
+    const text = await res.text();
+    const h = {};
+    res.headers.forEach((v, k) => { h[k] = v; });
+    // set-cookie 需要特殊取（多个）
+    try { h['set-cookie'] = res.headers.getSetCookie ? res.headers.getSetCookie() : (h['set-cookie'] ? [h['set-cookie']] : []); } catch (e) {}
+    return { status: res.status, headers: h, text };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** node http 原版请求（用于 upos init/finish：需要显式 Content-Length: 0，fetch/undici 会剥离 CL） */
+function requestRaw(url, { method = 'GET', headers = {}, body = null, timeoutMs = 30000 } = {}) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http;
     const req = mod.request(url, { method, headers: { 'User-Agent': UA, ...headers } }, res => {
@@ -79,43 +102,60 @@ async function uploadVideo(opts) {
   const fileSize = stat.size;
 
   // 1. 预上传
-  const preUrl = `https://member.bilibili.com/preupload?name=${encodeURIComponent(fileName)}&size=${fileSize}&r=upos&profile=ugcfx/bup&ssl=0&version=2.14.0&upcdn=bda2&build=2100000&probe_version=20221109`;
+  const preUrl = `https://member.bilibili.com/preupload?name=${encodeURIComponent(fileName)}&size=${fileSize}&r=upos&profile=ugcupos/bup&ssl=0&version=2.8.12&upcdn=bda2&build=2081200`;
   const pre = await request(preUrl, { headers: { Cookie: ck } });
   const preJ = JSON.parse(pre.text);
   if (!preJ.upos_uri) throw new Error('B站预上传失败: ' + (preJ.msg || pre.text.slice(0, 100)));
   const uposUri = preJ.upos_uri;                      // upos://bucket/path
-  const bucket = uposUri.replace('upos://', '').split('/')[0];
-  const osPath = uposUri.replace(`upos://${bucket}/`, '');
-  const host = `upos-cs-up.${preJ.os === 'upos' ? 'acgvideo.com' : (preJ.endpoint || 'acgvideo.com')}`;
+  // osPath = 去掉 upos:// 前缀的完整路径（保留 bucket 段，对齐 biliup：https://endpoint/bucket/path）
+  const osPath = uposUri.replace(/^upos:\/\//, '');
+  // 上传域名用 preupload 返回的 endpoint（如 //upos-cs-upcdnbda2.bilivideo.com），旧 acgvideo.com 域名已废弃
+  const host = String(preJ.endpoint || '//upos-cs-upcdnbda2.bilivideo.com').replace(/^\/\//, '');
 
-  // 2. upos 上传（小文件单请求模式：init → PUT 数据 → finish）
+  // 2. upos 分片上传（严格对齐 biliup 协议：init=POST / 分片 PUT / finish=POST+parts JSON）
+  //    注意 upos 对无 body 的 PUT 返回 411（MissingContentLength），init/finish 必须用 POST
   const uploadHost = `https://${host}`;
-  // 2.1 init
-  const initUrl = `${uploadHost}/${osPath}?uploads&output=json&filesize=${fileSize}&partsize=${fileSize}&profile=ugcfx/bup&ups.ak=${preJ.upos_uri ? '' : ''}`;
-  const initRes = await request(initUrl, {
-    method: 'POST',
-    headers: { Cookie: ck, 'X-Upos-Auth': ck },
+
+  // 2.1 init（POST ?uploads&output=json → upload_id）
+  const initRes = await requestRaw(`${uploadHost}/${osPath}?uploads&output=json`, {
+    method: 'POST', headers: { 'X-Upos-Auth': preJ.auth, 'Content-Length': 0 },
   });
   const initJ = JSON.parse(initRes.text || '{}');
   const uploadId = initJ.upload_id;
-  if (!uploadId) throw new Error('B站上传初始化失败: ' + initRes.text.slice(0, 120));
+  if (!uploadId) throw new Error('B站上传初始化失败: ' + initRes.text.slice(0, 600));
 
-  // 2.2 PUT 数据（单分片）
+  // 2.2 分片 PUT（10MB/片，与 biliup chunk_size 一致；串行，超时按大小给足）
   const data = fs.readFileSync(filePath);
-  const putUrl = `${uploadHost}/${osPath}?partNumber=1&uploadId=${uploadId}&chunk=1&chunks=1&size=${fileSize}&start=0&end=${fileSize}&output=json`;
-  const putRes = await request(putUrl, {
-    method: 'PUT',
-    headers: { Cookie: ck, 'X-Upos-Auth': ck, 'Content-Type': 'application/octet-stream' },
-    body: data,
-  });
-  if (putRes.status !== 200) throw new Error('B站数据上传失败: HTTP ' + putRes.status);
+  const CHUNK = preJ.chunk_size || 10485760;
+  const chunks = Math.ceil(fileSize / CHUNK);
+  for (let c = 0; c < chunks; c++) {
+    const start = c * CHUNK;
+    const size = Math.min(CHUNK, fileSize - start);
+    const q = new URLSearchParams({
+      partNumber: c + 1, uploadId, chunk: c, chunks,
+      size, start, end: start + size, total: fileSize,
+    });
+    const putRes = await request(`${uploadHost}/${osPath}?${q}`, {
+      method: 'PUT',
+      headers: { 'X-Upos-Auth': preJ.auth, 'Content-Type': 'application/octet-stream' },
+      body: data.subarray(start, start + size),
+      timeoutMs: Math.max(300000, size / 1024),
+    });
+    if (putRes.status !== 200) throw new Error(`B站分片上传失败(第${c + 1}/${chunks}片): HTTP ${putRes.status} ` + putRes.text.slice(0, 100));
+  }
 
-  // 2.3 finish
-  const finUrl = `${uploadHost}/${osPath}?output=json&name=${encodeURIComponent(fileName)}&profile=ugcfx/bup&submit=finish&os=upos&uploadId=${uploadId}&biz_id=${preJ.biz_id || 0}`;
-  const finRes = await request(finUrl, { method: 'POST', headers: { Cookie: ck, 'X-Upos-Auth': ck }, body: '{}' });
+  // 2.3 finish（POST ?name&uploadId&biz_id&output=json&profile=ugcupos/bup + parts JSON）
+  const parts = Array.from({ length: chunks }, (_, i) => ({ partNumber: i + 1, eTag: 'etag' }));
+  const finQ = new URLSearchParams({
+    name: fileName, uploadId, biz_id: preJ.biz_id || 0,
+    output: 'json', profile: 'ugcupos/bup',
+  });
+  const finRes = await request(`${uploadHost}/${osPath}?${finQ}`, {
+    method: 'POST', headers: { 'X-Upos-Auth': preJ.auth }, body: JSON.stringify({ parts }),
+  });
   let finJ = {};
   try { finJ = JSON.parse(finRes.text || '{}'); } catch (e) {}
-  if (finJ.OK !== 1 && finJ.ok !== 1) throw new Error('B站上传完成确认失败: ' + finRes.text.slice(0, 120));
+  if (finJ.OK !== 1) throw new Error('B站上传完成确认失败: ' + finRes.text.slice(0, 120));
 
   // 3. 投稿 add/v3
   const addBody = JSON.stringify({
@@ -126,7 +166,7 @@ async function uploadVideo(opts) {
     desc_format_id: 0,
     desc: String(desc || '').slice(0, 2000),
     tag: tags,
-    videos: [{ filename: osPath, title: '合并投稿', desc: '' }],
+    videos: [{ filename: osPath.split("/").pop().replace(/\.[^.]*$/, ""), title: "合并投稿", desc: "" }],  // 对齐 biliup: splitext(basename(upos_uri))[0] 去扩展名
     csrf: cookies.bili_jct,
     dtime: undefined,
     dynamic: '',
@@ -134,9 +174,14 @@ async function uploadVideo(opts) {
     no_reprint: 1,
     subtitle: { open: 0, lan: '', list: [] },
   });
-  const addRes = await request('https://member.bilibili.com/x/vu/web/add/v3', {
+  const addRes = await request(`https://member.bilibili.com/x/vu/web/add/v3?csrf=${encodeURIComponent(cookies.bili_jct)}`, {
     method: 'POST',
-    headers: { Cookie: ck, 'Content-Type': 'application/json;charset=UTF-8', Referer: 'https://member.bilibili.com/platform/upload/video/frame' },
+    headers: {
+      Cookie: ck,
+      'Content-Type': 'application/json;charset=UTF-8',
+      Referer: 'https://member.bilibili.com/platform/upload/video/frame',
+      Origin: 'https://member.bilibili.com',
+    },
     body: addBody,
   });
   const addJ = JSON.parse(addRes.text || '{}');
