@@ -1385,7 +1385,7 @@ createApp({
         const r = await this.get('/api/bili/qr');
         if (!r.ok) return this.$message.error(r.error || '二维码获取失败');
         this.biliQrKey = r.qrcodeKey;
-        this.biliQrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(r.qrUrl);
+        this.biliQrImg = r.qrimg;  // 服务端本地生成（data URI），不经第三方
         this.biliQrExpired = false;
         this.biliQrVisible = true;
         this.biliPollLoop();

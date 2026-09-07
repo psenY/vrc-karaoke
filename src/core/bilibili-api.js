@@ -101,7 +101,10 @@ async function qrGenerate() {
   const r = await request('https://passport.bilibili.com/x/passport-login/web/qrcode/generate?source=main_web');
   const j = JSON.parse(r.text);
   if (j.code !== 0) throw new Error('B站二维码生成失败: ' + (j.message || j.code));
-  return { qrUrl: j.data.url, qrcodeKey: j.data.qrcode_key, qrimg: j.data.qrcode_image || '' };
+  // 服务端本地生成二维码图（qrcode 包，data URI）——不依赖第三方渲染服务
+  const QRCode = require('qrcode');
+  const qrimg = await QRCode.toDataURL(j.data.url, { width: 220, margin: 1 });
+  return { qrUrl: j.data.url, qrcodeKey: j.data.qrcode_key, qrimg };
 }
 
 /** 扫码登录：轮询状态。code: 86101=未扫码 86090=已扫未确认 86038=已过期 0=成功(含cookie) */
