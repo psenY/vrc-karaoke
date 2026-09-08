@@ -144,10 +144,24 @@ async function checkLogin(cookies) {
  * @param {object} opts { cookies, filePath, fileName, title, desc, tid, tags, coverBuffer? }
  */
 async function uploadVideo(opts) {
-  const { cookies, filePath, fileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat', onProgress = null, seasonId = 0, coverImageUrl = '', losslessMusic = false } = opts;
+  const { cookies, filePath: rawFilePath, fileName: rawFileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat', onProgress = null, seasonId = 0, coverImageUrl = '', losslessMusic = false } = opts;
   const report = (phase, extra = {}) => { try { onProgress && onProgress({ phase, ...extra }); } catch (e) {} };
   const ck = cookieString(cookies);
   const fs = require('fs');
+  let filePath = rawFilePath;
+  let fileName = rawFileName;
+  // Hi-Res 投稿：MP4 内 FLAC 音轨 B 站转码器不识别（降级 AAC）→ 转封装 MKV+FLAC（流复制无损，秒级）
+  if (losslessMusic && /\.mp4$/i.test(filePath)) {
+    const mkvPath = filePath.replace(/\.mp4$/i, '') + '_bili.mkv';
+    await new Promise((resolve, reject) => {
+      const { spawn } = require('child_process');
+      const ff = spawn('ffmpeg', ['-y', '-v', 'error', '-i', filePath, '-c', 'copy', mkvPath]);
+      ff.on('close', code => code === 0 ? resolve() : reject(new Error('MKV 转封装失败 exit ' + code)));
+      ff.on('error', reject);
+    });
+    filePath = mkvPath;
+    fileName = path.basename(mkvPath);
+  }
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
 
@@ -236,14 +250,21 @@ async function uploadVideo(opts) {
     videos: [{ filename: osPath.split("/").pop().replace(/\.[^.]*$/, ""), title: "合并投稿", desc: "" }],  // 对齐 biliup: splitext(basename(upos_uri))[0] 去扩展名
     csrf: cookies.bili_jct,
     lossless_music: losslessMusic ? 1 : 0,  // 无损音乐=Hi-Res 金标（需大会员+B站转码支持）
+    dolby: 0,                               // 杜比音效（音源支持时可开）
     ...(seasonId ? { season_id: seasonId } : {}),  // 自动加入合集（0/缺省=不加入）
-    dtime: undefined,
     dynamic: '',
-    open_elec: 0,
+    interactive: 0,
+    act_reserve_create: 0,
+    no_disturbance: 0,
     no_reprint: 1,
+    up_selection_reply: false,
+    up_close_reply: false,
+    up_close_danmu: false,
+    web_os: 3,
     subtitle: { open: 0, lan: '', list: [] },
   });
-  const addRes = await request(`https://member.bilibili.com/x/vu/web/add/v3?csrf=${encodeURIComponent(cookies.bili_jct)}`, {
+  const ts = Date.now();
+  const addRes = await request(`https://member.bilibili.com/x/vu/web/add/v3?ts=${ts}&csrf=${encodeURIComponent(cookies.bili_jct)}`, {
     method: 'POST',
     headers: {
       Cookie: ck,
@@ -255,8 +276,11 @@ async function uploadVideo(opts) {
   });
   const addJ = JSON.parse(addRes.text || '{}');
   if (addJ.code !== 0) throw new Error('B站投稿失败: ' + (addJ.message || addJ.code));
+  console.log('[B站投稿debug] lossless_music已发送, 响应data字段:', Object.keys(addJ.data || {}).join(','), '| cid:', addJ.data?.cid);
   const aid = addJ.data?.aid || addJ.data?.id;
   const bvid = addJ.data?.bvid || '';
+  // 清理临时 MKV（Hi-Res 转封装副本，原始 MP4 保留）
+  try { if (filePath !== rawFilePath && fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
   return { aid, bvid, url: bvid ? `https://www.bilibili.com/video/${bvid}` : `https://www.bilibili.com/video/av${aid}` };
 }
 
