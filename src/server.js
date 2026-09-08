@@ -170,7 +170,7 @@ function runNext() {
                 biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
                 // 自动加入合集（add/v3 的 season_id 不生效，需事后补挂；失败仅日志不影响投稿结果）
                 if (bs.seasonId) {
-                  attachToSeasonRetry(bs.seasonId, { bvid: up.bvid, title: songTitle });
+                  attachToSeasonRetry(bs.seasonId, { bvid: up.bvid, title: songTitle, aid: up.aid, cid: up.cid });
                 }
                 t.biliUrl = up.url;
                 t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
@@ -275,15 +275,16 @@ let biliUploadSeq = 0;
 try { biliUploads = JSON.parse(fs.readFileSync(BILI_UPLOADS_FILE, 'utf8')); biliUploadSeq = biliUploads.reduce((m, u) => Math.max(m, u.id || 0), 0); } catch (e) {}
 function biliUpSave() { try { fs.writeFileSync(BILI_UPLOADS_FILE, JSON.stringify(biliUploads.slice(0, 50), null, 2)); } catch (e) {} }
 // 合集补挂（含延迟重试）：投稿时审核中 cid 查不到 → 失败后 20 分钟重试一次（过审后 cid 可查）
-function attachToSeasonRetry(seasonId, { bvid, title }, attempt = 1) {
+function attachToSeasonRetry(seasonId, { bvid, title, aid, cid }, attempt = 1) {
   bili.listSeasons(readConfig().biliCookies).then(seasons => {
     const season = (seasons || []).find(s => s.id === seasonId);
     if (!season || !season.sectionId) { console.error(`[B站合集] 找不到合集 ${seasonId}`); return; }
-    return bili.addToSeason(readConfig().biliCookies, { bvid, title, seasonId, sectionId: season.sectionId })
+    // 对齐网页端：episodes/add 需 aid+cid；投稿成功即知 aid(响应)+cid(multipart biz_id)，无需等审核
+    return bili.addToSeason(readConfig().biliCookies, { bvid, title, aid, cid, seasonId, sectionId: season.sectionId })
       .then(() => console.log(`[B站合集] 已加入合集 ${season.title}: ${bvid}`))
       .catch(err => {
         console.error(`[B站合集补挂失败] ${title} 第${attempt}次:`, err.message);
-        if (attempt < 3) setTimeout(() => attachToSeasonRetry(seasonId, { bvid, title }, attempt + 1), 20 * 60 * 1000);
+        if (attempt < 3) setTimeout(() => attachToSeasonRetry(seasonId, { bvid, title, aid, cid }, attempt + 1), 20 * 60 * 1000);
       });
   }).catch(err => console.error(`[B站合集] 列表查询失败:`, err.message));
 }

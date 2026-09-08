@@ -331,7 +331,7 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
   const aid = addJ.data?.aid || addJ.data?.id;
   const bvid = addJ.data?.bvid || '';
   console.log('[B站 multipart 投稿] lossless_music=1 + cid=' + bizId + ' 已提交');
-  return { aid, bvid, url: bvid ? `https://www.bilibili.com/video/${bvid}` : `https://www.bilibili.com/video/av${aid}` };
+  return { aid, bvid, cid: bizId, url: bvid ? `https://www.bilibili.com/video/${bvid}` : `https://www.bilibili.com/video/av${aid}` };
 }
 
 /**
