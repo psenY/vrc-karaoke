@@ -144,7 +144,7 @@ async function checkLogin(cookies) {
  * @param {object} opts { cookies, filePath, fileName, title, desc, tid, tags, coverBuffer? }
  */
 async function uploadVideo(opts) {
-  const { cookies, filePath, fileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat', onProgress = null, seasonId = 0, coverImageUrl = '' } = opts;
+  const { cookies, filePath, fileName, title, desc = '', tid = 130, tags = '卡拉OK,歌词,VRChat', onProgress = null, seasonId = 0, coverImageUrl = '', losslessMusic = false } = opts;
   const report = (phase, extra = {}) => { try { onProgress && onProgress({ phase, ...extra }); } catch (e) {} };
   const ck = cookieString(cookies);
   const fs = require('fs');
@@ -235,6 +235,7 @@ async function uploadVideo(opts) {
     tag: tags,
     videos: [{ filename: osPath.split("/").pop().replace(/\.[^.]*$/, ""), title: "合并投稿", desc: "" }],  // 对齐 biliup: splitext(basename(upos_uri))[0] 去扩展名
     csrf: cookies.bili_jct,
+    lossless_music: losslessMusic ? 1 : 0,  // 无损音乐=Hi-Res 金标（需大会员+B站转码支持）
     ...(seasonId ? { season_id: seasonId } : {}),  // 自动加入合集（0/缺省=不加入）
     dtime: undefined,
     dynamic: '',

@@ -493,6 +493,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       tid: bs.tid,
       tags: bs.tags,
       seasonId: bs.seasonId || 0,
+      losslessMusic: !!(q.levelLabel && q.levelLabel !== '标准'),
       onProgress: makeBiliProgressHandler(upRec),
     });
     biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
