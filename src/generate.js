@@ -38,7 +38,7 @@ async function generateVideo(input, options = {}) {
     coverMaskLevel = 30,       // 遮罩强度 0-90(%)
     out = null,                 // 输出文件名
     onProgress = null,          // 进度回调 (0~1 数字, 或 {segIdx,progress} 对象)
-    segCount = 8,               // 分段并行数(线程数)
+    segCount: segCountIn = 8, // 分段并行数(线程数)
     resolution = '1080p',       // 分辨率
     codec = 'libx264',          // 编码器
     preset = 'veryfast',        // 编码预设(速度↔压缩)
@@ -58,6 +58,14 @@ async function generateVideo(input, options = {}) {
 
   const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480], '4K': [3840, 2160], '8K': [7680, 4320] };
   const [width, height] = RESOLUTIONS[resolution] || RESOLUTIONS['1080p'];
+  let segCount = segCountIn;
+
+  // 内存保护：4K/8K 每段 x264 内存占用大（8K 单段约 2-4GB），并行段数超限会被系统 OOM 杀掉（ffmpeg exit null）
+  const SEG_CAP = { '8K': 4, '4K': 6 };
+  if (SEG_CAP[resolution] && segCount > SEG_CAP[resolution]) {
+    console.log(`[内存保护] ${resolution} 并行分段 ${segCount} → ${SEG_CAP[resolution]}（防 OOM）`);
+    segCount = SEG_CAP[resolution];
+  }
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
 
@@ -175,6 +183,7 @@ async function generateVideo(input, options = {}) {
       bgGradPath,
       audioMs: result.audioMs,
       width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio: finalFlac,
+      threads: resolution === '8K' ? 4 : 0,
       onSpawn,
     }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });

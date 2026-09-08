@@ -222,7 +222,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
       ...bgSourceArgs({ coverPath, bgGradPath, background, width, height, fps }),
       '-vf', assFilter(segAssPath),
       '-an',
-      '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0',
+      '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', String(threads),
       '-fps_mode', 'cfr',
       '-frames:v', String(segFrames),
       segOut,
@@ -240,7 +240,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
   const videoPath = path.join(tmpDir, '_video.mp4');
   const segInputs = segOuts.map(p => ['-i', p]).flat();
   const concatFilter = segOuts.map((_, i) => `[${i}:v]`).join('') + `concat=n=${segOuts.length}:v=1:a=0,setpts=N/${fps}/TB[v]`;
-  await runFfmpeg(['-y', ...segInputs, '-filter_complex', concatFilter, '-map', '[v]', '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', '0', videoPath], null, onSpawn);
+  await runFfmpeg(['-y', ...segInputs, '-filter_complex', concatFilter, '-map', '[v]', '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', String(threads), videoPath], null, onSpawn);
 
   // 4. 视频 + 完整音频 mux（无损，音频完全连续；FLAC 封装需 -strict -2）
   const muxArgs = ['-y', '-i', videoPath, '-i', audioOutPath, '-c', 'copy', '-shortest', '-movflags', '+faststart'];

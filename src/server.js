@@ -54,6 +54,7 @@ const MAX_CONCURRENT = 1; // 串行(用户要求一首一首来, 单首内部用
 // 失败错误信息友好化：把技术错误映射成可操作的提示
 function friendlyError(msg) {
   const m = String(msg || '未知错误');
+  if (m.includes('ffmpeg exit null')) return '编码进程被系统终止（内存不足）——请降低分辨率（8K→4K/1080p）或减少并行分段数后重试';
   if (m.includes('ffmpeg exit')) return '视频合成失败（编码异常），可尝试降低音质、分辨率或分段数后重试';
   if (m.includes('未获取到音频地址')) return '未能获取音频（可能是会员/无版权歌曲，或所选音质无权限）';
   if (m.includes('多次下载仍不完整')) return '音频多次下载不完整（可能是试听片段/会员歌），请检查登录状态';
