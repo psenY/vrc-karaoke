@@ -274,6 +274,19 @@ async function listSeasons(cookies) {
 }
 
 /**
+ * 查询B站视频是否仍存在（无需登录的 view 接口）。
+ * @returns {Promise<boolean>} true=存在 code 0；false=已删除 code -404/-403；其他错误抛出
+ */
+async function checkVideoExists(bvid) {
+  const r = await request(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, {});
+  let j = {};
+  try { j = JSON.parse(r.text || '{}'); } catch (e) {}
+  if (j.code === 0) return true;
+  if (j.code === -404 || j.code === -403) return false;
+  throw new Error('B站查询视频状态失败: ' + (j.message || r.text.slice(0, 80)));
+}
+
+/**
  * 投稿后把视频补挂进合集（add/v3 的 season_id 不生效，必须事后 episodes/add，csrf 放 query）。
  */
 async function addToSeason(cookies, { bvid, aid, cid, title, seasonId, sectionId }) {
@@ -305,4 +318,4 @@ async function addToSeason(cookies, { bvid, aid, cid, title, seasonId, sectionId
   return { ok: true };
 }
 
-module.exports = { qrGenerate, qrPoll, cookieString, checkLogin, uploadVideo, listSeasons, addToSeason, uploadCoverFromUrl };
+module.exports = { qrGenerate, qrPoll, cookieString, checkLogin, uploadVideo, listSeasons, addToSeason, uploadCoverFromUrl, checkVideoExists };

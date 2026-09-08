@@ -105,9 +105,9 @@ function runNext() {
       }
     };
     // 生成前B站查重：fetch 完成拿到歌名后回调，命中则中止（省下载/编码）
-    options.checkBiliDup = (songTitle) => {
-      if (getBiliSettings().checkScope !== 'generate') return false;
-      return findBiliDup(readHistory(), songTitle);
+    options.checkBiliDup = async (songTitle) => {
+      const dupInfo = await findBiliDupLive(songTitle);
+      return dupInfo.skip ? dupInfo : null;
     };
     options.onSpawn = (proc) => {
       if (!t.procs) t.procs = [];
@@ -125,12 +125,13 @@ function runNext() {
           const cfg = readConfig();
           if (cfg.biliCookies && cfg.biliCookies.SESSDATA) {
             const songTitle = result.meta.title || '未命名';
-            // 上传前查重（checkScope=upload 或 generate 都查）
+            (async () => {
+            // 上传前查重（含在线校验：B站被删则清标记继续投）
             if (getBiliSettings().checkScope !== 'off') {
-              const dup = findBiliDup(readHistory(), songTitle);
-              if (dup) {
-                console.log(`[B站查重跳过] ${songTitle} 已投稿: ${dup.biliUrl}`);
-                t.biliError = `B站已投过（${dup.bvid || dup.biliUrl}），跳过重复投稿`;
+              const dupInfo = await findBiliDupLive(songTitle);
+              if (dupInfo.skip) {
+                console.log(`[B站查重跳过] ${songTitle}: ${dupInfo.reason}`);
+                t.biliError = dupInfo.reason + '，跳过重复投稿';
                 return;
               }
             }
@@ -142,7 +143,6 @@ function runNext() {
             t.biliUploading = true;
             const upRec = biliUpNew(title, result.outPath, songTitle, result.quality);
             // 投稿自动重试 3 次（网络波动容错，指数退避 30s/60s）
-            (async () => {
               let up = null, lastErr = null;
               for (let attempt = 1; attempt <= 3 && !up; attempt++) {
                 try {
@@ -210,7 +210,7 @@ function runNext() {
 }
 
 // ---- 历史记录 ----
-const { dedupeHistory, findBiliDup, renderBiliTpl } = require('./core/bili-dedup');
+const { dedupeHistory, findBiliDup, renderBiliTpl, getCachedExists, setCachedExists } = require('./core/bili-dedup');
 function readHistory() {
   try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); }
   catch (e) { return []; }
@@ -315,6 +315,42 @@ function getBiliSettings() {
 
 
 // B站投稿设置读取/保存
+// B站查重（含在线校验）：本地命中后验证 bvid 是否仍存在（被删则清 biliUrl 放行，尽量少请求B站）
+async function findBiliDupLive(songTitle) {
+  if (getBiliSettings().checkScope === 'off') return { skip: false };
+  const dup = findBiliDup(readHistory(), songTitle);
+  if (!dup) return { skip: false };
+  const m = (dup.biliUrl || '').match(/BV[0-9A-Za-z]+/);
+  const bvid = m ? m[0] : null;
+  if (!bvid) return { skip: true, reason: `B站已投过（${dup.biliUrl}）` };
+  const cached = getCachedExists(bvid);
+  if (cached !== null) {
+    if (cached) return { skip: true, reason: `B站已投过（${bvid}）` };
+    removeBiliUrlByBvid(bvid);
+    return { skip: false, removed: true };
+  }
+  try {
+    const exists = await bili.checkVideoExists(bvid);
+    setCachedExists(bvid, exists);
+    if (exists) return { skip: true, reason: `B站已投过（${bvid}）` };
+    removeBiliUrlByBvid(bvid);
+    console.log(`[B站查重] ${bvid} 已在B站被删除，清除本地投稿标记，继续生成`);
+    return { skip: false, removed: true };
+  } catch (e) {
+    console.error(`[B站查重] 校验失败，保守跳过:`, e.message);
+    return { skip: true, reason: `B站已投过（${bvid}），在线校验异常暂跳过` };
+  }
+}
+
+function removeBiliUrlByBvid(bvid) {
+  const hist = readHistory();
+  let changed = false;
+  for (const h of hist) {
+    if (h.biliUrl && h.biliUrl.includes(bvid)) { delete h.biliUrl; delete h.bvid; changed = true; }
+  }
+  if (changed) { try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(hist, null, 2)); } catch (e) {} }
+}
+
 app.get('/api/bili/settings', requireAuth, (req, res) => {
   res.json({ ok: true, settings: getBiliSettings() });
 });
@@ -435,10 +471,10 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const safe = path.resolve(ROOT, 'output', path.basename(String(outPath || '')));
   if (!safe.startsWith(path.join(ROOT, 'output')) || !fs.existsSync(safe)) return res.json({ ok: false, error: '视频文件不存在' });
   const songTitle = (title || path.basename(safe)).replace(/\.mp4$/i, '');
-  // 手动投稿查重（checkScope 非 off 时）
+  // 手动投稿查重（含在线校验）
   if (getBiliSettings().checkScope !== 'off') {
-    const dup = findBiliDup(readHistory(), songTitle);
-    if (dup) return res.json({ ok: false, error: `B站已投过（${dup.bvid || '见历史'}），如需重投请关闭查重开关` });
+    const dupInfo = await findBiliDupLive(songTitle);
+    if (dupInfo.skip) return res.json({ ok: false, error: dupInfo.reason + '，如需重投请关闭查重开关' });
   }
   // 模板渲染（quality 从匹配的历史项取，老记录无则空）
   const bs = getBiliSettings();

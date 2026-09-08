@@ -58,4 +58,15 @@ function renderBiliTpl(tpl, vars) {
     .replace(/\{日期\}/g, new Date().toISOString().slice(0, 10));
 }
 
-module.exports = { dedupeHistory, findBiliDup, renderBiliTpl };
+// bvid 存在性验证缓存（1小时TTL）：同一视频短期内不重复请求B站
+const existsCache = new Map();
+const EXISTS_TTL = 60 * 60 * 1000;
+
+function getCachedExists(bvid) {
+  const c = existsCache.get(bvid);
+  if (c && Date.now() - c.ts < EXISTS_TTL) return c.exists;
+  return null;  // 缓存未命中
+}
+function setCachedExists(bvid, exists) { existsCache.set(bvid, { exists, ts: Date.now() }); }
+
+module.exports = { dedupeHistory, findBiliDup, renderBiliTpl, getCachedExists, setCachedExists };
