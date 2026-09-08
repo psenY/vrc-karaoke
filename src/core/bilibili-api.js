@@ -80,6 +80,43 @@ async function uploadCoverFromUrl(cookies, imageUrl) {
   return j.data.url;
 }
 
+/**
+ * WBI 签名（w_rid/wts）：B 站部分接口要求对 query 做签名，缺失/错误时参数可能被静默忽略。
+ * 实现：nav 接口取 img_key/sub_key → 按混淆表重排得 mixin_key → query 参数排序拼接 + wts → MD5。
+ */
+const WBI_MIXIN_TAB = [
+  46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
+  33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40,
+  61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11,
+  36, 20, 34, 44, 52,
+];
+let wbiKeyCache = { keys: null, ts: 0 };
+async function getWbiKeys() {
+  if (wbiKeyCache.keys && Date.now() - wbiKeyCache.ts < 12 * 60 * 60 * 1000) return wbiKeyCache.keys;
+  const r = await request('https://api.bilibili.com/x/web-interface/nav', { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const j = JSON.parse(r.text || '{}');
+  const wbi = (j.data && j.data.wbi_img) || {};
+  const img = (wbi.img_url || '').split('/').pop().split('.')[0];
+  const sub = (wbi.sub_url || '').split('/').pop().split('.')[0];
+  if (!img || !sub) throw new Error('WBI key 获取失败');
+  const raw = img + sub;
+  const keys = WBI_MIXIN_TAB.map(i => raw[i]).join('').slice(0, 32);
+  wbiKeyCache = { keys, ts: Date.now() };
+  return keys;
+}
+async function wbiSign(params) {
+  const mixin = await getWbiKeys();
+  const p = { ...params, wts: Math.floor(Date.now() / 1000) };
+  const q = Object.keys(p)
+    .filter(k => p[k] !== undefined && p[k] !== null)
+    .sort()
+    .map(k => `${k}=${encodeURIComponent(String(p[k]).replace(/[!'()*]/g, ''))}`)
+    .join('&');
+  const crypto = require('crypto');
+  const w_rid = crypto.createHash('md5').update(q + mixin).digest('hex');
+  return { w_rid, wts: p.wts, _q: q };
+}
+
 /** node http 原版请求（用于 upos init/finish：需要显式 Content-Length: 0，fetch/undici 会剥离 CL） */
 function requestRaw(url, { method = 'GET', headers = {}, body = null, timeoutMs = 30000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -237,34 +274,43 @@ async function uploadVideo(opts) {
     }
   }
 
-  // 3. 投稿 add/v3
+  // 3. 投稿 add/v3（body 逐字段对齐 2026-09 网页端真实抓包：web_os=1/no_reprint=0/recreate=0/videos带cid/creation_statement/watermark等）
   const addBody = JSON.stringify({
-    ...(coverUrl ? { cover: coverUrl } : {}),
-    copyright: 1,
-    source: '',
-    tid,
+    ...(coverUrl ? { cover: coverUrl, cover43: coverUrl } : {}),
+    ai_cover: 0,
+    is_ab_cover: 0,
+    ab_cover_info: null,
     title: title.slice(0, 80),
-    desc_format_id: 0,
-    desc: String(desc || '').slice(0, 2000),
+    copyright: 1,
+    creation_statement: { id: -1 },
+    human_type2: 1003,
+    tid,
     tag: tags,
-    videos: [{ filename: osPath.split("/").pop().replace(/\.[^.]*$/, ""), title: "合并投稿", desc: "" }],  // 对齐 biliup: splitext(basename(upos_uri))[0] 去扩展名
-    csrf: cookies.bili_jct,
-    lossless_music: losslessMusic ? 1 : 0,  // 无损音乐=Hi-Res 金标（需大会员+B站转码支持）
-    dolby: 0,                               // 杜比音效（音源支持时可开）
-    ...(seasonId ? { season_id: seasonId } : {}),  // 自动加入合集（0/缺省=不加入）
+    desc: String(desc || '').slice(0, 2000),
     dynamic: '',
+    recreate: 0,
     interactive: 0,
+    videos: [{ filename: osPath.split("/").pop().replace(/\.[^.]*$/, ""), title: title.slice(0, 80), desc: "" }],
     act_reserve_create: 0,
+    act_reserve_create_title: '',
     no_disturbance: 0,
-    no_reprint: 1,
+    is_only_self: 0,
+    space_hidden: 2,
+    watermark: { state: 1 },
+    subtitle: { open: 0, lan: '' },
+    no_reprint: 0,
     up_selection_reply: false,
     up_close_reply: false,
     up_close_danmu: false,
-    web_os: 3,
-    subtitle: { open: 0, lan: '', list: [] },
+    dolby: 0,
+    lossless_music: losslessMusic ? 1 : 0,  // 无损音乐=Hi-Res 金标
+    web_os: 1,
+    csrf: cookies.bili_jct,
+    ...(seasonId ? { season_id: seasonId } : {}),
   });
-  const ts = Date.now();
-  const addRes = await request(`https://member.bilibili.com/x/vu/web/add/v3?ts=${ts}&csrf=${encodeURIComponent(cookies.bili_jct)}`, {
+  // URL：ts+csrf+WBI 签名（w_rid/wts，网页端带，缺签名疑被静默降级）
+  const wbi = await wbiSign({ t: Date.now(), csrf: cookies.bili_jct });
+  const addRes = await request(`https://member.bilibili.com/x/vu/web/add/v3?${wbi._q}&w_rid=${wbi.w_rid}&wts=${wbi.wts}&web_location=333.1024`, {
     method: 'POST',
     headers: {
       Cookie: ck,
