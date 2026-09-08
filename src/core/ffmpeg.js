@@ -224,6 +224,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
       '-vf', assFilter(segAssPath),
       '-an',
       '-c:v', codec, '-preset', preset, '-crf', String(crf), '-pix_fmt', 'yuv420p', '-threads', String(threads),
+      ...(codec === 'libx265' ? ['-x265-params', `pools=${Math.max(1, threads)}:frame-threads=4`] : []),
       '-fps_mode', 'cfr',
       '-frames:v', String(segFrames),
       segOut,
