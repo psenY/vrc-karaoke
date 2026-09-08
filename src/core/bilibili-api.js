@@ -218,7 +218,7 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
   if (newJ.code !== 0) throw new Error('B站 multipart/new 失败: ' + (newJ.message || newRes.text.slice(0, 120)));
   const up = newJ.data;
   const bizId = up.biz_id;
-  const chunkSize = 4194304;  // 4MB 小分片：CDN 偶发挂起时单片重传损失小、超时窗口短（实测 CDN 单片限速约 7.6MB/s）
+  const chunkSize = up.chunk_size || 10485760;  // ⚠️必须用服务端返回的 chunk_size：B站会话按此记录每片，自改小片会导致 complete -409 冲突（实测）
   console.log(`[B站 multipart] biz_id=${bizId} | 分片大小 ${Math.round(chunkSize / 1048576)}MB`);
   report('uploading', { chunk: 0, chunks: Math.ceil(fileSize / chunkSize), totalMB: +(fileSize / 1048576).toFixed(1) });
 
