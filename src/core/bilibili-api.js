@@ -183,7 +183,7 @@ async function checkLogin(cookies) {
  * new（返回 biz_id=cid + 分片预签名URL）→ part（PUT 到预签名URL，拿 ETag）→ complete → add/v3（videos[0].cid=biz_id）
  * B 站转码管线以 cid 关联上传文件的音频分析——有 cid + lossless_music=1 才出 Hi-Res 音轨。
  */
-async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies }) {
+async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies, losslessMusic = false }) {
   const fs = require('fs');
   const MEMBER = 'https://member.bilibili.com';
   const hdrs = { Cookie: ck, 'Content-Type': 'application/json', Referer: 'https://member.bilibili.com/platform/upload/video/frame', Origin: 'https://member.bilibili.com' };
@@ -315,7 +315,7 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
     no_reprint: 0,
     up_selection_reply: false, up_close_reply: false, up_close_danmu: false,
     dolby: 0,
-    lossless_music: 1,
+    lossless_music: losslessMusic ? 1 : 0,
     web_os: 3,
     csrf: cookies.bili_jct,
     ...(seasonId ? { season_id: seasonId } : {}),
@@ -360,23 +360,12 @@ async function uploadVideo(opts) {
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
 
-  // ===== 流程选择：losslessMusic 走新 multipart 端点族（响应带 biz_id=cid，转码管线关联音频分析→Hi-Res 生效）=====
-  if (losslessMusic) {
-    return await uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies });
-  }
-
-  // 1. 预上传
-  const preUrl = `https://member.bilibili.com/preupload?name=${encodeURIComponent(fileName)}&size=${fileSize}&r=upos&profile=ugcupos/bup&ssl=0&version=2.8.12&upcdn=bda2&build=2081200`;
-  report('preupload');
-  const pre = await request(preUrl, { headers: { Cookie: ck } });
-  const preJ = JSON.parse(pre.text);
-  if (!preJ.upos_uri) throw new Error('B站预上传失败: ' + (preJ.msg || pre.text.slice(0, 100)));
-  const uposUri = preJ.upos_uri;                      // upos://bucket/path
-  // osPath = 去掉 upos:// 前缀的完整路径（保留 bucket 段，对齐 biliup：https://endpoint/bucket/path）
-  const osPath = uposUri.replace(/^upos:\/\//, '');
+  // ===== 统一走 multipart 新端点族（网页端现役流程）：响应带 biz_id=cid（合集补挂必需）+ 音频分析（Hi-Res 生效）=====
+  return await uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies, losslessMusic });
   // 上传域名用 preupload 返回的 endpoint（如 //upos-cs-upcdnbda2.bilivideo.com），旧 acgvideo.com 域名已废弃
   const host = String(preJ.endpoint || '//upos-cs-upcdnbda2.bilivideo.com').replace(/^\/\//, '');
 
+  // ⚠️ 以下旧 upos 流程已退役（2026-09-08 统一走 multipart）：保留仅作参考，运行时不可达
   // 2. upos 分片上传（严格对齐 biliup 协议：init=POST / 分片 PUT / finish=POST+parts JSON）
   //    注意 upos 对无 body 的 PUT 返回 411（MissingContentLength），init/finish 必须用 POST
   const uploadHost = `https://${host}`;
