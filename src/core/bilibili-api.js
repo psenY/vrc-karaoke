@@ -218,7 +218,7 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
   if (newJ.code !== 0) throw new Error('B站 multipart/new 失败: ' + (newJ.message || newRes.text.slice(0, 120)));
   const up = newJ.data;
   const bizId = up.biz_id;
-  const chunkSize = up.chunk_size || 10485760;
+  const chunkSize = 4194304;  // 4MB 小分片：CDN 偶发挂起时单片重传损失小、超时窗口短（实测 CDN 单片限速约 7.6MB/s）
   console.log(`[B站 multipart] biz_id=${bizId} | 分片大小 ${Math.round(chunkSize / 1048576)}MB`);
   report('uploading', { chunk: 0, chunks: Math.ceil(fileSize / chunkSize), totalMB: +(fileSize / 1048576).toFixed(1) });
 
@@ -237,13 +237,24 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
       throw new Error(`B站 multipart/part 失败(第${c + 1}片): ` + partRes.text.slice(0, 120));
     }
     const putUrl = partJ.data.reqs[0].url;
-    const putRes = await request(putUrl, {
-      method: 'PUT',
-      headers: { Cookie: ck, 'Content-Type': 'application/octet-stream' },
-      body: data.subarray(start, start + size),
-      timeoutMs: Math.max(300000, size / 1024),
-    });
-    if (putRes.status !== 200) throw new Error(`B站分片 PUT 失败(第${c + 1}/${chunks}片): HTTP ${putRes.status}`);
+    // 单片重试（3 次，1s/3s 退避）：CDN 偶发挂起/失败时快速恢复，不重烧整个上传
+    let putRes = null;
+    for (let retry = 1; retry <= 3; retry++) {
+      try {
+        putRes = await request(putUrl, {
+          method: 'PUT',
+          headers: { Cookie: ck, 'Content-Type': 'application/octet-stream' },
+          body: data.subarray(start, start + size),
+          timeoutMs: 90000,
+        });
+        if (putRes.status === 200) break;
+      } catch (e) {
+        if (retry === 3) throw new Error(`B站分片 PUT 失败(第${c + 1}/${chunks}片，3次重试后): ` + e.message.slice(0, 80));
+        console.log(`[B站] 分片${c + 1} PUT 第${retry}次失败(${e.message.slice(0, 40)})，退避重试...`);
+        await new Promise(r => setTimeout(r, 1000 * (retry * 2 - 1)));
+      }
+    }
+    if (!putRes || putRes.status !== 200) throw new Error(`B站分片 PUT 失败(第${c + 1}/${chunks}片): HTTP ${putRes ? putRes.status : 'none'}`);
     const rawEtag = (putRes.headers && (putRes.headers['etag'] || '')) || '';
     const etag = rawEtag ? (rawEtag.startsWith('"') ? rawEtag : `"${rawEtag.replace(/"/g, '')}"`) : `"${c + 1}-0"`;  // 缺 ETag 时用占位（B站部分节点不回传）
     parts.push({ part_number: c + 1, etag });
