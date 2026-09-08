@@ -174,6 +174,7 @@ async function runFfmpegSegmented(opts, segCount, onProgress) {
     crf = 20, preset = 'veryfast', audioBitrate = '192k', codec = 'libx264',
     flacAudio = false,   // 无损封装：音频保持 FLAC（部分播放器不支持）
     onSpawn = null,
+    threads = 0,          // x264 线程数（0=自动；8K 应限 4 防 OOM）
   } = opts;
   const tmpDir = path.dirname(outPath);
   const segMs = Math.ceil(audioMs / segCount);
