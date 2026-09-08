@@ -1,0 +1,50 @@
+[
+  {
+    "url": "https://member.bilibili.com/preupload?r=probe",
+    "reqBody": "",
+    "respBody": "{\"OK\":1,\"lines\":[{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=akbd\\u0026zone=cs\",\"probe_url\":\"//bb27c891csbd.aikobo.cn/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=bda2\\u0026zone=cs\",\"probe_url\":\"//upos-cs-upcdnbda2.bilivideo.com/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=bldsa\\u0026zone=cs\",\"probe_url\":\"//upos-cs-upcdnbldsa.bilivideo.com/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=estx\\u0026zone=cs\",\"probe_url\":\"//e17962d5cstx.esheep.com/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=tx\\u0026zone=cs\",\"probe_url\":\"//upos-cs-upcdntx.bilivideo.com/OK\"}],\"probe\":{\"post\":1},\"quic_lines\":[{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=antx\\u0026zone=cs\",\"probe_url\":\"//c3350892cstx.anitama.cn/OK\"}]}",
+    "base64": false
+  },
+  {
+    "url": "https://member.bilibili.com/preupload?r=probe",
+    "reqBody": "",
+    "respBody": "{\"OK\":1,\"lines\":[{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=bldsa\\u0026zone=cs\",\"probe_url\":\"//upos-cs-upcdnbldsa.bilivideo.com/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=tx\\u0026zone=cs\",\"probe_url\":\"//upos-cs-upcdntx.bilivideo.com/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=akbd\\u0026zone=cs\",\"probe_url\":\"//bb27c891csbd.aikobo.cn/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=bda2\\u0026zone=cs\",\"probe_url\":\"//upos-cs-upcdnbda2.bilivideo.com/OK\"},{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=estx\\u0026zone=cs\",\"probe_url\":\"//e17962d5cstx.esheep.com/OK\"}],\"probe\":{\"post\":1},\"quic_lines\":[{\"os\":\"upos\",\"query\":\"probe_version=20250923\\u0026upcdn=antx\\u0026zone=cs\",\"probe_url\":\"//c3350892cstx.anitama.cn/OK\"}]}",
+    "base64": false
+  },
+  {
+    "url": "https://member.bilibili.com/upload/file",
+    "reqBody": "{\"profile\":\"fxmeta/bup\",\"name\":\"file_meta.txt\"}",
+    "respBody": "{\"code\":0,\"message\":\"0\",\"ttl\":1,\"data\":{\"uri\":\"upos://fxmetalf/n260908s31kd0rsgndej8p2d81c4xbcw.txt\",\"reqs\":[{\"method\":\"PUT\",\"url\":\"https://jscs-luffy-upcdnbd.bilivideo.com/fxmetalf/n260908s31kd0rsgndej8p2d81c4xbcw.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256\\u0026X-Amz-Credential=1494471752%2F20260908%2Fcn%2Fs3%2Faws4_request\\u0026X-Amz-Date=20260908T073056Z\\u0026X-Amz-Expires=900\\u0026X-Amz-SignedHeaders=host\\u0026x-id=PutObject\\u0026X-Amz-Signature=a8988544d2ea836bf1f49ad26a17efab6d452adc856ea1227f36e92624fed1e6\",\"cdn_name\":\"luffy_jscs_bd\"},{\"method\":\"PUT\",\"url\":\"https://jscs-luffy-upcdnbldsa.bilivideo.com/fxmetalf/n260908s31kd0rsgndej8p2d81c4xbcw.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256\\u0026X-Amz-Credential=1494471752%2F20260908%2Fcn%2Fs3%2Faws4_request\\u0026X-Amz-Date=20260908T073056Z\\u0026X-Amz-Expires=900\\u0026X-Amz-SignedHeaders=host\\u0026x-id=PutObject\\u0026X-Amz-Signature=8f81b2154b661994c91ea5983720b70a6af164b03e928bbc74a31d1bf43fdafb\",\"cdn_name\":\"luffy_jscs_bldsa\"},{\"method\":\"PUT\",\"url\":\"https://jscs-luffy-upcdntx.bilivideo.com/fxmetalf/n260908s31kd0rsgndej8p2d81c4xbcw.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256\\u0026X-Amz-Credential=1494471752%2F20260908%2Fcn%2Fs3%2Faws4_request\\u0026X-Amz-Date=20260908T073056Z\\u0026X-Amz-Expires=900\\u0026X-Amz-SignedHeaders=host\\u0026x-id=PutObject\\u0026X-Amz-Signature=cfb68259a84d60f9b6e3cb6325b09eeb2e446e58388869f0e232377a52fb5f1f\",\"cdn_name\":\"luffy_jscs_tx\"},{\"method\":\"PUT\",\"url\":\"https://jscs-luffy-upcdnbd.aikobo.cn/fxmetalf/n260908s31kd0rsgn",
+    "base64": false
+  },
+  {
+    "url": "https://member.bilibili.com/x/vupre/web/archive/precheck?content=test_hires&check_item=1&t=1788852657019",
+    "reqBody": "",
+    "respBody": "{\"code\":0,\"message\":\"OK\",\"ttl\":1}",
+    "base64": false
+  },
+  {
+    "url": "https://member.bilibili.com/upload/multipart/new",
+    "reqBody": "{\"profile\":\"ugcfx/bup\",\"init_params\":{\"meta_upos_uri\":\"upos://fxmetalf/n260908s31kd0rsgndej8p2d81c4xbcw.txt\"},\"name\":\"test_hires.mp4\",\"size\":344710}",
+    "respBody": "{\"code\":0,\"message\":\"0\",\"ttl\":1,\"data\":{\"uri\":\"upos://ugcfxever/n260908s313041kk1ab4w20uos36n4h2.mp4\",\"upload_token\":\"m1_CGY+uCspYixw5bt+5XTXQw_CLHz/tQGEil1cG9zOjZmYjNhMzk2LTU5MGItNDViZC1hODBjLTQyYzQyMjhkYzYzZCoJNDkxNTQ3Mzk3\",\"biz_id\":41689550633,\"retry\":10,\"retry_delay\":3,\"timeout\":1200,\"threads\":4,\"chunk_size\":10485760,\"filename\":\"n260908s313041kk1ab4w20uos36n4h2\"}}",
+    "base64": false
+  },
+  {
+    "url": "https://member.bilibili.com/upload/multipart/part",
+    "reqBody": "{\"uri\":\"upos://ugcfxever/n260908s313041kk1ab4w20uos36n4h2.mp4\",\"upload_token\":\"m1_CGY+uCspYixw5bt+5XTXQw_CLHz/tQGEil1cG9zOjZmYjNhMzk2LTU5MGItNDViZC1hODBjLTQyYzQyMjhkYzYzZCoJNDkxNTQ3Mzk3\",\"part_number\":1}",
+    "respBody": "{\"code\":0,\"message\":\"0\",\"ttl\":1,\"data\":{\"reqs\":[{\"method\":\"PUT\",\"url\":\"https://jscs-luffy-upcdnbd.bilivideo.com/ugcfxever/n260908s313041kk1ab4w20uos36n4h2.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256\\u0026X-Amz-Credential=1494471752%2F20260908%2Fcn%2Fs3%2Faws4_request\\u0026X-Amz-Date=20260908T073057Z\\u0026X-Amz-Expires=1200\\u0026X-Amz-SignedHeaders=host\\u0026partNumber=1\\u0026uploadId=6fb3a396-590b-45bd-a80c-42c4228dc63d\\u0026x-id=UploadPart\\u0026X-Amz-Signature=185cc10c4cd34d4d48b741ad7b110da48df0bb89f3e6ab684c52dc44d542a75e\",\"cdn_name\":\"luffy_jscs_bd\"},{\"method\":\"PUT\",\"url\":\"https://jscs-luffy-upcdnbldsa.bilivideo.com/ugcfxever/n260908s313041kk1ab4w20uos36n4h2.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256\\u0026X-Amz-Credential=1494471752%2F20260908%2Fcn%2Fs3%2Faws4_request\\u0026X-Amz-Date=20260908T073057Z\\u0026X-Amz-Expires=1200\\u0026X-Amz-SignedHeaders=host\\u0026partNumber=1\\u0026uploadId=6fb3a396-590b-45bd-a80c-42c4228dc63d\\u0026x-id=UploadPart\\u0026X-Amz-Signature=030655ffc554d95ac44601667dbc0f66385f515d06b6137e99674d345cd0ae7b\",\"cdn_name\":\"luffy_jscs_bldsa\"},{\"method\":\"PUT\",\"url\":\"https://jscs-luffy-upcdntx.bilivideo.com/ugcfxever/n260908s313041kk1ab4w20uos36n4h2.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256\\u0026X-Amz-Credential=1494471752%2F20260908%2Fcn%2Fs3%2Faws4_request\\u0026X-Amz-Date=20260908T073057Z\\u0026X-Amz-Expires=1200\\u0026X-Amz-SignedHeaders=host\\u0026partNumber=1\\u0026uploadId=6fb3a396-590b-45bd-a80c-42c4228dc63d\\u0026x-id=UploadPart\\u0026X-Amz-Signature=f4286920bc0539319a46c600f",
+    "base64": false
+  },
+  {
+    "url": "https://member.bilibili.com/upload/multipart/complete",
+    "reqBody": "{\"uri\":\"upos://ugcfxever/n260908s313041kk1ab4w20uos36n4h2.mp4\",\"upload_token\":\"m1_CGY+uCspYixw5bt+5XTXQw_CLHz/tQGEil1cG9zOjZmYjNhMzk2LTU5MGItNDViZC1hODBjLTQyYzQyMjhkYzYzZCoJNDkxNTQ3Mzk3\",\"parts\":[{\"part_number\":1,\"etag\":\"\\\"23cd23da6a539d8dabfdd3feaf28ad72\\\"\"}],\"upload_params\":{\"biz_id\":41689550633,\"profile\":\"ugcfx/bup\"}}",
+    "respBody": "{\"code\":0,\"message\":\"0\",\"ttl\":1,\"data\":{\"etag\":\"\\\"54bdf2acc05bf8aa03f7a5a691f3cdda-1\\\"\"}}",
+    "base64": false
+  },
+  {
+    "url": "https://member.bilibili.com/preupload?probe_version=20250923&upcdn=tx&zone=cs&name=frames_491547397_1788852656785_7379.zip&r=upos&profile=svf%2Fbup&ssl=0&version=2.14.0.0&build=2140000&size=412568&webVersion=2.14.0",
+    "reqBody": "",
+    "respBody": "{\"OK\":1,\"auth\":\"ak=1494471752\\u0026cdn=%2F%2Fupos-cs-upcdntx.bilivideo.com\\u0026os=upos\\u0026sign=14fe759d772b1c9b8bc002a815e2e2c5\\u0026timestamp=1788852659.052\\u0026uid=491547397\\u0026uip=223.85.155.14\\u0026uport=23992\\u0026use_dqp=0\",\"biz_id\":0,\"chunk_retry\":10,\"chunk_retry_delay\":3,\"chunk_size\":10485760,\"endpoint\":\"//upos-cs-upcdntx.bilivideo.com\",\"endpoints\":[\"//upos-cs-upcdntx.bilivideo.com\",\"//upos-cs-upcdnbda2.bilivideo.com\",\"//upos-cs-upcdnbldsa.bilivideo.com\",\"//bb27c891csbd.aikobo.cn\"],\"expose_params\":null,\"put_query\":\"os=upos\\u0026profile=svf%2Fbup\",\"quic_endpoints\":[\"//c3350892cstx.anitama.cn\"],\"threads\":5,\"timeout\":1200,\"uip\":\"223.85.155.14\",\"upos_uri\":\"upos://svfboss/n260908tx1iqdbbmgqwvkc1hi07gqjmo.zip\"}",
+    "base64": false
+  }
+]

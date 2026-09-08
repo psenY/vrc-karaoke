@@ -1,5 +1,7 @@
 'use strict';
 
+const path = require('path');
+
 /**
  * B站投稿 API（非官方逆向实现，自用低频）。
  * 链路：扫码登录拿 cookie → preupload 预上传 → upos 分片上传 → add/v3 投稿。
@@ -177,6 +179,140 @@ async function checkLogin(cookies) {
 }
 
 /**
+ * Hi-Res 投稿：新 multipart 端点族（2026 网页端同源流程）
+ * new（返回 biz_id=cid + 分片预签名URL）→ part（PUT 到预签名URL，拿 ETag）→ complete → add/v3（videos[0].cid=biz_id）
+ * B 站转码管线以 cid 关联上传文件的音频分析——有 cid + lossless_music=1 才出 Hi-Res 音轨。
+ */
+async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies }) {
+  const fs = require('fs');
+  const MEMBER = 'https://member.bilibili.com';
+  const hdrs = { Cookie: ck, 'Content-Type': 'application/json', Referer: 'https://member.bilibili.com/platform/upload/video/frame', Origin: 'https://member.bilibili.com' };
+
+  // 0. 元信息文件（网页端先传 meta txt——profile fxmeta/bup，预检数据源）
+  report('preupload');
+  let metaUri = '';
+  try {
+    const metaName = fileName.replace(/\.[^.]*$/, '') + '.txt';
+    const metaBody = JSON.stringify({ profile: 'fxmeta/bup', name: metaName });
+    const mf = await request(`${MEMBER}/upload/file`, { method: 'POST', headers: hdrs, body: metaBody });
+    const mfJ = JSON.parse(mf.text || '{}');
+    if (mfJ.code === 0 && mfJ.data && mfJ.data.uri) {
+      metaUri = mfJ.data.uri;
+      // meta txt 本体（经预签名 URL PUT）
+      const req0 = mfJ.data.reqs && mfJ.data.reqs[0];
+      if (req0 && req0.url) {
+        await request(req0.url, { method: req0.method || 'PUT', headers: { Cookie: ck }, body: JSON.stringify({}) });
+      }
+    }
+  } catch (e) { console.log('[B站] 元信息上传失败(继续):', e.message.slice(0, 80)); }
+
+  // 1. multipart/new（返回 uri/upload_token/biz_id/chunk_size）
+  const newBody = JSON.stringify({
+    profile: 'ugcfx/bup',
+    ...(metaUri ? { init_params: { meta_upos_uri: metaUri } } : {}),
+    name: fileName,
+    size: fileSize,
+  });
+  const newRes = await request(`${MEMBER}/upload/multipart/new`, { method: 'POST', headers: hdrs, body: newBody });
+  const newJ = JSON.parse(newRes.text || '{}');
+  if (newJ.code !== 0) throw new Error('B站 multipart/new 失败: ' + (newJ.message || newRes.text.slice(0, 120)));
+  const up = newJ.data;
+  const bizId = up.biz_id;
+  const chunkSize = up.chunk_size || 10485760;
+  console.log(`[B站 multipart] biz_id=${bizId} | 分片大小 ${Math.round(chunkSize / 1048576)}MB`);
+  report('uploading', { chunk: 0, chunks: Math.ceil(fileSize / chunkSize), totalMB: +(fileSize / 1048576).toFixed(1) });
+
+  // 2. 逐片：part（拿预签名URL）→ PUT（拿 ETag 响应头）
+  const data = fs.readFileSync(filePath);
+  const parts = [];
+  const chunks = Math.ceil(fileSize / chunkSize);
+  for (let c = 0; c < chunks; c++) {
+    const start = c * chunkSize;
+    const size = Math.min(chunkSize, fileSize - start);
+    report('uploading', { chunk: c + 1, chunks, uploadedMB: +(Math.min(start + size, fileSize) / 1048576).toFixed(1), totalMB: +(fileSize / 1048576).toFixed(1) });
+    const partBody = JSON.stringify({ uri: up.uri, upload_token: up.upload_token, part_number: c + 1 });
+    const partRes = await request(`${MEMBER}/upload/multipart/part`, { method: 'POST', headers: hdrs, body: partBody });
+    const partJ = JSON.parse(partRes.text || '{}');
+    if (partJ.code !== 0 || !partJ.data || !partJ.data.reqs || !partJ.data.reqs[0]) {
+      throw new Error(`B站 multipart/part 失败(第${c + 1}片): ` + partRes.text.slice(0, 120));
+    }
+    const putUrl = partJ.data.reqs[0].url;
+    const putRes = await request(putUrl, {
+      method: 'PUT',
+      headers: { Cookie: ck, 'Content-Type': 'application/octet-stream' },
+      body: data.subarray(start, start + size),
+      timeoutMs: Math.max(300000, size / 1024),
+    });
+    if (putRes.status !== 200) throw new Error(`B站分片 PUT 失败(第${c + 1}/${chunks}片): HTTP ${putRes.status}`);
+    const rawEtag = (putRes.headers && (putRes.headers['etag'] || '')) || '';
+    const etag = rawEtag ? (rawEtag.startsWith('"') ? rawEtag : `"${rawEtag.replace(/"/g, '')}"`) : `"${c + 1}-0"`;  // 缺 ETag 时用占位（B站部分节点不回传）
+    parts.push({ part_number: c + 1, etag });
+  }
+
+  // 3. complete（带 parts etag 列表）
+  const completeBody = JSON.stringify({
+    uri: up.uri,
+    upload_token: up.upload_token,
+    parts: parts.map(p => ({ part_number: p.part_number, etag: p.etag })),
+    upload_params: { biz_id: bizId, profile: 'ugcfx/bup' },
+  });
+  const cRes = await request(`${MEMBER}/upload/multipart/complete`, { method: 'POST', headers: hdrs, body: completeBody });
+  const cJ = JSON.parse(cRes.text || '{}');
+  if (cJ.code !== 0) throw new Error('B站 multipart/complete 失败: ' + (cJ.message || cRes.text.slice(0, 120)));
+  console.log('[B站 multipart] 上传完成 etag=', (cJ.data && cJ.data.etag || '').slice(0, 30));
+
+  // 4. 封面
+  let coverUrl = '';
+  if (coverImageUrl) {
+    try {
+      coverUrl = await uploadCoverFromUrl(cookies, coverImageUrl);
+      console.log('[B站封面] 上传成功:', coverUrl.slice(0, 60));
+    } catch (e) { console.log('[B站封面] 上传失败(降级):', e.message.slice(0, 60)); }
+  }
+
+  // 5. add/v3（videos[0].cid = bizId——Hi-Res 关键；WBI 签名 URL）
+  report('publish');
+  const addBody = JSON.stringify({
+    ...(coverUrl ? { cover: coverUrl, cover43: coverUrl } : {}),
+    ai_cover: 0, is_ab_cover: 0, ab_cover_info: null,
+    title: title.slice(0, 80),
+    copyright: 1,
+    creation_statement: { id: -1 },
+    human_type2: 1003,
+    tid,
+    tag: tags,
+    desc: String(desc || '').slice(0, 2000),
+    dynamic: '',
+    recreate: 0,
+    interactive: 0,
+    videos: [{ filename: (up.filename || fileName.replace(/\.[^.]*$/, '')), title: title.slice(0, 80), desc: '', cid: bizId }],
+    act_reserve_create: 0, act_reserve_create_title: '',
+    no_disturbance: 0, is_only_self: 0, space_hidden: 2,
+    watermark: { state: 1 },
+    subtitle: { open: 0, lan: '' },
+    no_reprint: 0,
+    up_selection_reply: false, up_close_reply: false, up_close_danmu: false,
+    dolby: 0,
+    lossless_music: 1,
+    web_os: 3,
+    csrf: cookies.bili_jct,
+    ...(seasonId ? { season_id: seasonId } : {}),
+  });
+  const wbi = await wbiSign({ t: Date.now(), csrf: cookies.bili_jct });
+  const addRes = await request(`${MEMBER}/x/vu/web/add/v3?${wbi._q}&w_rid=${wbi.w_rid}&wts=${wbi.wts}&web_location=333.1024`, {
+    method: 'POST',
+    headers: { Cookie: ck, 'Content-Type': 'application/json;charset=UTF-8', Referer: 'https://member.bilibili.com/platform/upload/video/frame', Origin: 'https://member.bilibili.com' },
+    body: addBody,
+  });
+  const addJ = JSON.parse(addRes.text || '{}');
+  if (addJ.code !== 0) throw new Error('B站投稿失败: ' + (addJ.message || addRes.text.slice(0, 120)));
+  const aid = addJ.data?.aid || addJ.data?.id;
+  const bvid = addJ.data?.bvid || '';
+  console.log('[B站 multipart 投稿] lossless_music=1 + cid=' + bizId + ' 已提交');
+  return { aid, bvid, url: bvid ? `https://www.bilibili.com/video/${bvid}` : `https://www.bilibili.com/video/av${aid}` };
+}
+
+/**
  * 投稿视频（三步：预上传 → upos 上传 → add/v3 投稿）
  * @param {object} opts { cookies, filePath, fileName, title, desc, tid, tags, coverBuffer? }
  */
@@ -201,6 +337,11 @@ async function uploadVideo(opts) {
   }
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
+
+  // ===== 流程选择：losslessMusic 走新 multipart 端点族（响应带 biz_id=cid，转码管线关联音频分析→Hi-Res 生效）=====
+  if (losslessMusic) {
+    return await uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies });
+  }
 
   // 1. 预上传
   const preUrl = `https://member.bilibili.com/preupload?name=${encodeURIComponent(fileName)}&size=${fileSize}&r=upos&profile=ugcupos/bup&ssl=0&version=2.8.12&upcdn=bda2&build=2081200`;

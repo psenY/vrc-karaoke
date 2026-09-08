@@ -1,0 +1,14 @@
+[
+  {
+    "stage": "MP-NEW",
+    "url": "https://member.bilibili.com/upload/multipart/new",
+    "body": "{\"profile\":\"ugcfx/bup\",\"init_params\":{\"meta_upos_uri\":\"upos://fxmetalf/n260908s3od7l6b5yzu7m20729hcuwke.txt\"},\"name\":\"test_hires.mp4\",\"size\":344710}",
+    "resp": "https://member.bilibili.com/upload/multipart/new"
+  },
+  {
+    "stage": "MP-COMPLETE",
+    "url": "https://member.bilibili.com/upload/multipart/complete",
+    "body": "{\"uri\":\"upos://ugcfxever/n260908s33eksdok26z3jn2vi8ckb814.mp4\",\"upload_token\":\"m1_ppcgWyX/2oJo0uKRVl/J9g_CPLn/tQGEil1cG9zOjBkMjg0ZDdjLTZjMmYtNGU2OC1hODE5LTc0NjRmZDViYzM0ZCoJNDkxNTQ3Mzk3\",\"parts\":[{\"part_number\":1,\"etag\":\"\\\"23cd23da6a539d8dabfdd3feaf28ad72\\\"\"}],\"upload_params\":{\"biz_id\":41688893891,\"profile\":\"ugcfx/bup\"}}",
+    "resp": "https://member.bilibili.com/upload/multipart/complete"
+  }
+]

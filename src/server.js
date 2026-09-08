@@ -153,6 +153,7 @@ function runNext() {
                     title,
                     desc,
                     coverImageUrl: (result.meta && result.meta.coverUrl) || '',
+                    losslessMusic: !!(options.flacAudio),
                     tid: bs.tid,
                     tags: bs.tags,
                     onProgress: makeBiliProgressHandler(upRec),
