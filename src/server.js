@@ -168,12 +168,7 @@ function runNext() {
                 biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
                 // 自动加入合集（add/v3 的 season_id 不生效，需事后补挂；失败仅日志不影响投稿结果）
                 if (bs.seasonId) {
-                  const season = (await bili.listSeasons(cfg.biliCookies).catch(() => [])).find(s => s.id === bs.seasonId);
-                  if (season && season.sectionId) {
-                    await bili.addToSeason(cfg.biliCookies, { bvid: up.bvid, title, seasonId: bs.seasonId, sectionId: season.sectionId })
-                      .then(() => console.log(`[B站合集] 已加入合集 ${season.title}`))
-                      .catch(err => console.error(`[B站合集补挂失败] ${songTitle}:`, err.message));
-                  }
+                  attachToSeasonRetry(bs.seasonId, { bvid: up.bvid, title: songTitle });
                 }
                 t.biliUrl = up.url;
                 t.result = { ...result, biliUrl: up.url, bvid: up.bvid };
@@ -277,6 +272,20 @@ let biliUploads = [];
 let biliUploadSeq = 0;
 try { biliUploads = JSON.parse(fs.readFileSync(BILI_UPLOADS_FILE, 'utf8')); biliUploadSeq = biliUploads.reduce((m, u) => Math.max(m, u.id || 0), 0); } catch (e) {}
 function biliUpSave() { try { fs.writeFileSync(BILI_UPLOADS_FILE, JSON.stringify(biliUploads.slice(0, 50), null, 2)); } catch (e) {} }
+// 合集补挂（含延迟重试）：投稿时审核中 cid 查不到 → 失败后 20 分钟重试一次（过审后 cid 可查）
+function attachToSeasonRetry(seasonId, { bvid, title }, attempt = 1) {
+  bili.listSeasons(readConfig().biliCookies).then(seasons => {
+    const season = (seasons || []).find(s => s.id === seasonId);
+    if (!season || !season.sectionId) { console.error(`[B站合集] 找不到合集 ${seasonId}`); return; }
+    return bili.addToSeason(readConfig().biliCookies, { bvid, title, seasonId, sectionId: season.sectionId })
+      .then(() => console.log(`[B站合集] 已加入合集 ${season.title}: ${bvid}`))
+      .catch(err => {
+        console.error(`[B站合集补挂失败] ${title} 第${attempt}次:`, err.message);
+        if (attempt < 3) setTimeout(() => attachToSeasonRetry(seasonId, { bvid, title }, attempt + 1), 20 * 60 * 1000);
+      });
+  }).catch(err => console.error(`[B站合集] 列表查询失败:`, err.message));
+}
+
 function biliUpNew(title, outPath, rawTitle, quality) {
   const rec = { id: ++biliUploadSeq, title, rawTitle: rawTitle || title, outPath, quality: quality || null, phase: 'preupload', phaseText: '准备中', progress: 0, uploadedMB: 0, totalMB: 0, speed: 0, error: '', bvid: '', url: '', start: Date.now(), end: 0 };
   biliUploads.unshift(rec);
@@ -449,11 +458,7 @@ app.post('/api/bili/retry', requireAuth, async (req, res) => {
     });
     biliUpPatch(rec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });
     if (bs.seasonId) {
-      const season = (await bili.listSeasons(cfg.biliCookies).catch(() => [])).find(s => s.id === bs.seasonId);
-      if (season && season.sectionId) {
-        await bili.addToSeason(cfg.biliCookies, { bvid: up.bvid, title: songTitle, seasonId: bs.seasonId, sectionId: season.sectionId })
-          .catch(err => console.error(`[B站合集补挂失败] ${songTitle}:`, err.message));
-      }
+      attachToSeasonRetry(bs.seasonId, { bvid: up.bvid, title: songTitle });
     }
     console.log(`[B站投稿成功] ${songTitle}: ${up.url}`);
     res.json({ ok: true, url: up.url });
