@@ -237,26 +237,31 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
       throw new Error(`B站 multipart/part 失败(第${c + 1}片): ` + partRes.text.slice(0, 120));
     }
     const putUrl = partJ.data.reqs[0].url;
-    // 单片重试（3 次，1s/3s 退避）：CDN 偶发挂起/失败时快速恢复，不重烧整个上传
-    let putRes = null;
+    // 单片重试（3 次，1s/3s 退避）：CDN 偶发挂起/失败时快速恢复，不重烧整个上传。
+    // ⚠️ PUT 成功但拿不到 ETag 视同失败重传——占位 etag 会让 complete 报 -409 冲突（实测）
+    let etag = '';
+    let lastErr = null;
     for (let retry = 1; retry <= 3; retry++) {
       try {
-        putRes = await request(putUrl, {
+        const putRes = await request(putUrl, {
           method: 'PUT',
           headers: { Cookie: ck, 'Content-Type': 'application/octet-stream' },
           body: data.subarray(start, start + size),
           timeoutMs: 90000,
         });
-        if (putRes.status === 200) break;
+        const raw = (putRes.headers && (putRes.headers['etag'] || '')) || '';
+        if (putRes.status === 200 && raw) {
+          etag = raw.startsWith('"') ? raw : `"${raw.replace(/"/g, '')}"`;
+          break;
+        }
+        lastErr = `HTTP ${putRes.status}${raw ? '' : ' 无ETag'}`;
       } catch (e) {
-        if (retry === 3) throw new Error(`B站分片 PUT 失败(第${c + 1}/${chunks}片，3次重试后): ` + e.message.slice(0, 80));
-        console.log(`[B站] 分片${c + 1} PUT 第${retry}次失败(${e.message.slice(0, 40)})，退避重试...`);
-        await new Promise(r => setTimeout(r, 1000 * (retry * 2 - 1)));
+        lastErr = e.message.slice(0, 60);
       }
+      console.log(`[B站] 分片${c + 1} PUT 第${retry}次失败(${lastErr})，退避重试...`);
+      await new Promise(r => setTimeout(r, 1000 * (retry * 2 - 1)));
     }
-    if (!putRes || putRes.status !== 200) throw new Error(`B站分片 PUT 失败(第${c + 1}/${chunks}片): HTTP ${putRes ? putRes.status : 'none'}`);
-    const rawEtag = (putRes.headers && (putRes.headers['etag'] || '')) || '';
-    const etag = rawEtag ? (rawEtag.startsWith('"') ? rawEtag : `"${rawEtag.replace(/"/g, '')}"`) : `"${c + 1}-0"`;  // 缺 ETag 时用占位（B站部分节点不回传）
+    if (!etag) throw new Error(`B站分片 PUT 失败(第${c + 1}/${chunks}片，3次重试后): ${lastErr || '无ETag'}`);
     parts.push({ part_number: c + 1, etag });
   }
 
@@ -267,9 +272,15 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
     parts: parts.map(p => ({ part_number: p.part_number, etag: p.etag })),
     upload_params: { biz_id: bizId, profile: 'ugcfx/bup' },
   });
-  const cRes = await request(`${MEMBER}/upload/multipart/complete`, { method: 'POST', headers: hdrs, body: completeBody });
-  const cJ = JSON.parse(cRes.text || '{}');
-  if (cJ.code !== 0) throw new Error('B站 multipart/complete 失败: ' + (cJ.message || cRes.text.slice(0, 120)));
+  let cJ = null;
+  for (let cretry = 1; cretry <= 3; cretry++) {
+    const cRes = await request(`${MEMBER}/upload/multipart/complete`, { method: 'POST', headers: hdrs, body: completeBody });
+    cJ = JSON.parse(cRes.text || '{}');
+    if (cJ.code === 0) break;
+    console.log(`[B站] complete 第${cretry}次失败(${cJ.message || cRes.text.slice(0, 40)})${cretry < 3 ? '，退避重试...' : ''}`);
+    if (cretry < 3) await new Promise(r => setTimeout(r, 2000 * cretry));
+  }
+  if (!cJ || cJ.code !== 0) throw new Error('B站 multipart/complete 失败: ' + (cJ && cJ.message || 'unknown'));
   console.log('[B站 multipart] 上传完成 etag=', (cJ.data && cJ.data.etag || '').slice(0, 30));
 
   // 4. 封面
