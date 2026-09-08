@@ -355,7 +355,7 @@ app.get('/api/bili/settings', requireAuth, (req, res) => {
   res.json({ ok: true, settings: getBiliSettings() });
 });
 app.post('/api/bili/settings', requireAuth, (req, res) => {
-  const { titleTpl, descTpl, tags, tid, checkScope } = req.body || {};
+  const { titleTpl, descTpl, tags, tid, checkScope, seasonId } = req.body || {};
   const cfg = readConfig();
   // merge 而非替换：保留未传字段（如 seasonId 由前端 biliSettings 带出，但兼容旧前端）
   cfg.biliSettings = Object.assign({}, cfg.biliSettings, {
@@ -363,6 +363,7 @@ app.post('/api/bili/settings', requireAuth, (req, res) => {
     descTpl: String(descTpl || '').slice(0, 2000),
     tags: String(tags || '卡拉OK,歌词,VRChat').slice(0, 200),
     tid: Number(tid) || (cfg.biliSettings && cfg.biliSettings.tid) || 130,
+    seasonId: Number(seasonId) || (cfg.biliSettings && cfg.biliSettings.seasonId) || 0,
     checkScope: ['off', 'upload', 'generate'].includes(checkScope) ? checkScope : (cfg.biliSettings.checkScope || 'off'),
   });
   writeConfig(cfg);
