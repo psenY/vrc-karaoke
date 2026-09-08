@@ -41,7 +41,7 @@ async function generateVideo(input, options = {}) {
     segCount: segCountIn = 8, // 分段并行数(线程数)
     resolution = '1080p',       // 分辨率
     codec: codecIn = '',        // 编码器（8K 自动切 libx265：体积小10倍+B站8K标准HEVC）
-    preset = 'veryfast',        // 编码预设(速度↔压缩)
+    preset: presetIn = '',      // 编码预设(速度↔压缩)
     crf = 23,                   // 质量(越小越高)
     fps = 24,                   // 帧率
     audioBitrate = 'auto',      // 音频码率（auto=跟随音源质量对齐）
@@ -59,6 +59,7 @@ async function generateVideo(input, options = {}) {
   const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480], '4K': [3840, 2160], '8K': [7680, 4320] };
   const [width, height] = RESOLUTIONS[resolution] || RESOLUTIONS['1080p'];
   const codec = codecIn || (resolution === '8K' ? 'libx265' : 'libx264');
+  const preset = presetIn || (resolution === '8K' ? 'ultrafast' : 'veryfast');
   let segCount = segCountIn;
 
   // 内存保护：4K/8K 每段 x264 内存占用大（8K 单段约 2-4GB），并行段数超限会被系统 OOM 杀掉（ffmpeg exit null）
