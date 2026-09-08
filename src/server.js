@@ -7,7 +7,7 @@ const express = require('express');
 const { platforms } = require('./platforms');
 const { getSongUrl } = require('./core/netease-api');
 const { generateVideo } = require('./generate');
-const { getPlaylist, getQrKey, getQrImg, checkQrLogin, getUserInfo, getLyric } = require('./core/netease-api');
+const { getPlaylist, getQrKey, getQrImg, checkQrLogin, getUserInfo, getUserPlaylists, getLyric } = require('./core/netease-api');
 
 const ROOT = path.join(__dirname, '..');
 const HISTORY_FILE = path.join(ROOT, 'output', 'history.json');
@@ -613,6 +613,18 @@ app.post('/api/trial', async (req, res) => {
 });
 
 // 解析歌单（网易云 playlist 链接）
+/** 列出当前登录网易云账号的歌单（用户免复制链接，直接选） */
+app.get('/api/my/playlists', async (req, res) => {
+  try {
+    const cfg = readConfig();
+    if (!cfg.cookie) return res.json({ ok: false, error: '未登录网易云' });
+    const playlists = await getUserPlaylists(cfg.cookie);
+    res.json({ ok: true, playlists });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 app.post('/api/playlist', async (req, res) => {
   try {
     const { url } = req.body || {};

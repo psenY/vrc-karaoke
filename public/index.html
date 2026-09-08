@@ -361,8 +361,8 @@
   </el-card>
 
   <el-card class="card" shadow="never">
-    <template #header><b>歌单批量生成</b>（网易云歌单链接）</template>
-    <el-row :gutter="8">
+    <template #header><b>歌单批量生成</b>（网易云歌单）</template>
+    <el-row :gutter="8" style="margin-bottom:8px">
       <el-col :xs="24" :sm="16" :md="16">
         <el-input v-model="playlistUrl" placeholder="https://music.163.com/playlist?id=xxx"></el-input>
       </el-col>
@@ -371,6 +371,16 @@
           <el-button @click="parsePlaylist" style="flex:1" :loading="playlistLoading">解析歌单</el-button>
           <el-button type="primary" @click="batchGenerate" v-if="playlistName" style="flex:1">批量生成</el-button>
         </div>
+      </el-col>
+    </el-row>
+    <el-row :gutter="8" v-if="myPlaylists.length">
+      <el-col :xs="24" :sm="16" :md="16">
+        <el-select v-model="selectedMyPlaylist" placeholder="选择我的歌单（免复制链接）" style="width:100%" size="small">
+          <el-option v-for="p in myPlaylists" :key="p.id" :label="p.name + '（' + p.count + '首）'" :value="p.id"></el-option>
+        </el-select>
+      </el-col>
+      <el-col :xs="24" :sm="8" :md="8">
+        <el-button size="small" style="width:100%" @click="parseMyPlaylist" :disabled="!selectedMyPlaylist">解析选中歌单</el-button>
       </el-col>
     </el-row>
     <div v-if="playlistName" style="margin-top:10px">
@@ -676,6 +686,8 @@ createApp({
       playlistName: '',
       playlist: [],
       playlistLoading: false,
+      myPlaylists: [],
+      selectedMyPlaylist: '',
       searchOffset: 0,
       trialId: '',
       trialAudio: null,
@@ -1048,6 +1060,17 @@ createApp({
       if (!r.ok) { this.progressText = ''; this.retryVisible = true; return this.$message.error(r.error); }
       this.poll(r.taskId);
     },
+    async loadMyPlaylists() {
+      try {
+        const r = await this.get('/api/my/playlists');
+        if (r.ok) this.myPlaylists = r.playlists || [];
+      } catch (e) {}
+    },
+    async parseMyPlaylist() {
+      if (!this.selectedMyPlaylist) return;
+      this.playlistUrl = 'https://music.163.com/playlist?id=' + this.selectedMyPlaylist;
+      await this.parsePlaylist();
+    },
     async parsePlaylist() {
       if (!this.playlistUrl.trim()) return this.$message.warning('请输入歌单链接');
       this.playlistLoading = true;
@@ -1063,6 +1086,10 @@ createApp({
           seen.add(k);
           return true;
         }).map(s => ({ ...s, selected: true }));
+        if (!r.songs.length) {
+          this.playlistName = r.name;
+          return this.$message.warning(`歌单「${r.name}」为空或链接已失效——请在网易云网页版复制当前歌单链接，或用下方「我的歌单」选择`);
+        }
         const dup = r.songs.length - this.playlist.length;
         this.$message.success(`歌单 ${r.name} 共 ${r.songs.length} 首${dup ? `（去重 ${dup} 首重复）` : ''}`);
       } finally {
@@ -1153,6 +1180,7 @@ createApp({
           this.notifyDone(`批量完成 ${success} 首`);
         }
         this.loadHistory();
+    this.loadMyPlaylists();
       }
     },
     async poll(taskId) {

@@ -166,4 +166,18 @@ function download(url, destPath, retries = 3, onProgress = null) {
   });
 }
 
-module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, getOuterUrl, getQrKey, getQrImg, checkQrLogin, getUserInfo, download };
+/** 列出账号歌单（先取登录 uid，再查歌单） */
+async function getUserPlaylists(cookie) {
+  const me = await api.login_status({ cookie });
+  const profile = me.body?.data?.profile || me.body?.profile || {};
+  const uid = profile.userId;
+  if (!uid) return [];
+  const res = await api.user_playlist({ uid: String(uid), cookie, limit: 100 });
+  return ((res.body && res.body.playlist) || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    count: p.trackCount || 0,
+  }));
+}
+
+module.exports = { searchSong, getLyric, getSongUrl, getSongDetail, getPlaylist, getOuterUrl, getQrKey, getQrImg, checkQrLogin, getUserInfo, getUserPlaylists, download };
