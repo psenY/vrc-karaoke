@@ -278,22 +278,28 @@ async function listSeasons(cookies) {
  * @returns {Promise<boolean>} true=存在 code 0；false=已删除 code -404/-403；其他错误抛出
  */
 async function checkVideoExists(bvid, cookies = null) {
-  // 权威数据源：创作中心稿件列表（与稿件管理页同源，未公开/审核中的稿件也在列）
-  // view 接口对未公开稿件一律 62002「稿件不可见」，无法与已删除区分，弃用
+  const headers = cookies ? { Cookie: cookieString(cookies) } : {};
+  // 阶段1: view 单查（1 请求）——code 0 = 已公开，确定存在（多数场景一轮结束）
+  const r = await request(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, { headers });
+  let j = {};
+  try { j = JSON.parse(r.text || '{}'); } catch (e) {}
+  if (j.code === 0) return true;  // 已公开
+  // 阶段2: view 非 0（62002 未公开/审核中 或 -404 等）→ 创作中心稿件列表权威判定
+  //        在稿件列表 = 存在（未公开/审核中）；不在 = 已删除
   const ck = cookies ? cookieString(cookies) : '';
   for (let pn = 1; pn <= 2; pn++) {
-    const r = await request(`https://member.bilibili.com/x2/creative/web/archives/sp?pn=${pn}&ps=20&status=all`, {
+    const r2 = await request(`https://member.bilibili.com/x2/creative/web/archives/sp?pn=${pn}&ps=20&status=all`, {
       headers: { Cookie: ck, Referer: 'https://member.bilibili.com/platform/upload/video' },
     });
-    let j = {};
-    try { j = JSON.parse(r.text || '{}'); } catch (e) {}
-    const arcs = (j.data && j.data.arc_audits) || [];
+    let j2 = {};
+    try { j2 = JSON.parse(r2.text || '{}'); } catch (e) {}
+    const arcs = (j2.data && j2.data.arc_audits) || [];
     for (const a of arcs) {
       if ((a.Archive || {}).bvid === bvid) return true;
     }
     if (arcs.length < 20) break;  // 最后一页
   }
-  return false;  // 前 2 页（40 条）未找到视为已删除
+  return false;  // 已删除（前 2 页 40 条未找到）
 }
 
 /**
