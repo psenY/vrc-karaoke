@@ -277,12 +277,15 @@ async function listSeasons(cookies) {
  * 查询B站视频是否仍存在（无需登录的 view 接口）。
  * @returns {Promise<boolean>} true=存在 code 0；false=已删除 code -404/-403；其他错误抛出
  */
-async function checkVideoExists(bvid) {
-  const r = await request(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, {});
+async function checkVideoExists(bvid, cookies = null) {
+  const headers = cookies ? { Cookie: cookieString(cookies) } : {};
+  const r = await request(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, { headers });
   let j = {};
   try { j = JSON.parse(r.text || '{}'); } catch (e) {}
-  if (j.code === 0) return true;
-  if (j.code === -404 || j.code === -403) return false;
+  if (j.code === 0) return true;      // 公开
+  if (j.code === 62002) return true;  // 稿件不可见=存在但未公开（审核中/仅自己可见）
+  if (j.code === -403) return true;   // 同上
+  if (j.code === -404) return false;  // 稿件已删除
   throw new Error('B站查询视频状态失败: ' + (j.message || r.text.slice(0, 80)));
 }
 
