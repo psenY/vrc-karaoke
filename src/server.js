@@ -154,7 +154,7 @@ function runNext() {
                     title,
                     desc,
                     coverImageUrl: (result.meta && result.meta.coverUrl) || '',
-                    losslessMusic: !!(options.flacAudio),
+                    losslessMusic: !!(result.quality && (result.quality.brLabel || '').startsWith('FLAC')),  // 按最终音轨自动判定：无损源自动 Hi-Res 投稿
                     tid: bs.tid,
                     tags: bs.tags,
                     onProgress: makeBiliProgressHandler(upRec),
