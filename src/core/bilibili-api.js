@@ -330,10 +330,11 @@ async function checkVideoExists(bvid, cookies = null) {
 /**
  * 投稿后把视频补挂进合集（add/v3 的 season_id 不生效，必须事后 episodes/add，csrf 放 query）。
  */
-async function addToSeason(cookies, { bvid, aid, cid, title, seasonId, sectionId }) {
-  if (!cid && bvid) {
+async function addToSeason(cookies, { bvid, aid: aidIn, cid: cidIn, title, seasonId, sectionId }) {
+  let aid = aidIn, cid = cidIn;
+  if ((!cid || !aid) && bvid) {
     const v = await request(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, { headers: { Cookie: cookieString(cookies) } });
-    try { cid = JSON.parse(v.text).data.cid; } catch (e) {}
+    try { const d = JSON.parse(v.text).data || {}; cid = cid || d.cid; aid = aid || d.aid; } catch (e) {}
   }
   if (!aid || !cid) throw new Error('无法获取视频 aid/cid，合集补挂失败');
   const q = new URLSearchParams({ csrf: cookies.bili_jct });
