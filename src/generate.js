@@ -56,7 +56,7 @@ async function generateVideo(input, options = {}) {
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;
 
-  const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480] };
+  const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480], '4K': [3840, 2160], '8K': [7680, 4320] };
   const [width, height] = RESOLUTIONS[resolution] || RESOLUTIONS['1080p'];
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
