@@ -330,7 +330,7 @@ async function findBiliDupLive(songTitle) {
     return { skip: false, removed: true };
   }
   try {
-    const exists = await bili.checkVideoExists(bvid);
+    const exists = await bili.checkVideoExists(bvid, cfg.biliCookies);
     setCachedExists(bvid, exists);
     if (exists) return { skip: true, reason: `B站已投过（${bvid}）` };
     removeBiliUrlByBvid(bvid);
