@@ -149,7 +149,7 @@ module.exports = {
     const audioMs = await probeDuration(audioPath);
 
     return {
-      meta: { id: songmid, title, source: 'qqmusic' },
+      meta: { id: songmid, title, artist: (songs[0] && songs[0].artists) || '', source: 'qqmusic' },
       lines,
       audioPath,
       audioMs,

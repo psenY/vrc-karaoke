@@ -120,7 +120,7 @@ module.exports = {
     }
 
     return {
-      meta: { id: musicId, title, source: 'kuwo' },
+      meta: { id: musicId, title, artist: (songs[0] && songs[0].artists) || '', source: 'kuwo' },
       lines,
       audioPath,
       audioMs,

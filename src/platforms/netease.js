@@ -109,7 +109,7 @@ module.exports = {
     }
 
     return {
-      meta: { id: String(id), title, source: 'netease', coverUrl: detail.picUrl || '' },
+      meta: { id: String(id), title, artist: detail.artists || '', source: 'netease', coverUrl: detail.picUrl || '' },
       lines,
       audioPath: audio.path,
       audioMs: audio.durationMs,

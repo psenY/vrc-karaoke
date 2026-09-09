@@ -174,7 +174,8 @@ module.exports = {
     const audioMs = await probeDuration(audioPath);
 
     return {
-      meta: { id: videoId, title: meta.title, source: 'youtube' },
+      meta: { id: videoId, title: meta.title, artist: meta.artists || '', source: 'youtube' },
+      // meta.artists = 频道名（e.channel）
       lines: unifiedLines,
       audioPath,
       audioMs,
