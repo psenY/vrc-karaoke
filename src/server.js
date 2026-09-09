@@ -73,10 +73,19 @@ function friendlyError(msg) {
 
 // 清理完成的旧任务（限制 tasks Map 大小，避免长期运行内存累积）
 function cleanupTasks() {
-  while (tasks.size > 100) {
-    const oldestKey = tasks.keys().next().value;
-    tasks.delete(oldestKey);
+  // 只清理终态任务（done/failed/skipped/cancelled）——绝不动 pending/running：
+  // queue 数组仍引用 pending 任务，误删会让 runNext 的 tasks.get(id) 返回 undefined 冻结队列
+  if (tasks.size <= 100) return;
+  const terminal = [];
+  for (const [k, t] of tasks) {
+    if (t && ['done', 'failed', 'skipped', 'cancelled'].includes(t.status)) terminal.push(k);
   }
+  // 按插入顺序删最老的终态，直到 ≤100
+  let i = 0;
+  while (tasks.size > 100 && i < terminal.length) {
+    tasks.delete(terminal[i++]);
+  }
+  // 极端：若全是 pending/running 仍超限——宁可超限也不删（不冻结队列）
 }
 
 let queuePaused = false;  // 队列暂停（暂停时不启动新任务，正在生成的不打断）
@@ -84,6 +93,7 @@ function runNext() {
   while (!queuePaused && running < MAX_CONCURRENT && queue.length > 0) {
     const { id, input, options } = queue.shift();
     const t = tasks.get(id);
+    if (!t) continue;  // 防御：任务已被清理（不应发生，修复后仅极端情况），跳过不冻结
     t.status = 'running';
     t.progress = 0;
     running++;
