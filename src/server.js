@@ -195,8 +195,8 @@ function runNext() {
                 biliUpPatch(upRec, { phase: 'failed', phaseText: '失败', error: t.biliError, end: Date.now() });
               }
             })();
-            // 串行链尾：下一个投稿等它完成 + 20s 冷却（降低连续投稿频率，防"投稿过于频繁"风控）
-            biliUploadChain = thisUpload.then(() => new Promise(r => setTimeout(r, 20000)));
+            // 串行链尾：下一个投稿等它完成 + 可配置冷却（防 B站 投稿频率风控）
+            biliUploadChain = thisUpload.then(() => new Promise(r => setTimeout(r, (bs.uploadInterval || 60) * 1000)));
           } else {
             t.biliError = '未登录B站，自动上传跳过';
           }
@@ -339,6 +339,7 @@ function getBiliSettings() {
     tid: 130,
     checkScope: 'off',  // off=不查重 upload=上传前查重 generate=生成前查重(编码前跳过)
     uploadCover: true,  // 是否自动上传封面（关掉则用B站默认截帧）
+    uploadInterval: 60,  // 投稿间隔秒（B站对连续投稿有频率风控，biliLive经验建议不设过短）
   }, cfg.biliSettings || {});
 }
 
@@ -384,7 +385,7 @@ app.get('/api/bili/settings', requireAuth, (req, res) => {
   res.json({ ok: true, settings: getBiliSettings() });
 });
 app.post('/api/bili/settings', requireAuth, (req, res) => {
-  const { titleTpl, descTpl, tags, tid, checkScope, seasonId, uploadCover } = req.body || {};
+  const { titleTpl, descTpl, tags, tid, checkScope, seasonId, uploadCover, uploadInterval } = req.body || {};
   const cfg = readConfig();
   // merge 而非替换：保留未传字段（如 seasonId 由前端 biliSettings 带出，但兼容旧前端）
   cfg.biliSettings = Object.assign({}, cfg.biliSettings, {
@@ -394,6 +395,7 @@ app.post('/api/bili/settings', requireAuth, (req, res) => {
     tid: Number(tid) || (cfg.biliSettings && cfg.biliSettings.tid) || 130,
     seasonId: Number(seasonId) || (cfg.biliSettings && cfg.biliSettings.seasonId) || 0,
     uploadCover: typeof uploadCover === 'boolean' ? uploadCover : (cfg.biliSettings && cfg.biliSettings.uploadCover !== false),
+    uploadInterval: Math.min(3600, Math.max(0, Number(uploadInterval) || (cfg.biliSettings && cfg.biliSettings.uploadInterval) || 60)),
     checkScope: ['off', 'upload', 'generate'].includes(checkScope) ? checkScope : (cfg.biliSettings.checkScope || 'off'),
   });
   writeConfig(cfg);
