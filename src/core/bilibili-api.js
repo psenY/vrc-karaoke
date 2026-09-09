@@ -213,9 +213,19 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
     name: fileName,
     size: fileSize,
   });
-  const newRes = await request(`${MEMBER}/upload/multipart/new`, { method: 'POST', headers: hdrs, body: newBody });
-  const newJ = JSON.parse(newRes.text || '{}');
-  if (newJ.code !== 0) throw new Error('B站 multipart/new 失败: ' + (newJ.message || newRes.text.slice(0, 120)));
+  let newJ = null;
+  for (let nt = 1; nt <= 3; nt++) {
+    const newRes = await request(`${MEMBER}/upload/multipart/new`, { method: 'POST', headers: hdrs, body: newBody });
+    newJ = JSON.parse(newRes.text || '{}');
+    if (newJ.code === 0) break;
+    if (/过快|稍作休息|休息一下/.test(newJ.message || '')) {
+      console.log(`[B站] 上传限速(${newJ.message})，等待 ${120 * nt}s 后重试...`);
+      await new Promise(r => setTimeout(r, 120000 * nt));
+      continue;
+    }
+    break;  // 非限速错误直接抛出
+  }
+  if (!newJ || newJ.code !== 0) throw new Error('B站 multipart/new 失败: ' + (newJ && newJ.message || newRes.text.slice(0, 120)));
   const up = newJ.data;
   const bizId = up.biz_id;
   const chunkSize = up.chunk_size || 10485760;  // ⚠️必须用服务端返回的 chunk_size：B站会话按此记录每片，自改小片会导致 complete -409 冲突（实测）

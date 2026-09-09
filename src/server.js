@@ -191,6 +191,7 @@ function runNext() {
                 biliUpPatch(upRec, { phase: 'failed', phaseText: '失败', error: t.biliError, end: Date.now() });
               }
             })();
+            biliUploadChain = thisUpload;  // 串行链尾：下一个投稿等它完成
           } else {
             t.biliError = '未登录B站，自动上传跳过';
           }
