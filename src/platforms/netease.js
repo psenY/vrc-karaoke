@@ -14,14 +14,14 @@ function parseNeteaseUrl(input) {
 
 async function downloadWithVerify(songId, cookie, basePath, expectedMs, maxRetries = 2, level = 'standard') {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const { url } = await getSongUrl(songId, cookie, level);
+    const { url, br, type, level: actualLevel } = await getSongUrl(songId, cookie, level);
     if (!url) throw new Error('未获取到音频地址（可能是会员/无版权歌曲，或当前音质需要 VIP/SVIP 权限）');
     const ext = url.split('?')[0].endsWith('.flac') ? '.flac' : '.mp3';
     const destPath = basePath + ext;
     await download(url, destPath);
     const actualMs = await probeDuration(destPath);
     if (expectedMs <= 0 || actualMs >= expectedMs * 0.95) {
-      return { durationMs: actualMs, path: destPath };
+      return { durationMs: actualMs, path: destPath, actualLevel: actualLevel || '', actualBr: br || 0, actualType: type || '' };
     }
     console.log(`[警告] 第 ${attempt} 次下载不完整(实际 ${(actualMs / 1000).toFixed(1)}s / 完整 ${(expectedMs / 1000).toFixed(1)}s)，重试...`);
   }
@@ -109,7 +109,11 @@ module.exports = {
     }
 
     return {
-      meta: { id: String(id), title, artist: detail.artists || '', source: 'netease', coverUrl: detail.picUrl || '' },
+      meta: {
+        id: String(id), title, artist: detail.artists || '', source: 'netease', coverUrl: detail.picUrl || '',
+        actualLevel: audio.actualLevel || '', actualBr: audio.actualBr || 0, actualType: audio.actualType || '',
+        requestedLevel: audioLevel,
+      },
       lines,
       audioPath: audio.path,
       audioMs: audio.durationMs,

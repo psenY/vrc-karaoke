@@ -148,7 +148,13 @@ async function generateVideo(input, options = {}) {
   let finalIntro = introText;
   // 音质标签/码率（无条件计算：片头信息卡与B站投稿模板共用）
   const qualityLabels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
-  const levelLabel = qualityLabels[audioLevel] || audioLevel;
+  // 音质标签以**实际获取到的音源**为准（请求档位可能被平台降级）
+  const actualLevel = result.meta && result.meta.actualLevel;
+  const levelLabel = actualLevel ? (qualityLabels[actualLevel] || actualLevel) : (qualityLabels[audioLevel] || audioLevel);
+  const requestedLabel = qualityLabels[audioLevel] || audioLevel;
+  if (actualLevel && actualLevel !== audioLevel) {
+    console.log(`[音质] 请求 ${requestedLabel} → 实际 ${levelLabel}（平台按歌曲音源降级）`);
+  }
   // 音频码率：无损封装(FLAC音源)显示 FLAC 音源码率；否则显示 AAC 目标码率
   const brLabel = finalFlac ? `FLAC ${Math.round(srcBitrate / 1000)}k` : `AAC ${finalAudioBitrate}`;
   if (introText === 'AUTO') {
@@ -265,7 +271,7 @@ async function generateVideo(input, options = {}) {
   // 结果附带视频大小/时长（前端结果区显示）
   let fileSize = 0;
   try { fileSize = fs.statSync(outPath).size; } catch (e) {}
-  return { outPath, meta: result.meta, highlight: h, size: fileSize, durationMs: result.audioMs || 0, quality: { levelLabel, brLabel, resolution, fps, preset, crf } };
+  return { outPath, meta: result.meta, highlight: h, size: fileSize, durationMs: result.audioMs || 0, quality: { levelLabel, requestedLabel, brLabel, resolution, fps, preset, crf } };
   } finally {
     cleanupWorkDir(workDir);  // 任何结束方式(成功/失败/取消)都清理中间文件
   }

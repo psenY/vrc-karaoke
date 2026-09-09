@@ -39,6 +39,7 @@ async function getSongUrl(songId, cookie = '', level = 'standard') {
     url: item.url || null,
     br: item.br || 0,
     type: item.type || '',
+    level: item.level || '',   // 实际返回档位（可能低于请求：hires→lossless、dolby→jyeffect）
   };
 }
 
