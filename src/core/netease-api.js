@@ -102,7 +102,12 @@ async function getQrImg(key) {
 async function checkQrLogin(key) {
   const res = await api.login_qr_check({ key });
   const body = res.body || {};
-  return { code: body.code, cookie: body.cookie || '' };
+  // 登录 cookie 在响应头（res.cookie 数组）；body.cookie 在等待扫码阶段只有 NMTID（无效）
+  const fromHeaders = Array.isArray(res.cookie)
+    ? res.cookie.map(c => String(c).split(';')[0]).filter(Boolean).join('; ')
+    : '';
+  const cookie = fromHeaders || body.cookie || '';
+  return { code: body.code, cookie };
 }
 
 /** 用 cookie 获取账号信息（昵称/头像/VIP/等级） */

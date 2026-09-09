@@ -693,7 +693,9 @@ app.get('/api/login/check', async (req, res) => {
     if (!key) return res.json({ ok: false, error: '缺少 key' });
     const r = await checkQrLogin(key);
     if (r.code === 803 && r.cookie) {
-      writeConfig({ cookie: r.cookie });
+      // 必须 merge：直接 writeConfig({cookie}) 会全量覆盖，冲掉 biliCookies/biliSettings/密码
+      writeConfig({ ...readConfig(), cookie: r.cookie });
+      console.log('[网易云扫码] 登录成功，cookie 已保存（' + r.cookie.slice(0, 30) + '...）');
     }
     res.json({ ok: true, code: r.code, cookie: r.cookie });
   } catch (e) {
@@ -714,7 +716,8 @@ app.get('/api/config', async (req, res) => {
 // 配置：保存 cookie
 app.post('/api/config', (req, res) => {
   const { cookie } = req.body || {};
-  writeConfig({ cookie: cookie || '' });
+  // merge 语义：只改 cookie，保留其他配置
+  writeConfig({ ...readConfig(), cookie: cookie || '' });
   res.json({ ok: true, hasCookie: !!cookie });
 });
 
