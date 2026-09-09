@@ -172,7 +172,11 @@ function runNext() {
                 } catch (err) {
                   lastErr = err;
                   console.error(`[B站投稿失败] ${songTitle} 第${attempt}/3次:`, err.message);
-                  if (attempt < 3) await new Promise(r => setTimeout(r, 30000 * attempt));
+                  if (attempt < 3) {
+                    // 限速类错误（投稿过于频繁/上传过快/稍后再试）用长退避 5 分钟×N，其他 30s×N
+                    const limited = /频繁|稍后再试|稍作休息|过快/.test(String(err && err.message || ''));
+                    await new Promise(r => setTimeout(r, (limited ? 300000 : 30000) * attempt));
+                  }
                 }
               }
               t.biliUploading = false;
@@ -191,7 +195,8 @@ function runNext() {
                 biliUpPatch(upRec, { phase: 'failed', phaseText: '失败', error: t.biliError, end: Date.now() });
               }
             })();
-            biliUploadChain = thisUpload;  // 串行链尾：下一个投稿等它完成
+            // 串行链尾：下一个投稿等它完成 + 20s 冷却（降低连续投稿频率，防"投稿过于频繁"风控）
+            biliUploadChain = thisUpload.then(() => new Promise(r => setTimeout(r, 20000)));
           } else {
             t.biliError = '未登录B站，自动上传跳过';
           }
