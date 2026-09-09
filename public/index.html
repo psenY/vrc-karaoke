@@ -812,9 +812,6 @@ createApp({
       }
       return { ids, urls };
     },
-    isGenerated(s) {
-      return this.generatedSet.ids.has(String(s.id)) || (s.url && this.generatedSet.urls.has(s.url));
-    },
     vipLabel() {
       // 网易云 vipType: 0=普通 10=音乐包 11=黑胶VIP 110=黑胶SVIP
       const map = { 0: '普通用户', 10: '音乐包', 11: '黑胶VIP', 110: '黑胶SVIP' };
@@ -847,6 +844,10 @@ createApp({
     },
   },
   methods: {
+    // 已生成标记（歌单/批量项按 id 或 url 匹配历史）——必须是方法（接收参数），不能放 computed
+    isGenerated(s) {
+      return this.generatedSet.ids.has(String(s.id)) || (s.url && this.generatedSet.urls.has(s.url));
+    },
     applyTheme() {
       const isDark = this.theme === 'dark' || (this.theme === 'system' && this.isSystemDark);
       document.documentElement.classList.toggle('dark', isDark);
