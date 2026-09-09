@@ -1186,7 +1186,6 @@ createApp({
           this.notifyDone(`批量完成 ${success} 首`);
         }
         this.loadHistory();
-    this.loadMyPlaylists();
       }
     },
     async poll(taskId) {
@@ -1677,6 +1676,7 @@ createApp({
     });
     // 先确认登录状态，再拉数据（未登录时不发无效请求）
     this.bootstrap();
+    this.loadMyPlaylists();  // 我的歌单下拉（网易云登录后列出）
     try { this.presets = JSON.parse(localStorage.getItem('vrc-presets') || '[]'); } catch (e) {}
   },
   updated() {
