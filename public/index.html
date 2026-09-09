@@ -491,6 +491,11 @@
           <span style="font-size:12px;color:var(--muted)">按历史投稿记录检测同歌，命中跳过</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--muted);width:56px">封面</span>
+          <el-switch v-model="biliSettings.uploadCover" size="small"></el-switch>
+          <span style="font-size:12px;color:var(--muted)">自动上传专辑封面（关闭则用B站默认截帧）</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--muted);width:56px">分区</span>
           <el-select v-model="biliSettings.tid" size="small" style="width:160px">
             <el-option label="音乐·音乐综合" :value="130"></el-option>
@@ -712,7 +717,7 @@ createApp({
       biliQrExpired: false,
       autoBili: false,
       biliUploads: [],
-      biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130, checkScope: "off", seasonId: 0 },
+      biliSettings: { titleTpl: "{歌名} - vrc-karaoke", descTpl: "", tags: "卡拉OK,歌词,VRChat", tid: 130, checkScope: "off", seasonId: 0, uploadCover: true },
       biliSeasons: [],
       localAudio: '',
       localLrc: '',

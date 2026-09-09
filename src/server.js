@@ -153,7 +153,7 @@ function runNext() {
                     fileName: result.outPath.split('/').pop(),
                     title,
                     desc,
-                    coverImageUrl: (result.meta && result.meta.coverUrl) || '',
+                    coverImageUrl: bs.uploadCover === false ? '' : ((result.meta && result.meta.coverUrl) || ''),
                     losslessMusic: !!(result.quality && (result.quality.brLabel || '').startsWith('FLAC')),  // 按最终音轨自动判定：无损源自动 Hi-Res 投稿
                     tid: bs.tid,
                     tags: bs.tags,
@@ -322,6 +322,7 @@ function getBiliSettings() {
     tags: '卡拉OK,歌词,VRChat',
     tid: 130,
     checkScope: 'off',  // off=不查重 upload=上传前查重 generate=生成前查重(编码前跳过)
+    uploadCover: true,  // 是否自动上传封面（关掉则用B站默认截帧）
   }, cfg.biliSettings || {});
 }
 
@@ -367,7 +368,7 @@ app.get('/api/bili/settings', requireAuth, (req, res) => {
   res.json({ ok: true, settings: getBiliSettings() });
 });
 app.post('/api/bili/settings', requireAuth, (req, res) => {
-  const { titleTpl, descTpl, tags, tid, checkScope, seasonId } = req.body || {};
+  const { titleTpl, descTpl, tags, tid, checkScope, seasonId, uploadCover } = req.body || {};
   const cfg = readConfig();
   // merge 而非替换：保留未传字段（如 seasonId 由前端 biliSettings 带出，但兼容旧前端）
   cfg.biliSettings = Object.assign({}, cfg.biliSettings, {
@@ -376,6 +377,7 @@ app.post('/api/bili/settings', requireAuth, (req, res) => {
     tags: String(tags || '卡拉OK,歌词,VRChat').slice(0, 200),
     tid: Number(tid) || (cfg.biliSettings && cfg.biliSettings.tid) || 130,
     seasonId: Number(seasonId) || (cfg.biliSettings && cfg.biliSettings.seasonId) || 0,
+    uploadCover: typeof uploadCover === 'boolean' ? uploadCover : (cfg.biliSettings && cfg.biliSettings.uploadCover !== false),
     checkScope: ['off', 'upload', 'generate'].includes(checkScope) ? checkScope : (cfg.biliSettings.checkScope || 'off'),
   });
   writeConfig(cfg);
