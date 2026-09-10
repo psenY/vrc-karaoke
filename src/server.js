@@ -171,12 +171,14 @@ function runNext() {
                   });
                 } catch (err) {
                   lastErr = err;
+                  const limited = /频繁|稍后再试|稍作休息|过快/.test(String(err && err.message || ''));
                   console.error(`[B站投稿失败] ${songTitle} 第${attempt}/3次:`, err.message);
-                  if (attempt < 3) {
-                    // 限速类错误（投稿过于频繁/上传过快/稍后再试）用长退避 5 分钟×N，其他 30s×N
-                    const limited = /频繁|稍后再试|稍作休息|过快/.test(String(err && err.message || ''));
-                    await new Promise(r => setTimeout(r, (limited ? 300000 : 30000) * attempt));
+                  if (limited) {
+                    // ⚠️B站客服：限频期间不要反复重试——立即停止，不做自动重试
+                    console.error('[B站投稿] 限频，按客服建议停止重试');
+                    break;
                   }
+                  if (attempt < 3) await new Promise(r => setTimeout(r, 30000 * attempt));
                 }
               }
               t.biliUploading = false;

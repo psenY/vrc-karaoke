@@ -213,18 +213,9 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
     name: fileName,
     size: fileSize,
   });
-  let newJ = null;
-  for (let nt = 1; nt <= 3; nt++) {
-    const newRes = await request(`${MEMBER}/upload/multipart/new`, { method: 'POST', headers: hdrs, body: newBody });
-    newJ = JSON.parse(newRes.text || '{}');
-    if (newJ.code === 0) break;
-    if (/过快|稍作休息|休息一下/.test(newJ.message || '')) {
-      console.log(`[B站] 上传限速(${newJ.message})，等待 ${120 * nt}s 后重试...`);
-      await new Promise(r => setTimeout(r, 120000 * nt));
-      continue;
-    }
-    break;  // 非限速错误直接抛出
-  }
+  // ⚠️B站客服：限频期间不要反复重试——multipart/new 限速直接抛出，由上层停止投稿
+  const newRes = await request(`${MEMBER}/upload/multipart/new`, { method: 'POST', headers: hdrs, body: newBody });
+  const newJ = JSON.parse(newRes.text || '{}');
   if (!newJ || newJ.code !== 0) throw new Error('B站 multipart/new 失败: ' + (newJ && newJ.message || newRes.text.slice(0, 120)));
   const up = newJ.data;
   const bizId = up.biz_id;
