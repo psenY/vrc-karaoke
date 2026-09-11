@@ -959,7 +959,8 @@ app.post('/api/output/clean', (req, res) => {
   let removed = 0;
   try {
     for (const f of fs.readdirSync(outputDir)) {
-      if (!f.endsWith('.mp4') || known.has(f)) continue;
+      // 同时清理投稿用的 *_bili.mkv 转封装副本（修复前只删 .mp4，历史遗留的 MKV 永远清不掉）
+      if (!/\.(mp4|mkv)$/i.test(f) || known.has(f)) continue;
       try {
         const st = fs.statSync(path.join(outputDir, f));
         if (now - st.mtimeMs < recentMs) continue;

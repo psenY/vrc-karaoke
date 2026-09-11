@@ -364,7 +364,15 @@ async function uploadVideo(opts) {
   const fileSize = stat.size;
 
   // ===== 统一走 multipart 新端点族（网页端现役流程）：响应带 biz_id=cid（合集补挂必需）+ 音频分析（Hi-Res 生效）=====
-  return await uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies, losslessMusic });
+  try {
+    return await uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, tid, tags, seasonId, coverImageUrl, report, fileSize, cookies, losslessMusic });
+  } finally {
+    // Hi-Res 转封装副本（*_bili.mkv）用完即删。原清理写在下方"已退役"旧流程的末尾，
+    // 被上面的 return 跳过 → 永远不可达，每次投稿都在 output/ 留一份与成片等大的 MKV。
+    if (filePath !== rawFilePath) {
+      try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (e) {}
+    }
+  }
   // 上传域名用 preupload 返回的 endpoint（如 //upos-cs-upcdnbda2.bilivideo.com），旧 acgvideo.com 域名已废弃
   const host = String(preJ.endpoint || '//upos-cs-upcdnbda2.bilivideo.com').replace(/^\/\//, '');
 

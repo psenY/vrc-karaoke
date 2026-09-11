@@ -133,15 +133,21 @@ async function getUserInfo(cookie) {
   }
 }
 
-/** 下载文件到本地，自动跟随重定向 + 网络/DNS 错误自动重试 + 下载进度回调 */
-function download(url, destPath, retries = 3, onProgress = null) {
+/** 下载文件到本地，自动跟随重定向 + 网络/DNS 错误自动重试 + 下载进度回调
+ *  超时保护很关键：CDN 挂起时若不设超时，promise 永不 settle —— 而生成队列是串行的，
+ *  该任务会永久 running、后续任务永久排队，只能重启服务。 */
+function download(url, destPath, retries = 3, onProgress = null, depth = 0) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http;
     const attempt = (n) => {
       const req = mod.get(url, res => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          return download(res.headers.location, destPath, 0, onProgress).then(resolve, reject);
+          if (depth >= 5) return reject(new Error('重定向次数过多'));
+          let next;
+          try { next = new URL(res.headers.location, url).toString(); }
+          catch (e) { return reject(new Error('无效的重定向地址')); }
+          return download(next, destPath, 0, onProgress, depth + 1).then(resolve, reject);
         }
         if (res.statusCode !== 200) {
           res.resume();
@@ -150,14 +156,19 @@ function download(url, destPath, retries = 3, onProgress = null) {
         const total = parseInt(res.headers['content-length'], 10) || 0;
         let downloaded = 0;
         const file = fs.createWriteStream(destPath);
+        const fail = (err) => { try { file.destroy(); } catch (e) {} reject(err); };
         res.on('data', (chunk) => {
           downloaded += chunk.length;
           if (total > 0 && typeof onProgress === 'function') onProgress(Math.min(1, downloaded / total));
         });
+        res.on('error', fail);
+        res.on('aborted', () => fail(new Error('下载中断（连接被对端关闭）')));
         res.pipe(file);
         file.on('finish', () => { file.close(); resolve(); });
-        file.on('error', reject);
+        file.on('error', fail);
       });
+      // 空闲超时：30 秒无数据往来即断开（持续下载不受影响），避免 CDN 挂起时永久 pending
+      req.setTimeout(30000, () => req.destroy(new Error('下载超时（30 秒无数据）')));
       req.on('error', (err) => {
         // 网络/DNS 错误（ENOTFOUND/ECONNRESET 等）→ 自动重试
         if (n > 1) {
