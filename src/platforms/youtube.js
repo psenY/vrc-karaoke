@@ -63,12 +63,26 @@ function parseJson3(jsonText) {
   return lines;
 }
 
+/** 严格解析 YouTube 链接：必须 http(s) 且 host 命中白名单。
+ *  不能只用 /youtube\.com/ 子串判断 —— 那样凡是含 youtube.com 的字符串都算"YouTube 输入"，
+ *  而它会原样作为 argv 传给 yt-dlp，从而命中选项注入：上传一个名为 youtube.com.mp3 的文件
+ *  拿到绝对路径后，input="--config-locations=/app/tmp/uploads/youtube.com.mp3" 就能让 yt-dlp
+ *  加载攻击者写入的配置（含 --exec，实测走 shell=True 执行任意命令）。 */
+const YT_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be']);
+function parseYoutubeUrl(input) {
+  let u;
+  try { u = new URL(String(input || '').trim()); } catch (e) { return null; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+  if (!YT_HOSTS.has(u.hostname.toLowerCase())) return null;
+  return u;
+}
+
 module.exports = {
   id: 'youtube',
   name: 'YouTube',
 
   matches(input) {
-    return /(youtube\.com|youtu\.be)/i.test(input || '');
+    return !!parseYoutubeUrl(input);
   },
 
   // YouTube 搜索（yt-dlp ytsearch，走 mihomo 代理）
@@ -89,6 +103,11 @@ module.exports = {
 
   async fetch(input, options = {}) {
     const workDir = options.workDir;
+
+    // 只接受解析后的规范 URL：绝不把用户原始字符串当 argv 传给 yt-dlp（选项注入面）
+    const parsedUrl = parseYoutubeUrl(input);
+    if (!parsedUrl) throw new Error('不是有效的 YouTube 链接');
+    input = parsedUrl.toString();   // 下游（元信息/下载/字幕）统一走规范化 URL
 
     // 1. 视频元信息
     const infoJson = await runYtdlp(['--dump-single-json', '--no-warnings', '--skip-download', input]);

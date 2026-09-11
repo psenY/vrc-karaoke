@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const tokens = new Map(); // token -> 登录时间戳
 
 const app = express();
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');  // 只信任本机/私网反代传来的 X-Forwarded-For
 app.use(express.json());
 
 // 基础安全响应头（防点击劫持 / MIME 嗅探 / 降低 XSS 影响面）
@@ -251,12 +252,32 @@ function sha256(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex');
 }
 
+// 可信反代来源：仅当 TCP 对端是本机或私网时才采信转发头（公网直连一律用 socket 地址）。
+// 修复前直接用 req.socket.remoteAddress：反代后所有客户端共用一个键 —— 一个攻击者（或自己手误
+// 5 次）就能把所有人锁死 5 分钟；现在反代场景能取到真实客户端 IP，且公网直连无法伪造。
+function isTrustedProxy(addr) {
+  const a = String(addr || '').replace(/^::ffff:/, '');
+  return a === '::1' || /^127\./.test(a) || /^10\./.test(a)
+    || /^192\.168\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
+}
+function clientIp(req) {
+  const sock = String(req.socket.remoteAddress || '');
+  if (!isTrustedProxy(sock)) return sock.replace(/^::ffff:/, '') || 'unknown';
+  const cf = req.headers['cf-connecting-ip'];
+  if (cf) return String(cf).split(',')[0].trim();
+  const xr = req.headers['x-real-ip'];
+  if (xr) return String(xr).split(',')[0].trim();
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return String(xff).split(',')[0].trim();
+  return String(req.ip || sock || 'unknown');
+}
+
 // 登录暴力破解防护：每 IP 连续 5 次失败锁定 5 分钟（公网暴露安全）
 const loginFails = new Map(); // ip -> { count, lockUntil }
 app.post('/api/login', (req, res) => {
   const cfg = readConfig();
   if (!cfg.adminPassword) return res.json({ ok: true, needAuth: false, token: null });
-  const ip = req.socket.remoteAddress || 'unknown';
+  const ip = clientIp(req);
   const now = Date.now();
   const rec = loginFails.get(ip);
   if (rec && rec.lockUntil > now) {
@@ -810,10 +831,18 @@ app.get('/api/history/clear', (req, res) => {
 app.post('/api/history/delete', (req, res) => {
   const { filename } = req.body || {};
   if (!filename) return res.json({ ok: false, error: '缺少文件名' });
+  // 修复路径穿越：原先直接 path.join(ROOT, 'output', filename)，而 path.join 会把 '../..' 归一化，
+  // 已登录者可用 filename="../../../etc/passwd" 删除容器内任意文件（history.json 也能被删）。
+  const safe = path.basename(String(filename));
+  const outDir = path.resolve(ROOT, 'output');
+  const filePath = path.resolve(outDir, safe);
+  if (!filePath.startsWith(outDir + path.sep) || !/\.(mp4|mkv)$/i.test(safe)) {
+    console.error('[安全] 拒绝越界的历史删除请求:', String(filename).slice(0, 120));
+    return res.json({ ok: false, error: '非法文件名' });
+  }
   const h = readHistory();
-  const newH = h.filter(item => item.outPath.split('/').pop() !== filename);
+  const newH = h.filter(item => item.outPath.split('/').pop() !== safe);
   try { fs.writeFileSync(HISTORY_FILE, JSON.stringify(newH, null, 2)); } catch (e) {}
-  const filePath = path.join(ROOT, 'output', filename);
   try { fs.unlinkSync(filePath); } catch (e) {}
   res.json({ ok: true });
 });
