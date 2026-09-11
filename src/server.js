@@ -198,7 +198,7 @@ function runNext() {
               }
             })();
             // 串行链尾：下一个投稿等它完成 + 可配置冷却（防 B站 投稿频率风控）
-            biliUploadChain = thisUpload.then(() => new Promise(r => setTimeout(r, (bs.uploadInterval || 60) * 1000)));
+            biliUploadChain = thisUpload.then(() => new Promise(r => setTimeout(r, (getBiliSettings().uploadInterval || 60) * 1000)));
           } else {
             t.biliError = '未登录B站，自动上传跳过';
           }
@@ -391,9 +391,10 @@ app.post('/api/bili/settings', requireAuth, (req, res) => {
   const cfg = readConfig();
   // merge 而非替换：保留未传字段（如 seasonId 由前端 biliSettings 带出，但兼容旧前端）
   cfg.biliSettings = Object.assign({}, cfg.biliSettings, {
-    titleTpl: String(titleTpl || '{歌名} - vrc-karaoke').slice(0, 160),
-    descTpl: String(descTpl || '').slice(0, 2000),
-    tags: String(tags || '卡拉OK,歌词,VRChat').slice(0, 200),
+    // ⚠️undefined=前端未传（如旧缓存页面保存）→ 保留旧值；显式传空串才算清空
+    titleTpl: titleTpl === undefined ? (cfg.biliSettings && cfg.biliSettings.titleTpl) || '{歌名} - vrc-karaoke' : String(titleTpl || '{歌名} - vrc-karaoke').slice(0, 160),
+    descTpl: descTpl === undefined ? (cfg.biliSettings && cfg.biliSettings.descTpl) || '' : String(descTpl).slice(0, 2000),
+    tags: tags === undefined ? (cfg.biliSettings && cfg.biliSettings.tags) || '卡拉OK,歌词,VRChat' : String(tags || '卡拉OK,歌词,VRChat').slice(0, 200),
     tid: Number(tid) || (cfg.biliSettings && cfg.biliSettings.tid) || 130,
     seasonId: Number(seasonId) || (cfg.biliSettings && cfg.biliSettings.seasonId) || 0,
     uploadCover: typeof uploadCover === 'boolean' ? uploadCover : (cfg.biliSettings && cfg.biliSettings.uploadCover !== false),
@@ -406,6 +407,7 @@ app.post('/api/bili/settings', requireAuth, (req, res) => {
 
 // ---- B站投稿（扫码登录 + 自动上传）----
 const bili = require('./core/bilibili-api');
+let biliUploadChain = Promise.resolve();   // B站投稿串行链（Round 165 移植时定义漏了，致串行失效+thisUpload/bs 报错）
 const neteaseApi = require('./core/netease-api');
 const biliQrKeys = new Map(); // reqKey -> qrcodeKey（简化：单会话直接传 key）
 
@@ -524,6 +526,13 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       if (detail && detail.picUrl) coverUrl = detail.picUrl;
     }
   } catch (e) {}
+  // losslessMusic 探测上传文件的真实音轨（ffprobe）——不依赖历史匹配（匹配失败会导致丢 Hi-Res）
+  let losslessByProbe = false;
+  try {
+    const { spawnSync } = require('child_process');
+    const pr = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', safe]);
+    losslessByProbe = String(pr.stdout || '').trim().startsWith('flac');
+  } catch (e) {}
   const up = await bili.uploadVideo({
       cookies: cfg.biliCookies,
       filePath: safe,
@@ -534,7 +543,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       tags: bs.tags,
       // ⚠️不传 seasonId：与 autoBili 一致（season_id 进 add/v3 会改变 B站转码管线，实测丢 Hi-Res）；合集走投稿后补挂
       coverImageUrl: coverUrl,
-      losslessMusic: !!(q.levelLabel && q.levelLabel !== '标准'),
+      losslessMusic: losslessByProbe,
       onProgress: makeBiliProgressHandler(upRec),
     });
     biliUpPatch(upRec, { phase: 'done', phaseText: '完成', progress: 100, bvid: up.bvid, url: up.url, end: Date.now() });

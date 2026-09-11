@@ -322,6 +322,8 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
     ...(seasonId ? { season_id: seasonId } : {}),
   });
   const wbi = await wbiSign({ t: Date.now(), csrf: cookies.bili_jct });
+  // 临时调试：dump 完整 add/v3 body（定位 push 与 autoBili 的 Hi-Res 差异）
+  try { require('fs').writeFileSync(`/tmp/addbody_${bizId}_${Date.now()}.json`, JSON.stringify({ body: addBody, losslessMusic, filePath }, null, 2)); } catch (e) {}
   const addRes = await request(`${MEMBER}/x/vu/web/add/v3?${wbi._q}&w_rid=${wbi.w_rid}&wts=${wbi.wts}&web_location=333.1024`, {
     method: 'POST',
     headers: { Cookie: ck, 'Content-Type': 'application/json;charset=UTF-8', Referer: 'https://member.bilibili.com/platform/upload/video/frame', Origin: 'https://member.bilibili.com' },
