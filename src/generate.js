@@ -56,17 +56,27 @@ async function generateVideo(input, options = {}) {
     onSpawn = null,            // ffmpeg 进程暴露回调(用于取消)
   } = options;
 
-  const RESOLUTIONS = { '1080p': [1920, 1080], '720p': [1280, 720], '480p': [854, 480], '4K': [3840, 2160], '8K': [7680, 4320] };
+  // 分辨率档位：以像素高度命名（480P/720P/1080P/1440P/2160P/4320P）。
+  // 4K/8K 两个旧值保留为别名，兼容历史配置与命令行参数。
+  const RESOLUTIONS = {
+    '480p': [854, 480], '720p': [1280, 720], '1080p': [1920, 1080], '1440p': [2560, 1440],
+    '2160p': [3840, 2160], '4320p': [7680, 4320],
+    '4K': [3840, 2160], '8K': [7680, 4320],
+  };
   const [width, height] = RESOLUTIONS[resolution] || RESOLUTIONS['1080p'];
-  const codec = codecIn || (resolution === '8K' ? 'libx265' : 'libx264');
-  const preset = presetIn || (resolution === '8K' ? 'ultrafast' : 'veryfast');
+  // 按像素高度判断而非字符串比较：以后再加档位（如 1440p）自动适配，
+  // 不会出现"新增了档位但 HEVC/内存保护没跟上"的漏配。
+  const is8k = height >= 4320;
+  const isUhd = height >= 2160;   // 2160p(4K) / 4320p(8K)
+  const codec = codecIn || (isUhd ? 'libx265' : 'libx264');   // 4K/8K 用 HEVC：体积小、B站 8K 要求 HEVC
+  const preset = presetIn || (isUhd ? 'ultrafast' : 'veryfast');
   let segCount = segCountIn;
 
-  // 内存保护：4K/8K 每段 x264 内存占用大（8K 单段约 2-4GB），并行段数超限会被系统 OOM 杀掉（ffmpeg exit null）
-  const SEG_CAP = { '8K': 4, '4K': 6 };
-  if (SEG_CAP[resolution] && segCount > SEG_CAP[resolution]) {
-    console.log(`[内存保护] ${resolution} 并行分段 ${segCount} → ${SEG_CAP[resolution]}（防 OOM）`);
-    segCount = SEG_CAP[resolution];
+  // 内存保护：UHD 每段内存占用大（8K 单段约 2-4GB），并行段数超限会被系统 OOM 杀掉（ffmpeg exit null）
+  const SEG_CAP = is8k ? 4 : (isUhd ? 6 : 16);
+  if (segCount > SEG_CAP) {
+    console.log(`[内存保护] ${resolution} 并行分段 ${segCount} → ${SEG_CAP}（防 OOM）`);
+    segCount = SEG_CAP;
   }
 
   for (const d of [outDir, workDir, fontDir]) fs.mkdirSync(d, { recursive: true });
@@ -203,7 +213,7 @@ async function generateVideo(input, options = {}) {
       bgGradPath,
       audioMs: result.audioMs,
       width, height, fps, crf, preset, audioBitrate: finalAudioBitrate, codec, flacAudio: finalFlac,
-      threads: resolution === '8K' ? 4 : 0,
+      threads: is8k ? 4 : 0,
       onSpawn,
     }, segCount, (p) => {
       if (typeof onProgress === 'function') onProgress({ phase: 'assemble', segIdx: p.segIdx, progress: p.progress });
