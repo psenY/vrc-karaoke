@@ -148,9 +148,11 @@ async function generateVideo(input, options = {}) {
   let finalIntro = introText;
   // 音质标签/码率（无条件计算：片头信息卡与B站投稿模板共用）
   const qualityLabels = { standard: '标准', higher: '较高', exhigh: '极高', lossless: '无损', hires: '高解析度无损', jyeffect: '高清甄音', dolby: '甄音全景声', sky: '沉浸环绕声', jymaster: '超清母带' };
-  // 音质标签以**实际获取到的音源**为准（请求档位可能被平台降级）
+  // 音质标签以**实际获取到的音源**为准（请求档位可能被平台降级：hires→lossless、dolby→jyeffect）
   const actualLevel = result.meta && result.meta.actualLevel;
-  const levelLabel = actualLevel ? (qualityLabels[actualLevel] || actualLevel) : (qualityLabels[audioLevel] || audioLevel);
+  const levelLabel = actualLevel
+    ? (qualityLabels[actualLevel] || actualLevel)
+    : (qualityLabels[audioLevel] || audioLevel);
   const requestedLabel = qualityLabels[audioLevel] || audioLevel;
   if (actualLevel && actualLevel !== audioLevel) {
     console.log(`[音质] 请求 ${requestedLabel} → 实际 ${levelLabel}（平台按歌曲音源降级）`);
@@ -277,11 +279,11 @@ async function generateVideo(input, options = {}) {
   }
 }
 
-// 清理工作目录中非音频缓存的中间文件（.ass/.jpg/.png/.txt），保留音频缓存(mp3/flac/m4a)供下次复用
+// 清理工作目录中的中间文件（.ass/.jpg/.png/.txt + 分段视频 seg_*.mp4），保留音频缓存(mp3/flac/m4a)供下次复用
 function cleanupWorkDir(workDir) {
   try {
     for (const f of fs.readdirSync(workDir)) {
-      if (/\.(ass|jpg|png|txt)$/i.test(f)) {
+      if (/\.(ass|jpg|png|txt)$/i.test(f) || /^seg_\d+\.(mp4|ass)$/i.test(f)) {
         try { fs.unlinkSync(path.join(workDir, f)); } catch (e) {}
       }
     }
