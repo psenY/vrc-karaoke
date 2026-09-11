@@ -136,7 +136,7 @@ function runNext() {
           const cfg = readConfig();
           if (cfg.biliCookies && cfg.biliCookies.SESSDATA) {
             const songTitle = result.meta.title || '未命名';
-            (async () => {
+            const thisUpload = (async () => {
             // 上传前查重（含在线校验：B站被删则清标记继续投）
             if (getBiliSettings().checkScope !== 'off') {
               const dupInfo = await findBiliDupLive(songTitle);
@@ -406,6 +406,7 @@ app.post('/api/bili/settings', requireAuth, (req, res) => {
 
 // ---- B站投稿（扫码登录 + 自动上传）----
 const bili = require('./core/bilibili-api');
+const neteaseApi = require('./core/netease-api');
 const biliQrKeys = new Map(); // reqKey -> qrcodeKey（简化：单会话直接传 key）
 
 // B站扫码：生成二维码
@@ -514,7 +515,16 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
   const upRec = biliUpNew(renderBiliTpl(bs.titleTpl, vars).slice(0, 80), safe, songTitle, Object.keys(q).length ? q : null);
   try {
-    const up = await bili.uploadVideo({
+    // 封面：投稿必须有 cover 字段（B站无封面走自动截帧管线，Hi-Res 音频分析行为不同）——从网易云按歌曲 id 取
+  let coverUrl = '';
+  try {
+    const sidMatch = String((hist && hist.input) || '').match(/[?&]id=(\d+)/);
+    if (sidMatch) {
+      const detail = await neteaseApi.getSongDetail(sidMatch[1]).catch(() => null);
+      if (detail && detail.picUrl) coverUrl = detail.picUrl;
+    }
+  } catch (e) {}
+  const up = await bili.uploadVideo({
       cookies: cfg.biliCookies,
       filePath: safe,
       fileName: path.basename(safe),
@@ -523,6 +533,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       tid: bs.tid,
       tags: bs.tags,
       seasonId: bs.seasonId || 0,
+      coverImageUrl: coverUrl,
       losslessMusic: !!(q.levelLabel && q.levelLabel !== '标准'),
       onProgress: makeBiliProgressHandler(upRec),
     });
