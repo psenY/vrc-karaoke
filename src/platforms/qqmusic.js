@@ -119,8 +119,10 @@ module.exports = {
     // 1. 解析/搜索歌曲
     let songmid = parseQqUrl(input);
     let title = '';
+    // songs 必须声明在分支之外：下方 meta.artist 引用它（块内 const 会让直链分支抛 ReferenceError）
+    let songs = [];
     if (!songmid) {
-      const songs = await searchSong(input, 1);
+      songs = await searchSong(input, 1);
       if (!songs.length) throw new Error('未找到歌曲: ' + input);
       songmid = songs[0].id;
       title = `${songs[0].name} - ${songs[0].artists}`;
