@@ -51,6 +51,7 @@ let taskSeq = 0;
 const queue = [];
 let running = 0;
 const MAX_CONCURRENT = 1; // 串行(用户要求一首一首来, 单首内部用分段并行吃多核)
+const MAX_QUEUE = 200;    // 入队上限：防队列暂停/堆积时 tasks/queue 单向增长撑爆内存
 
 // 失败错误信息友好化：把技术错误映射成可操作的提示
 function friendlyError(msg) {
@@ -138,6 +139,10 @@ function runNext() {
           if (cfg.biliCookies && cfg.biliCookies.SESSDATA) {
             const songTitle = result.meta.title || '未命名';
             const thisUpload = (async () => {
+            // 修复：原串行链只有赋值、从未被 await —— 多任务同时完成时投稿完全并发，
+            // uploadInterval 冷却形同虚设（B站风控风险）。现在每个投稿先等上一条链
+            // （上一次投稿 + 冷却）结束再开始。
+            await biliUploadChain.catch(() => {});
             // 上传前查重（含在线校验：B站被删则清标记继续投）
             if (getBiliSettings().checkScope !== 'off') {
               const dupInfo = await findBiliDupLive(songTitle);
@@ -237,19 +242,65 @@ function appendHistory(entry) {
 }
 
 // ---- 配置(cookie) ----
+// 配置读写：
+// ① 写用「临时文件 + rename」原子替换——写一半崩溃不会留下半截 JSON；
+// ② 读失败不再静默返回 {}。原实现里 JSON 损坏 → readConfig 返回 {} →
+//    requireAuth 认为"没设密码"直接放行所有请求（fail-open 灾难），且下一次
+//    写入会把 adminPassword/biliCookies 全部抹掉。
+let configBroken = false;
+function configIsBroken() { return configBroken; }
 function readConfig() {
-  try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); }
-  catch (e) { return {}; }
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    configBroken = false;
+    return (cfg && typeof cfg === 'object') ? cfg : {};
+  } catch (e) {
+    if (e && e.code === 'ENOENT') { configBroken = false; return {}; }   // 首次运行，还没有配置文件
+    configBroken = true;
+    console.error('[配置] config.json 读取/解析失败，已进入保护模式（拒绝未认证请求）:', e.message);
+    return {};
+  }
 }
 function writeConfig(cfg) {
   try {
     fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
-  } catch (e) {}
+    const tmp = CONFIG_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2));
+    fs.renameSync(tmp, CONFIG_FILE);   // rename 是原子的
+    configBroken = false;
+    return true;
+  } catch (e) {
+    console.error('[配置] config.json 写入失败:', e.message);
+    return false;
+  }
 }
 
 function sha256(s) {
   return crypto.createHash('sha256').update(String(s)).digest('hex');
+}
+
+// ---------- 口令哈希：scrypt（加盐） ----------
+// 旧版本用无盐单轮 sha256，config.json 一旦泄露即可离线爆破。现改 scrypt；
+// 老格式（64 位 hex）仍可登录，登录成功时自动升级为 scrypt。
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pw), salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+}
+function isLegacyHash(stored) {
+  return !String(stored || '').startsWith('scrypt$');
+}
+function verifyPassword(pw, stored) {
+  const s = String(stored || '');
+  if (s.startsWith('scrypt$')) {
+    const [, salt, hash] = s.split('$');
+    try {
+      const calc = crypto.scryptSync(String(pw), salt, 64).toString('hex');
+      return crypto.timingSafeEqual(Buffer.from(calc, 'hex'), Buffer.from(hash, 'hex'));
+    } catch (e) { return false; }
+  }
+  // 兼容历史格式：无盐 sha256
+  return sha256(pw) === s;
 }
 
 // 可信反代来源：仅当 TCP 对端是本机或私网时才采信转发头（公网直连一律用 socket 地址）。
@@ -276,6 +327,7 @@ function clientIp(req) {
 const loginFails = new Map(); // ip -> { count, lockUntil }
 app.post('/api/login', (req, res) => {
   const cfg = readConfig();
+  if (configIsBroken()) return res.status(500).json({ ok: false, error: '配置文件损坏，请修复或删除 config.json 后重试' });
   if (!cfg.adminPassword) return res.json({ ok: true, needAuth: false, token: null });
   const ip = clientIp(req);
   const now = Date.now();
@@ -285,7 +337,12 @@ app.post('/api/login', (req, res) => {
     return res.json({ ok: false, error: `尝试过于频繁，请 ${waitMin} 分钟后再试` });
   }
   const { password } = req.body || {};
-  if (sha256(password) === cfg.adminPassword) {
+  if (verifyPassword(password, cfg.adminPassword)) {
+    if (isLegacyHash(cfg.adminPassword)) {
+      // 顺带把老格式升级为加盐 scrypt：config.json 即便泄露也无法快速离线爆破
+      writeConfig({ ...cfg, adminPassword: hashPassword(password) });
+      console.log('[安全] 访问密码哈希已从 sha256 升级为 scrypt');
+    }
     loginFails.delete(ip);
     const token = crypto.randomBytes(32).toString('hex');
     tokens.set(token, now);
@@ -601,6 +658,10 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
 const TOKEN_TTL = 24 * 60 * 60 * 1000;
 function requireAuth(req, res, next) {
   const cfg = readConfig();
+  if (configIsBroken()) {
+    // 配置损坏时宁可不服务，也绝不能把"读不到密码"当成"没设密码"放行
+    return res.status(500).json({ ok: false, error: '配置文件损坏，已拒绝访问；请修复或删除 config.json 后重新设置', needAuth: true });
+  }
   if (!cfg.adminPassword) return next();
   const token = req.headers['x-auth-token'] || req.query.token || '';
   const ts = tokens.get(token);
@@ -617,14 +678,18 @@ app.post('/api/set-password', (req, res) => {
   const { password, oldPassword } = req.body || {};
   const cfg = readConfig();
   // 已设置密码时，改密码必须验证原密码
-  if (cfg.adminPassword && sha256(oldPassword || '') !== cfg.adminPassword) {
+  if (cfg.adminPassword && !verifyPassword(oldPassword || '', cfg.adminPassword)) {
     return res.json({ ok: false, error: '原密码错误' });
   }
   if (password) {
-    writeConfig({ ...cfg, adminPassword: sha256(password) });
+    writeConfig({ ...cfg, adminPassword: hashPassword(password) });
+    // 改密后所有旧令牌立即失效（原实现不清 tokens，旧 token 还能用满 24 小时）
+    tokens.clear();
   } else {
+    // 取消密码：同样清掉全部旧令牌
     const { adminPassword, ...rest } = cfg;
     writeConfig(rest);
+    tokens.clear();
   }
   res.json({ ok: true });
 });
@@ -768,9 +833,12 @@ app.post('/api/config', (req, res) => {
 app.post('/api/generate', (req, res) => {
   const { input, highlight, bilingual, background, backgroundBottom, upload, cookie, cover, coverMask, coverMaskLevel, segCount, resolution, codec, preset, crf, fps, audioBitrate, currentColor, nextColor, titleColor, progressColor, introText, audioLevel, flacAudio, subtitleLang, autoBili } = req.body || {};
   if (!input) return res.json({ ok: false, error: '缺少输入' });
+  // 队列上限：cleanupTasks 只清终态且仅在任务结束时跑，队列暂停/堆积时 tasks 会单向增长
+  if (queue.length >= MAX_QUEUE) return res.json({ ok: false, error: `生成队列已满（${MAX_QUEUE} 个），请稍后再试` });
   const taskId = 't' + (++taskSeq);
   const cfg = readConfig();
   const finalCookie = cookie || cfg.cookie || '';
+  cleanupTasks();   // 入队时也顺带清理，避免只有任务结束才会触发
   tasks.set(taskId, { id: taskId, status: 'pending', result: null, error: null, phase: 'download', downloadProgress: 0, procs: [], title: input });
   queue.push({
     id: taskId,
@@ -785,7 +853,7 @@ app.post('/api/generate', (req, res) => {
       coverMask: coverMask !== false,
       coverMaskLevel: Math.min(90, Number(coverMaskLevel) || 30),
       cookie: finalCookie,
-      segCount: Number(segCount) || 8,
+      segCount: Math.min(16, Math.max(1, Math.floor(Number(segCount) || 8))),   // clamp 到 1-16，防"进程风暴"（上万段并发 ffmpeg）
       resolution: resolution || '1080p',
       codec: codec || 'libx264',
       preset: preset || 'veryfast',
@@ -933,19 +1001,28 @@ app.get('/api/stats', (req, res) => {
 
 // 清理 tmp 缓存（释放磁盘，下次生成重新下载）
 app.post('/api/cache/clean', (req, res) => {
+  // 有任务在队列/生成中时直接拒绝：无条件清空 tmp/ 会删掉任务正在使用的音频缓存与中间文件
+  const active = [...tasks.values()].filter(t => t && ['pending', 'running'].includes(t.status)).length;
+  if (active > 0) return res.json({ ok: false, error: `当前有 ${active} 个任务在队列中，请等生成结束后再清理` });
   const tmpDir = path.join(ROOT, 'tmp');
+  const recentMs = 30 * 60 * 1000;   // 双保险：再跳过最近 30 分钟的文件（与 output/clean 一致）
+  const now = Date.now();
   let removed = 0;
   let freed = 0;
+  let skipped = 0;
   try {
     for (const f of fs.readdirSync(tmpDir)) {
       const p = path.join(tmpDir, f);
       try {
         const st = fs.statSync(p);
-        if (st.isFile()) { freed += st.size; fs.unlinkSync(p); removed++; }
+        if (st.isFile()) {
+          if (now - st.mtimeMs < recentMs) { skipped++; continue; }
+          freed += st.size; fs.unlinkSync(p); removed++;
+        }
       } catch (e) {}
     }
   } catch (e) {}
-  res.json({ ok: true, removed, freed });
+  res.json({ ok: true, removed, freed, skipped });
 });
 
 // 清理孤儿文件（output 目录里历史记录没有的 mp4）
