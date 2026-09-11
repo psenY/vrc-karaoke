@@ -532,7 +532,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
       desc: renderBiliTpl(bs.descTpl, vars),
       tid: bs.tid,
       tags: bs.tags,
-      seasonId: bs.seasonId || 0,
+      // ⚠️不传 seasonId：与 autoBili 一致（season_id 进 add/v3 会改变 B站转码管线，实测丢 Hi-Res）；合集走投稿后补挂
       coverImageUrl: coverUrl,
       losslessMusic: !!(q.levelLabel && q.levelLabel !== '标准'),
       onProgress: makeBiliProgressHandler(upRec),
