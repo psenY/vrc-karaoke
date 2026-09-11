@@ -677,6 +677,11 @@ app.use('/output', requireAuth, express.static(path.join(ROOT, 'output')));
 app.post('/api/set-password', (req, res) => {
   const { password, oldPassword } = req.body || {};
   const cfg = readConfig();
+  // 首次设置密码只允许来自本机/私网：否则部署后"尚未设密码"的窗口期内，
+  // 任何能访问到服务的人都能抢先设密，把主人锁在门外。
+  if (!cfg.adminPassword && !isTrustedProxy(String(req.socket.remoteAddress || '')) && process.env.ALLOW_REMOTE_SETUP !== '1') {
+    return res.json({ ok: false, error: '首次设置密码请在本机或局域网内操作（如确需远程设置，请设环境变量 ALLOW_REMOTE_SETUP=1）' });
+  }
   // 已设置密码时，改密码必须验证原密码
   if (cfg.adminPassword && !verifyPassword(oldPassword || '', cfg.adminPassword)) {
     return res.json({ ok: false, error: '原密码错误' });

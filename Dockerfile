@@ -24,6 +24,11 @@ RUN mkdir -p fonts \
 
 RUN mkdir -p output tmp
 
+# 以非 root 运行：应用被攻破时不再直接拿到容器内 root。
+# 容器内文件归 node (uid 1000)，宿主机挂载目录也需 chown 1000:1000 才能写入。
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
 CMD ["node", "src/server.js"]

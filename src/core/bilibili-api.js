@@ -322,8 +322,16 @@ async function uploadVideoMultipartFlow({ ck, filePath, fileName, title, desc, t
     ...(seasonId ? { season_id: seasonId } : {}),
   });
   const wbi = await wbiSign({ t: Date.now(), csrf: cookies.bili_jct });
-  // 临时调试：dump 完整 add/v3 body（定位 push 与 autoBili 的 Hi-Res 差异）
-  try { require('fs').writeFileSync(`/tmp/addbody_${bizId}_${Date.now()}.json`, JSON.stringify({ body: addBody, losslessMusic, filePath }, null, 2)); } catch (e) {}
+  // 调试 dump（定位 push 与 autoBili 的 Hi-Res 差异）：默认关闭，需要时设 DEBUG_BILI_DUMP=1。
+  // 原实现每次投稿都写一份且永不清理（含完整投稿 body 与本地路径），长期运行会堆满 /tmp。
+  if (process.env.DEBUG_BILI_DUMP === '1') {
+    try {
+      const fs2 = require('fs');
+      fs2.writeFileSync(`/tmp/addbody_${bizId}_${Date.now()}.json`, JSON.stringify({ body: addBody, losslessMusic, filePath }, null, 2));
+      const olds = fs2.readdirSync('/tmp').filter(f => f.startsWith('addbody_')).sort();
+      while (olds.length > 10) { try { fs2.unlinkSync('/tmp/' + olds.shift()); } catch (e) {} }
+    } catch (e) {}
+  }
   const addRes = await request(`${MEMBER}/x/vu/web/add/v3?${wbi._q}&w_rid=${wbi.w_rid}&wts=${wbi.wts}&web_location=333.1024`, {
     method: 'POST',
     headers: { Cookie: ck, 'Content-Type': 'application/json;charset=UTF-8', Referer: 'https://member.bilibili.com/platform/upload/video/frame', Origin: 'https://member.bilibili.com' },
