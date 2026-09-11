@@ -3,6 +3,7 @@
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { probeDuration } = require('../core/ffmpeg');
 
 const PROXY = process.env.YTDLP_PROXY || 'http://192.168.100.1:7890';
@@ -92,7 +93,11 @@ module.exports = {
     // 1. 视频元信息
     const infoJson = await runYtdlp(['--dump-single-json', '--no-warnings', '--skip-download', input]);
     const meta = JSON.parse(infoJson);
-    const videoId = meta.id;
+    // meta.id 来自 yt-dlp（generic 提取器会把 URL 末段百分号解码后当 id，可能是 ../../ 路径片段），
+    // 直接拼进 path.join 会越界写 → 白名单化，非法值回退随机 id（generate.js 另有一层统一清洗）
+    const videoId = /^[A-Za-z0-9_-]{1,64}$/.test(String(meta.id || ''))
+      ? String(meta.id)
+      : `yt_${crypto.randomBytes(8).toString('hex')}`;
     const base = path.join(workDir, videoId);
 
     // 2. 下载音频（转 mp3，有缓存则复用）

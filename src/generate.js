@@ -79,6 +79,16 @@ async function generateVideo(input, options = {}) {
     onProgress: (p) => { if (typeof onProgress === 'function') onProgress({ phase: 'download', progress: p }); },
   });
 
+  // 1.2 meta.id 清洗：id 可能由第三方回填（yt-dlp generic 提取器会把 URL 末段百分号解码后当 id，
+  //     形如 ../../../../tmp/x），而它会被用来拼 ass/封面/输出文件名 → 不校验即越界写。
+  //     统一白名单化，非法值换随机 id，全部下游路径自动安全。
+  const rawMetaId = String((result.meta && result.meta.id) || '');
+  const safeMetaId = /^[A-Za-z0-9_-]{1,64}$/.test(rawMetaId) ? rawMetaId : `track_${Date.now().toString(36)}`;
+  if (safeMetaId !== rawMetaId) {
+    console.warn(`[安全] 非法 meta.id 已替换: ${JSON.stringify(rawMetaId).slice(0, 80)} → ${safeMetaId}`);
+  }
+  result.meta = { ...result.meta, id: safeMetaId };
+
   // 1.5 B站查重（可选开关：fetch 完拿到歌名后查历史，命中则中止生成，省下载/编码时间）
   if (typeof options.checkBiliDup === 'function' && result.meta && result.meta.title) {
     const dupInfo = await options.checkBiliDup(result.meta.title);
