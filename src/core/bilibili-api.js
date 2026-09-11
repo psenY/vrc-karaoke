@@ -40,6 +40,33 @@ async function request(url, { method = 'GET', headers = {}, body = null, timeout
  * 从 URL 下载图片并上传到B站图床（投稿封面用）。返回图床 URL。
  * 封面上传接口：POST x/vu/web/cover/up（form: fileUp=@图片, csrf）→ data.url
  */
+/** 把封面裁成 16:9（等比放大到覆盖 1920x1080 后居中裁剪）。
+ *  为什么需要：B站封面按 16:9 展示，而音乐平台封面多是 1:1 方图 ——
+ *  直接传方图会被居中显示、两侧留白（看起来"封面是方的"）；裁成 16:9 才是铺满效果。 */
+function toWideCover(buf) {
+  const { spawn } = require('child_process');
+  const fs = require('fs');
+  const rnd = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  const tmpIn = `/tmp/cover_in_${rnd}.jpg`;
+  const tmpOut = `/tmp/cover_out_${rnd}.jpg`;
+  const cleanup = () => {
+    try { fs.unlinkSync(tmpIn); } catch (e) {}
+    try { fs.unlinkSync(tmpOut); } catch (e) {}
+  };
+  return new Promise((resolve, reject) => {
+    try { fs.writeFileSync(tmpIn, buf); } catch (e) { return reject(e); }
+    const ff = spawn('ffmpeg', ['-y', '-v', 'error', '-i', tmpIn,
+      '-vf', 'scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080',
+      '-q:v', '2', tmpOut]);
+    ff.on('close', code => {
+      if (code !== 0) { cleanup(); return reject(new Error('封面裁剪失败 exit ' + code)); }
+      try { const out = fs.readFileSync(tmpOut); cleanup(); resolve(out); }
+      catch (e) { cleanup(); reject(e); }
+    });
+    ff.on('error', err => { cleanup(); reject(err); });
+  });
+}
+
 async function uploadCoverFromUrl(cookies, imageUrl) {
   // 1. 下载图片（buffer，通用重定向跟随最多 3 次——CDN 可能多级 302）
   const img = await new Promise((resolve, reject) => {
@@ -61,8 +88,13 @@ async function uploadCoverFromUrl(cookies, imageUrl) {
   });
   if (img.status !== 200 || !img.buf.length) throw new Error('封面下载失败 HTTP ' + img.status);
 
+  // 1.5 统一裁成 16:9（铺满）：转换失败就退回原图，不让投稿因封面处理而失败
+  let coverBuf = img.buf;
+  try { coverBuf = await toWideCover(img.buf); }
+  catch (e) { console.log('[B站封面] 16:9 处理失败，改用原图:', e.message.slice(0, 60)); }
+
   // 2. 上传到B站图床（对齐 biliup：form 编码 data:image/jpeg;base64 + csrf，非 multipart）
-  const dataUrl = 'data:image/jpeg;base64,' + img.buf.toString('base64');
+  const dataUrl = 'data:image/jpeg;base64,' + coverBuf.toString('base64');
   const params = new URLSearchParams({ cover: dataUrl, csrf: cookies.bili_jct });
   const formBody = params.toString();
 
