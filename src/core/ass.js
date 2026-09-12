@@ -245,6 +245,9 @@ function generateAss(lines, options = {}) {
       const next = lines[i + 1];
       endMs = next ? (next.startMs ?? next.time) : (audioDurationMs ?? startMs + 5000);
     }
+    // 兜底：单句最长显示 20 秒。LRC 异常（如远距离空时间戳）会把 endMs 拉得很长，
+    // 该句与其"下一句预览"就会常驻画面、与后续歌词叠成一片。
+    if (endMs - startMs > 20000) endMs = startMs + 20000;
     if (endMs <= startMs) continue;
 
     const curText = getLineText(cur);

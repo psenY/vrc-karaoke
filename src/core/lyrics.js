@@ -50,10 +50,17 @@ function parseLrc(lrcText) {
 
     const text = line.replace(/\[[^\]]*\]/g, '').trim();
     if (!text) {
-      // 空歌词行 = 上一句的结束标记（不作为句子显示，仅提供 endMs）
+      // 空歌词行 = 上一句的结束标记。但很多 LRC 会用 [03:04.61] 这类**远距离**的
+      // 纯时间戳标记间奏/段落，若无条件采纳，上一句的 endMs 会被拉到那里、
+      // 导致它在接下来几分钟里一直显示（实测：46.85s 的句子 endMs 被设为 184.61s，
+      // 该句与其"下一句预览"整段常驻，画面同时出现 4 行）。
+      // 因此只在"与上一句间隔在正常句长范围内"时才采纳。
       if (lines.length > 0) {
         const t = parseTimeTag(tags[0][0].slice(1, -1));
-        if (t !== null) lines[lines.length - 1].endMs = t + offset;
+        const prev = lines[lines.length - 1];
+        if (t !== null && t > prev.time && t - prev.time <= 15000) {
+          prev.endMs = t + offset;
+        }
       }
       continue;
     }
