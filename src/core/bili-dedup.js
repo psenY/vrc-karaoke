@@ -50,12 +50,22 @@ function findBiliDup(history, songTitle) {
  */
 function renderBiliTpl(tpl, vars) {
   const v = vars || {};
+  // 日期/时间按北京时间：容器时区是 UTC，直接用 toISOString 会差 8 小时
+  // （北京时间凌晨生成的视频，日期会显示成前一天）
+  const bj = new Date(Date.now() + 8 * 3600 * 1000);
+  const full = String(v.songTitle || '');
+  const artist = String(v.artist || '');
+  // {曲名} = 去掉「 - 歌手」后缀的纯歌名（与平台版对齐）
+  const pure = artist && full.endsWith(' - ' + artist) ? full.slice(0, full.length - artist.length - 3) : full;
   return String(tpl || '')
-    .replace(/\{歌名\}/g, v.songTitle || '')
+    .replace(/\{歌名\}/g, full)
+    .replace(/\{曲名\}/g, pure)
+    .replace(/\{歌手\}/g, artist)
     .replace(/\{音质\}/g, v.levelLabel || '')
     .replace(/\{比特率\}/g, v.brLabel || '')
     .replace(/\{分辨率\}/g, v.resolution || '')
-    .replace(/\{日期\}/g, new Date().toISOString().slice(0, 10));
+    .replace(/\{日期\}/g, bj.toISOString().slice(0, 10))
+    .replace(/\{时间\}/g, bj.toISOString().slice(11, 19));
 }
 
 // bvid 存在性验证缓存（1小时TTL）：同一视频短期内不重复请求B站

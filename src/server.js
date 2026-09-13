@@ -153,7 +153,7 @@ function runNext() {
               }
             }
             const q = result.quality || {};
-            const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || options.resolution || '' };
+            const vars = { songTitle, artist: (result.meta && result.meta.artist) || '', levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || options.resolution || '' };
             const bs = getBiliSettings();
             const title = renderBiliTpl(bs.titleTpl, vars).slice(0, 80);
             const desc = renderBiliTpl(bs.descTpl, vars);
@@ -409,7 +409,7 @@ app.get('/api/bili/uploads', requireAuth, (req, res) => {
 });
 
 // ---- B站投稿模板渲染 ----
-// 变量：{歌名} {音质} {比特率} {分辨率} {日期}
+// 变量：{歌名} {曲名} {歌手} {音质} {比特率} {分辨率} {日期} {时间}（日期/时间为北京时间）
 function getBiliSettings() {
   const cfg = readConfig();
   return Object.assign({
@@ -547,7 +547,7 @@ app.post('/api/bili/retry', requireAuth, async (req, res) => {
   if (!fs.existsSync(safe)) return res.json({ ok: false, error: '视频文件已不存在' });
   const songTitle = rec.rawTitle || rec.title;
   const q = rec.quality || {};
-  const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
+  const vars = { songTitle, artist: (songTitle.match(/ - ([^-]+)$/) || [])[1] || '', levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
   const bs = getBiliSettings();
   try {
     biliUpPatch(rec, { phase: 'preupload', phaseText: '准备中', progress: 0, error: '' });
@@ -592,7 +592,7 @@ app.post('/api/bili/push', requireAuth, async (req, res) => {
   const bs = getBiliSettings();
   const hist = readHistory().find(h => h.outPath === safe);
   const q = (hist && hist.quality) || {};
-  const vars = { songTitle, levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
+  const vars = { songTitle, artist: (songTitle.match(/ - ([^-]+)$/) || [])[1] || '', levelLabel: q.levelLabel || '', brLabel: q.brLabel || '', resolution: q.resolution || '' };
   const upRec = biliUpNew(renderBiliTpl(bs.titleTpl, vars).slice(0, 80), safe, songTitle, Object.keys(q).length ? q : null);
   try {
     // 封面：投稿必须有 cover 字段（B站无封面走自动截帧管线，Hi-Res 音频分析行为不同）——从网易云按歌曲 id 取
