@@ -78,10 +78,33 @@ module.exports = {
     // 3. 音频（音质选择：standard 走 outer/url 免费 + 缓存；高品/无损走 song_url 对应音质）
     const detail = await getSongDetail(id);
     const audioLevel = options.audioLevel || 'standard';
-    const cachedPath = path.join(workDir, String(id) + (audioLevel !== 'standard' ? '_' + audioLevel : '') + '.mp3');
+    // 缓存按「请求档位」命名，实际格式由下载决定（.flac / .mp3），并配一份 .meta.json 记录真实档位。
+    // 命中必须同时满足：①时长匹配 ②meta.actualLevel 与请求档位一致。
+    // —— 只比时长是不够的：cookie 临时失效时会下载到降级音质，若被当作正常缓存留下，
+    //    之后无论怎样重新生成都会命中这个低音质文件、再也拿不回无损（2026-09-13 实际踩到）。
+    const cacheBase = path.join(workDir, String(id) + (audioLevel !== 'standard' ? '_' + audioLevel : ''));
+    const cachedPath = cacheBase + '.mp3';   // standard 档沿用旧命名
     let audio;
-    // 缓存命中：已有完整音频（时长匹配），跳过下载
-    if (fs.existsSync(cachedPath)) {
+    if (audioLevel !== 'standard') {
+      for (const ext of ['.flac', '.mp3']) {
+        const p = cacheBase + ext;
+        if (!fs.existsSync(p)) continue;
+        let meta = null;
+        try { meta = JSON.parse(fs.readFileSync(cacheBase + '.meta.json', 'utf8')); } catch (e) {}
+        const ms = await probeDuration(p).catch(() => 0);
+        const okDuration = detail.dt <= 0 || ms >= detail.dt * 0.95;
+        const okLevel = !!(meta && meta.actualLevel === audioLevel);
+        if (okDuration && okLevel) {
+          audio = { durationMs: ms, path: p, actualLevel: meta.actualLevel, actualBr: meta.br || 0, actualType: meta.type || '' };
+          console.log(`[音源缓存] 命中 ${path.basename(p)}（${meta.actualLevel} ${meta.br || ''}）`);
+          break;
+        }
+        // 无效缓存（降级遗留或档位不符）：直接删掉，避免一直被误用
+        console.log(`[音源缓存] 丢弃无效缓存 ${path.basename(p)}（实际档位 ${meta ? meta.actualLevel : '未知'}，请求 ${audioLevel}）`);
+        try { fs.unlinkSync(p); } catch (e) {}
+        try { fs.unlinkSync(cacheBase + '.meta.json'); } catch (e) {}
+      }
+    } else if (fs.existsSync(cachedPath)) {
       try {
         const cachedMs = await probeDuration(cachedPath);
         if (detail.dt <= 0 || cachedMs >= detail.dt * 0.95) {
@@ -92,7 +115,18 @@ module.exports = {
     if (!audio) {
       if (audioLevel !== 'standard') {
         // 高品(320k)/无损(FLAC)：直接用 song_url 对应音质（需 VIP/SVIP cookie）
-        audio = await downloadWithVerify(id, cookie, path.join(workDir, String(id) + '_' + audioLevel), detail.dt || 0, 2, audioLevel);
+        audio = await downloadWithVerify(id, cookie, cacheBase, detail.dt || 0, 2, audioLevel);
+        // 只有「实际拿到的档位 == 请求档位」才写缓存；降级结果用完即弃，下次会重新尝试下载
+        if (!audio.actualLevel || audio.actualLevel === audioLevel) {
+          try {
+            fs.writeFileSync(cacheBase + '.meta.json', JSON.stringify({
+              actualLevel: audio.actualLevel || '', br: audio.actualBr || 0, type: audio.actualType || '',
+              durationMs: audio.durationMs || 0, cachedAt: Date.now(),
+            }));
+          } catch (e) {}
+        } else {
+          console.log(`[音源缓存] 实际档位 ${audio.actualLevel} 低于请求 ${audioLevel}，不写入缓存（避免低音质文件被固化）`);
+        }
       } else {
         const outerUrl = await getOuterUrl(id);
         if (outerUrl) {
